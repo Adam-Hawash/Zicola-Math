@@ -1,0 +1,12 @@
+.next
+node_modules/
+next-env.d.ts
+tsconfig.tsbuildinfo
+prisma/db/
+.env
+db/
+dev.log
+dev-3300.log
+seed-test.cjs
+dev.log
+*.log

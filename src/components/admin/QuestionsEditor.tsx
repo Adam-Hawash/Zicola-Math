@@ -1,0 +1,758 @@
+'use client'
+
+// FILE: src/components/admin/QuestionsEditor.tsx
+// PURPOSE: Admin dialog to EDIT existing homework/exam questions:
+//   - question text (with live FractionText preview — exactly what students see)
+//   - MCQ: 4 options + which one is correct
+//   - points, model answer (الإجابة النموذجية), accepted answers
+//   - add / remove questions
+// Saved via PUT {apiPath}/{itemId} with { questions: JSON.stringify(list) }.
+// The teacher can fix a question that appeared wrong for a student, then
+// press "إعادة تصحيح بالذكاء" on the result — everything updates in place.
+
+import { useEffect, useMemo, useState } from 'react'
+import { toast } from 'sonner'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
+import { Loader2, Plus, Trash2, Save } from 'lucide-react'
+import { FractionText } from '@/components/FractionText'
+import { WorksheetFigure, WorksheetTableEditor } from '@/components/worksheet/WorksheetParts'
+import { repairCorruptMath } from '@/lib/math-text'
+/* (و46) رفع صورة اختيار من المحرر نفسه — نفس مسار شاشة الاستخراج */
+import { chunkedUpload } from '@/lib/chunked-upload'
+
+export interface EditableQuestion {
+  type: string
+  question: string
+  options: string[]
+  correct: number
+  points: number
+  modelAnswer: string
+  acceptedAnswers: string[]
+  /* (و46) رسومات الاختيارات + رسمة السؤال — كانت بتتمسح عند أي فتح وحفظ
+     من المحرر ده (ده كان سبب «باجي أحفظه ما بيتظهرش برضه») */
+  optionFigures?: any[]
+  figure?: any
+  /* (2026-و55) جدول السؤال + مصدره — كانت بتتمسح هي كمان عند أي حفظ
+     من المحرر (سبب ضياع جداول ورقة العمل). دلوقتي بتتفض + تبقى قابلة
+     للتعديل من المحرر نفسه */
+  table?: any
+  sourcePage?: number
+  srcName?: string
+}
+
+/** (و46) هل السؤال ده اختياراته صور/رسومات؟ — نفس قاعدة question-figures بس من غير
+ *  أي اعتماديات عشان المحرر — السؤال ده مبيتحولش مقالي أبدًا */
+export function editorHasVisualOptions(q: any): boolean {
+  if (!q || typeof q !== 'object' || !Array.isArray(q.optionFigures)) return false
+  return q.optionFigures.some(function (ofg: any) {
+    return ofg && typeof ofg === 'object' && ((typeof ofg.url === 'string' && ofg.url) || ofg.bbox)
+  })
+}
+
+export function parseQuestionsRaw(raw: any): EditableQuestion[] {
+  try {
+    var arr = typeof raw === 'string' ? JSON.parse(raw) : raw
+    if (!Array.isArray(arr)) return []
+    return arr.map(function (q: any) {
+      var isWriting = q.type === 'writing' || q.type === 'essay'
+      /* (و46) رسومات الاختيارات → اختياري دايمًا حتي لو النصوص كلها فاضية/N/A */
+      var hasVisual = editorHasVisualOptions(q)
+      if (hasVisual) isWriting = false
+      var options = Array.isArray(q.options) ? q.options.slice(0, 4) : []
+      while (options.length < 4) options.push('')
+      var allNA = options.length > 0 && options.every(function (o: string) { return !o || o === 'N/A' || o === 'لا يوجد' })
+      if (!isWriting && (!Array.isArray(q.options) || q.options.length === 0 || allNA) && !hasVisual) isWriting = true
+      /* (و46) رسومات الاختيارات ورسمة السؤال بتتفضل زي ما هي (pass-through) */
+      var ofPass: any[] | undefined = undefined
+      if (hasVisual) {
+        ofPass = (q.optionFigures as any[]).slice(0, 4)
+        while (ofPass.length < 4) ofPass.push(null)
+      }
+      var figPass: any = undefined
+      if (q.figure && typeof q.figure === 'object' && (q.figure.url || q.figure.bbox)) figPass = q.figure
+      /* (2026-و55) الجدول + مصدر الصفحة بيتفضوا — ممنوع يضيعوا عند الحفظ */
+      var tablePass: any = undefined
+      if (q.table && typeof q.table === 'object' && Array.isArray(q.table.rows) && q.table.rows.length > 0) tablePass = q.table
+      var sourcePagePass: number | undefined = typeof q.sourcePage === 'number' && q.sourcePage > 0 ? q.sourcePage : undefined
+      var srcNamePass: string | undefined = q.srcName && String(q.srcName).trim() ? String(q.srcName) : undefined
+      // heal JSON-corrupted math ("rac{", control chars) on load —
+      // a simple open+save in this dialog permanently repairs the stored text
+      return {
+        type: isWriting ? 'writing' : 'mcq',
+        question: repairCorruptMath(String(q.question || q.q || '')),
+        options: isWriting ? ['', '', '', ''] : options.map(function (o) { return repairCorruptMath(String(o)) }),
+        correct: typeof q.correct === 'number' ? q.correct : 0,
+        points: typeof q.points === 'number' && q.points > 0 ? q.points : (isWriting ? 5 : 1),
+        modelAnswer: repairCorruptMath(String(q.modelAnswer || q.answer || '')),
+        acceptedAnswers: Array.isArray(q.acceptedAnswers) ? q.acceptedAnswers.map(function (a) { return repairCorruptMath(String(a)) }) : [],
+        optionFigures: ofPass,
+        figure: figPass,
+        table: tablePass,
+        sourcePage: sourcePagePass,
+        srcName: srcNamePass,
+      }
+    })
+  } catch (e) {
+    return []
+  }
+}
+
+interface Props {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  title: string
+  apiPath: string
+  itemId: string
+  initialQuestionsRaw: any
+  onSaved?: () => void
+}
+
+export function QuestionsEditorDialog({ open, onOpenChange, title, apiPath, itemId, initialQuestionsRaw, onSaved }: Props) {
+  const initial = useMemo(() => parseQuestionsRaw(initialQuestionsRaw), [initialQuestionsRaw, open])
+  const [questions, setQuestions] = useState<EditableQuestion[]>(initial)
+  const [saving, setSaving] = useState(false)
+  /* (و50) إصلاح الرسمات الناقصة من ملف أصلي — للاستخراجات القديمة المحفوظة
+     اللي رسماتها placeholders (اللي الطالب مش شايفها) */
+  const [repairing, setRepairing] = useState(false)
+
+  /* (و50) عدد الرسمات الناقصة (bbox من غير url) */
+  const missingFigs = useMemo(function () {
+    var n = 0
+    questions.forEach(function (q) {
+      if (q.figure && q.figure.bbox && !q.figure.url) n++
+      if (Array.isArray(q.optionFigures)) q.optionFigures.forEach(function (of: any) {
+        if (of && of.bbox && !of.url) n++
+      })
+    })
+    return n
+  }, [questions])
+
+  /* (و50) رفع الملف الأصلي → السيرفر يقص كل الرسمات الناقصة → حفظ أوتوماتيك */
+  const repairFiguresFromFile = async function (f: File | null) {
+    if (!f) return
+    if (repairing) return
+    setRepairing(true)
+    try {
+      var fd = new FormData()
+      fd.append('file', f)
+      fd.append('questions', JSON.stringify(questions))
+      var res = await fetch('/api/crop-figures', { method: 'POST', body: fd })
+      var data = await res.json()
+      if (res.ok && data.success && Array.isArray(data.questions)) {
+        var fixedN = data.figuresCrop && data.figuresCrop.cropped ? data.figuresCrop.cropped : 0
+        setQuestions(data.questions)
+        if (fixedN > 0) {
+          toast.success('السيرفر قصّ ' + fixedN + ' رسمة من الملف الأصلي ✓ — بيتحفظ دلوقتي أوتوماتيك…')
+          await saveQuestions(data.questions)
+        } else {
+          toast.error('مقدرتش أقص رسمات من الملف ده — اتأكد إنه نفس ملف المصدر (PDF أو صورة)')
+        }
+      } else {
+        toast.error((data && data.error) || 'فشل إصلاح الرسمات')
+      }
+    } catch (e: any) {
+      toast.error('خطأ في الاتصال: ' + (e.message || ''))
+    }
+    setRepairing(false)
+  }
+
+  useEffect(function () {
+    if (open) {
+      setQuestions(parseQuestionsRaw(initialQuestionsRaw))
+    }
+  }, [open, initialQuestionsRaw])
+
+  const update = function (qi: number, patch: Partial<EditableQuestion>) {
+    setQuestions(function (prev) {
+      var next = prev.slice()
+      next[qi] = Object.assign({}, next[qi], patch)
+      return next
+    })
+  }
+
+  const addQuestion = function (type: 'mcq' | 'writing') {
+    setQuestions(function (prev) {
+      return prev.concat([{
+        type: type,
+        question: '',
+        options: type === 'mcq' ? ['', '', '', ''] : ['', '', '', ''],
+        correct: 0,
+        points: type === 'mcq' ? 1 : 5,
+        modelAnswer: '',
+        acceptedAnswers: [],
+      }])
+    })
+  }
+
+  /* (و46) رفع صورة اختيار من جوه المحرر — optionFigures[i] = { url } */
+  const uploadOptionFigure = async function (qi: number, oi: number, f: File | null) {
+    if (!f) return
+    try {
+      var up = await chunkedUpload(f, 'exam-figures')
+      if (up && up.filePath && /^\/api\/files\//.test(up.filePath)) {
+        setQuestions(function (prev) {
+          return prev.map(function (q, i) {
+            if (i !== qi) return q
+            var ofs = Array.isArray(q.optionFigures) ? q.optionFigures.slice() : ['', '', '', ''].map(function () { return null })
+            while (ofs.length < 4) ofs.push(null)
+            ofs[oi] = { url: up.filePath }
+            return Object.assign({}, q, { optionFigures: ofs, type: q.type === 'writing' ? 'mcq' : q.type })
+          })
+        })
+        toast.success('صورة الاختيار اتضافت — هتظهر للطالب صغيرة جنب حرف الاختيار')
+      } else {
+        toast.error('فشل رفع صورة الاختيار — جرب تاني')
+      }
+    } catch (e) {
+      toast.error('فشل رفع صورة الاختيار — جرب تاني')
+    }
+  }
+
+  /* (و48) رسمة السؤال في المحرر: عرض + رفع + إزالة — عشان المستر يقدر
+     يصلح أسئلة قديمة رسمتها مش ظاهرة (bbox من غير url من استخراج قديم) */
+  const uploadQuestionFigure = async function (qi: number, f: File | null) {
+    if (!f) return
+    try {
+      var up = await chunkedUpload(f, 'exam-figures')
+      if (up && up.filePath && /^\/api\/files\//.test(up.filePath)) {
+        setQuestions(function (prev) {
+          return prev.map(function (q, i) {
+            if (i !== qi) return q
+            return Object.assign({}, q, { figure: { url: up.filePath } })
+          })
+        })
+        toast.success('رسمة السؤال اتضافت — هتظهر للطالب زي الملف')
+      } else {
+        toast.error('فشل رفع الرسمة — جرب تاني')
+      }
+    } catch (e) {
+      toast.error('فشل رفع الرسمة — جرب تاني')
+    }
+  }
+
+  /* (2026-و55) إضافة جدول جديد للسؤال — عشان المستر يعرف يعمل جدول بنفسه
+     ويكتب عناوينه وخلاياه من غير ما يعرف JSON */
+  const addTable = function (qi: number) {
+    setQuestions(function (prev) {
+      return prev.map(function (q, i) {
+        if (i !== qi) return q
+        return Object.assign({}, q, {
+          table: {
+            headers: ['اكس', 'ف(x)'],
+            rows: [
+              [{ t: '', blank: true }, { t: '', blank: true }],
+              [{ t: '', blank: true }, { t: '', blank: true }],
+            ],
+          },
+        })
+      })
+    })
+  }
+
+  const removeQuestionFigure = function (qi: number) {
+    setQuestions(function (prev) {
+      return prev.map(function (q, i) {
+        if (i !== qi) return q
+        return Object.assign({}, q, { figure: undefined })
+      })
+    })
+  }
+
+  /* (و46) إزالة صورة اختيار من المحرر */
+  const removeOptionFigure = function (qi: number, oi: number) {
+    setQuestions(function (prev) {
+      return prev.map(function (q, i) {
+        if (i !== qi) return q
+        var ofs = Array.isArray(q.optionFigures) ? q.optionFigures.slice() : ['', '', '', ''].map(function () { return null })
+        ofs[oi] = null
+        var anyLeft = ofs.some(function (o: any) { return o && (o.url || o.bbox) })
+        return Object.assign({}, q, { optionFigures: anyLeft ? ofs : undefined })
+      })
+    })
+  }
+
+  const removeQuestion = function (qi: number) {
+    setQuestions(function (prev) { return prev.filter(function (_, i) { return i !== qi }) })
+  }
+
+  const save = async function () {
+    await saveQuestions(questions)
+  }
+
+  /* (و50) الحفظ منفصل عشان زرار الإصلاح يعيد استخدامه بقائمة محدثة */
+  const saveQuestions = async function (qs: EditableQuestion[]) {
+    var emptyQ = qs.some(function (q) { return !q.question.trim() })
+    if (emptyQ) { toast.error('فيه سؤال فاضي — اكتب نصه أو احذفه'); return }
+    setSaving(true)
+    try {
+      var payload = qs.map(function (q) {
+        if (q.type === 'writing') {
+          return {
+            type: 'writing',
+            question: q.question,
+            options: [],
+            correct: -1,
+            points: q.points || 5,
+            modelAnswer: q.modelAnswer || '',
+            acceptedAnswers: q.acceptedAnswers.filter(function (a) { return a.trim() }),
+            /* (و46) رسمة السؤال بتتفضل — مكانها مش بيتلمس */
+            figure: q.figure || undefined,
+            /* (2026-و55) الجدول + مصدر الصفحة بيتحفظوا — وممكن المستر يكون عدلهم */
+            table: q.table || undefined,
+            sourcePage: q.sourcePage || undefined,
+            srcName: q.srcName || undefined,
+          }
+        }
+        var base: any = {
+          type: 'mcq',
+          question: q.question,
+          options: q.options.map(function (o) { return o.trim() }),
+          correct: q.correct,
+          points: q.points || 1,
+          modelAnswer: q.modelAnswer || '',
+          figure: q.figure || undefined,
+          /* (2026-و55) الجدول + مصدر الصفحة بيحفظوا حتى لأسئلة الاختيارات */
+          table: q.table || undefined,
+          sourcePage: q.sourcePage || undefined,
+          srcName: q.srcName || undefined,
+        }
+        /* (و46) رسومات الاختيارات بتتفضل في الحفظ — دايمًا بمحاذاة الاختيارات */
+        if (Array.isArray(q.optionFigures) && q.optionFigures.some(function (o: any) { return o && (o.url || o.bbox) })) {
+          base.optionFigures = q.optionFigures
+        }
+        return base
+      })
+      var res = await fetch(apiPath + '/' + itemId, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questions: JSON.stringify(payload) }),
+      })
+      if (res.ok) {
+        toast.success('تم حفظ الأسئلة ✓ — افتح نتيجة أي طالب ودوس "إعادة تصحيح بالذكاء" عشان الدرجات تتحدث')
+        onOpenChange(false)
+        if (onSaved) onSaved()
+      } else {
+        var d: any = {}
+        try { d = await res.json() } catch (e) {}
+        toast.error(d.error || 'خطأ في الحفظ', { duration: 8000 })
+      }
+    } catch (err: any) {
+      toast.error('خطأ في الاتصال: ' + (err.message || ''), { duration: 8000 })
+    }
+    setSaving(false)
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto custom-scrollbar">
+        <DialogHeader>
+          <DialogTitle className="text-base">✏️ تعديل الأسئلة — {title}</DialogTitle>
+          <p className="text-xs text-muted-foreground">
+            عدّل نص السؤال أو الإجابة الصحيحة أو الإجابة النموذجية. بعد الحفظ، اعمل "إعادة تصحيح بالذكاء" لنتيجة أي طالب عشان يتصحح تاني بالتعديلات الجديدة.
+          </p>
+          {/* (و50) إصلاح الرسمات الناقصة من الملف الأصلي — للاستخراجات القديمة
+             اللي رسماتها placeholders والطالب مش شايفها */}
+          {missingFigs > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-violet-300 dark:border-violet-700 bg-violet-50/60 dark:bg-violet-950/20 px-2 py-1.5">
+              <span className="text-[11px] font-bold text-violet-600 dark:text-violet-400">📐 فيه {missingFigs} رسمة ناقصة (بتظهر للطالب فاضية) — افتح ملف الـ PDF الأصلي نفسه والسيرفر يقصهم ويحفظهم أوتوماتيك:</span>
+              <label className="inline-flex items-center gap-1 cursor-pointer text-[11px] font-bold text-white bg-violet-600 hover:bg-violet-700 rounded-md px-2 py-1 transition-colors">
+                {repairing ? 'بيقص ويحفظ…' : '📁 اختار الملف الأصلي'}
+                <input type="file" accept="application/pdf,image/*" hidden disabled={repairing} onChange={function (e) { var f = e.target.files && e.target.files[0]; e.target.value = ''; repairFiguresFromFile(f) }} />
+              </label>
+            </div>
+          )}
+        </DialogHeader>
+
+        <div className="space-y-3">
+          {questions.map(function (q, qi) {
+            var isWriting = q.type === 'writing'
+            return (
+              <div key={qi} className="border rounded-lg p-3 space-y-2 bg-card">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className={'text-[10px] ' + (isWriting ? 'border-amber-500/40 text-amber-600' : 'border-emerald-500/40 text-emerald-600')}>
+                      {isWriting ? 'مقالي' : 'اختياري'}
+                    </Badge>
+                    <span className="text-xs font-semibold text-muted-foreground">سؤال {qi + 1}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-destructive"
+                      title="حذف السؤال"
+                      onClick={function () { removeQuestion(qi) }}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+
+                <Textarea
+                  value={q.question}
+                  onChange={function (e) { update(qi, { question: e.target.value }) }}
+                  rows={2}
+                  className="text-sm"
+                  placeholder="نص السؤال… (يدعم الكسور \\frac{أ}{ب} والأسوس x^2)"
+                />
+
+                {/* المعاينة الحية — ظاهرة على طول (زي ما الطالب هيشوفها بالظبط) */}
+                {q.question.trim() && (
+                  <div className="rounded-md border border-primary/25 bg-primary/5 p-2.5 text-sm" dir="ltr" style={{ textAlign: 'left' }}>
+                    <p className="text-[9px] font-bold text-muted-foreground mb-1" dir="rtl" style={{ textAlign: 'right' }}>👁️ المعاينة (زي ما الطالب هيشوفها):</p>
+                    <FractionText text={q.question} />
+                    {!isWriting && q.options.some(function (o) { return o.trim() }) && (
+                      <div className="mt-2 space-y-1">
+                        {q.options.map(function (o, oi) {
+                          if (!o.trim()) return null
+                          return (
+                            <p key={oi} className={'text-xs ' + (oi === q.correct ? 'text-emerald-600 font-bold' : '')}>
+                              {String.fromCharCode(65 + oi)}. <FractionText text={o} /> {oi === q.correct ? '✓' : ''}
+                            </p>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* (و48) رسمة السؤال: الصورة الحقيقية لو متوفرة، placeholder لو ناقصة
+                     + زرار رفع/إزالة — المستر يقدر يصلح أي رسمة ناقصة من هنا */}
+                {(q.figure && (q.figure.url || q.figure.bbox)) ? (
+                  <div className="rounded-md border border-violet-500/25 bg-violet-500/5 p-2">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <p className="text-[9px] font-bold text-muted-foreground" dir="rtl" style={{ textAlign: 'right' }}>📐 رسمة السؤال:</p>
+                      <div className="flex items-center gap-2">
+                        <label className="text-[9px] font-bold text-primary cursor-pointer hover:underline">
+                          📷 استبدال
+                          <input type="file" accept="image/*" hidden onChange={function (e) { var f = e.target.files && e.target.files[0]; e.target.value = ''; uploadQuestionFigure(qi, f) }} />
+                        </label>
+                        <button type="button" onClick={function () { removeQuestionFigure(qi) }} className="text-[9px] text-destructive hover:underline">✕ إزالة</button>
+                      </div>
+                    </div>
+                    <WorksheetFigure figure={q.figure} className="mt-0" />
+                  </div>
+                ) : (
+                  <label className="text-[9px] font-bold text-muted-foreground cursor-pointer hover:text-foreground">
+                    📷 رفع رسمة للسؤال (اختياري)
+                    <input type="file" accept="image/*" hidden onChange={function (e) { var f = e.target.files && e.target.files[0]; e.target.value = ''; uploadQuestionFigure(qi, f) }} />
+                  </label>
+                )}
+
+                {/* (2026-و55) محرر الجدول — المستر يعدل العناوين والخلايا، يمسح،
+                    يكتب، ويحدد أنهي خانات الطالب يكتبها (👤) وأنها ظاهرة زي ما هي (📄).
+                    لو مفيش جدول — زرار إضافة جدول جديد */}
+                {q.table ? (
+                  <div className="rounded-md border border-sky-500/25 bg-sky-500/5 p-2">
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <p className="text-[9px] font-bold text-muted-foreground">📋 جدول السؤال:</p>
+                      <button type="button" onClick={function () { update(qi, { table: undefined }) }} className="text-[9px] text-destructive hover:underline">✕ حذف الجدول</button>
+                    </div>
+                    <WorksheetTableEditor table={q.table} onChange={function (t: any) { update(qi, { table: t }) }} />
+                  </div>
+                ) : (
+                  <button type="button" onClick={function () { addTable(qi) }} className="text-[10px] font-bold text-sky-600 dark:text-sky-400 border border-sky-400/40 rounded-md px-2 py-1 hover:bg-sky-500/10">
+                    ＋ إضافة جدول للسؤال
+                  </button>
+                )}
+
+                {!isWriting && (
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {q.options.map(function (opt, oi) {
+                      /* (و46) صورة الاختيار بتظهر هنا (صغيرة) — والزرار 📷 يرفعها لو ناقصة */
+                      var ofImg = q.optionFigures && q.optionFigures[oi]
+                      return (
+                        <div key={oi} className="space-y-1">
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="radio"
+                              name={'correct-' + itemId + '-' + qi}
+                              checked={q.correct === oi}
+                              onChange={function () { update(qi, { correct: oi }) }}
+                              className="accent-emerald-600"
+                              title="الإجابة الصحيحة"
+                            />
+                            <Input
+                              value={opt}
+                              onChange={function (e) {
+                                var newOpts = q.options.slice()
+                                newOpts[oi] = e.target.value
+                                update(qi, { options: newOpts })
+                              }}
+                              className="h-8 text-xs"
+                              placeholder={'اختيار ' + String.fromCharCode(65 + oi)}
+                            />
+                            <label
+                              title="رفع صورة للاختيار (اختياري — لما الاختيار نفسه رسمة)"
+                              className="shrink-0 h-8 px-1.5 inline-flex items-center justify-center rounded-md border border-border text-[11px] cursor-pointer transition-colors hover:bg-muted"
+                            >
+                              📷
+                              <input type="file" accept="image/*" hidden onChange={function (e) { var f = e.target.files && e.target.files[0]; e.target.value = ''; uploadOptionFigure(qi, oi, f) }} />
+                            </label>
+                          </div>
+                          {ofImg && ofImg.url && (
+                            <span className="relative inline-flex pr-6">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={ofImg.url} alt={'صورة الاختيار ' + String.fromCharCode(65 + oi)} className="h-10 rounded border border-border bg-white object-contain" />
+                              <button type="button" title="إزالة صورة الاختيار" onClick={function () { removeOptionFigure(qi, oi) }} className="absolute top-0 right-0 h-4 w-4 rounded-full bg-destructive text-white text-[9px] leading-none flex items-center justify-center">✕</button>
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex items-center gap-1.5">
+                    <Label className="text-[11px] text-muted-foreground whitespace-nowrap">الدرجة</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={q.points}
+                      onChange={function (e) { update(qi, { points: Math.max(1, parseInt(e.target.value) || 1) }) }}
+                      className="h-8 w-16 text-xs"
+                    />
+                  </div>
+                  {!isWriting && (
+                    <span className="text-[11px] text-emerald-600">
+                      الصحيح: {String.fromCharCode(65 + (q.correct || 0))}
+                    </span>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground">الإجابة النموذجية {isWriting ? '(بيتصحح بيها الذكاء الاصطناعي)' : '(اختياري)'}</Label>
+                  <Textarea
+                    value={q.modelAnswer}
+                    onChange={function (e) { update(qi, { modelAnswer: e.target.value }) }}
+                    rows={2}
+                    className="text-xs"
+                    placeholder="خطوات الحل والإجابة النهائية… (الذكاء يقبل أي صيغة مساوية رياضياً)"
+                  />
+                  {/* معاينة الإجابة النموذجية — منسّقة زي ما بتتعرض للطالب */}
+                  {q.modelAnswer.trim() && (
+                    <div className="rounded-md border border-emerald-500/25 bg-emerald-500/5 p-2" dir="ltr" style={{ textAlign: 'left' }}>
+                      <p className="text-[9px] font-bold text-muted-foreground mb-1" dir="rtl" style={{ textAlign: 'right' }}>👁️ معاينة الإجابة النموذجية:</p>
+                      <FractionText text={q.modelAnswer} />
+                    </div>
+                  )}
+                </div>
+
+                {isWriting && (
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-muted-foreground">إجابات مقبولة (افصل بينهم بفاصلة ،)</Label>
+                    <Input
+                      value={q.acceptedAnswers.join(' ، ')}
+                      onChange={function (e) {
+                        var parts = e.target.value.split(/،|,/)
+                        update(qi, { acceptedAnswers: parts.map(function (p) { return p.trim() }) })
+                      }}
+                      className="h-8 text-xs"
+                      placeholder="مثال: 16 ، x=16 ، 2^4"
+                    />
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={function () { addQuestion('mcq') }}>
+            <Plus className="h-3.5 w-3.5 ml-1" /> سؤال اختياري
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={function () { addQuestion('writing') }}>
+            <Plus className="h-3.5 w-3.5 ml-1" /> سؤال مقالي
+          </Button>
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={function () { onOpenChange(false) }}>إلغاء</Button>
+          <Button type="button" onClick={save} disabled={saving}>
+            {saving ? <Loader2 className="h-4 w-4 ml-1 animate-spin" /> : <Save className="h-4 w-4 ml-1" />}
+            حفظ الأسئلة
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/* Small round edit button used in list rows */
+export function EditQuestionsButton({ onClick, label }: { onClick: () => void; label?: string }) {
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      className="h-8 px-2.5 text-[11px] border-primary/40 text-primary hover:bg-primary/10 shrink-0"
+      onClick={onClick}
+      title="تعديل الأسئلة (النص / الاختيارات / الإجابة الصحيحة / النموذجية)"
+    >
+      ✏️ {label || 'تعديل الأسئلة'}
+    </Button>
+  )
+}
+
+/*
+ * RegradeButton — admin "إعادة تصحيح بالذكاء" for ONE existing result.
+ * kind: 'homework' → POST /api/homework/regrade   |  'exam' → POST /api/exams/regrade
+ * Re-grades writing answers with the smart grader + re-scores MCQ against the
+ * CURRENT questions, then calls onDone() so the parent reloads fresh numbers.
+ */
+export function OverrideButton({ kind, resultId, qIndex, isCorrect, onDone }: {
+  kind: 'homework' | 'exam'
+  resultId: string
+  qIndex: number
+  isCorrect: boolean
+  onDone?: () => void
+}) {
+  const [busy, setBusy] = useState(false)
+
+  const flip = async function () {
+    if (busy) return
+    setBusy(true)
+    try {
+      var res = await fetch('/api/grading/override', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: kind, resultId: resultId, qIndex: qIndex, isCorrect: !isCorrect }),
+      })
+      var d: any = {}
+      try { d = await res.json() } catch (e) {}
+      if (res.ok && d.success) {
+        toast.success('حالة السؤال بقت: ' + (!isCorrect ? 'صح ✓' : 'غلط ✗') + ' — الدرجة: ' + d.score + ' / ' + d.maxScore, { duration: 5000 })
+        if (onDone) onDone()
+      } else {
+        toast.error(d.error || 'فشل تغيير الحالة — جرب تاني', { duration: 8000 })
+      }
+    } catch (err: any) {
+      toast.error('خطأ في الاتصال: ' + (err.message || ''), { duration: 8000 })
+    }
+    setBusy(false)
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={flip}
+      disabled={busy}
+      title="غيّر حالة السؤال ده يدوياً (صح ↔ غلط) — درجة الطالب بتتحدث فوراً وكلمة المستر هي اللي بتتحسب"
+      className={
+        'shrink-0 inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[9px] font-bold border transition-colors disabled:opacity-50 ' +
+        (isCorrect
+          ? 'border-red-400/60 text-red-600 hover:bg-red-500/10 dark:text-red-400'
+          : 'border-emerald-400/60 text-emerald-600 hover:bg-emerald-500/10 dark:text-emerald-400')
+      }
+    >
+      {busy ? '…' : !isCorrect ? '✔ خلّيه صح' : '✖ خلّيه غلط'}
+    </button>
+  )
+}
+
+export function RegradeButton({ kind, resultId, onDone }: { kind: 'homework' | 'exam'; resultId: string; onDone?: () => void }) {
+  const [busy, setBusy] = useState(false)
+
+  const regrade = async function () {
+    if (busy) return
+    setBusy(true)
+    try {
+      var res = await fetch('/api/' + (kind === 'homework' ? 'homework' : 'exams') + '/regrade', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resultId: resultId }),
+      })
+      var d: any = {}
+      try { d = await res.json() } catch (e) {}
+      if (res.ok && d.success) {
+        toast.success('اتصحح بالذكاء: ' + d.score + ' / ' + d.maxScore + ' ✓', { duration: 5000 })
+        if (onDone) onDone()
+      } else {
+        toast.error(d.error || 'فشل إعادة التصحيح — جرب تاني', { duration: 8000 })
+      }
+    } catch (err: any) {
+      toast.error('خطأ في الاتصال: ' + (err.message || ''), { duration: 8000 })
+    }
+    setBusy(false)
+  }
+
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      className="h-7 px-2 text-[10px] border-purple-500/40 text-purple-600 hover:bg-purple-500/10 shrink-0"
+      onClick={regrade}
+      disabled={busy}
+      title="إعادة تصحيح النتيجة دي بالذكاء الاصطناعي (من غير ما الطالب يعيد) — بيقبل أي صيغة مساوية رياضياً للإجابة النموذجية"
+    >
+      {busy ? <Loader2 className="h-3 w-3 ml-1 animate-spin" /> : '🧠'}
+      {busy ? 'بيصحح…' : 'إعادة تصحيح بالذكاء'}
+    </Button>
+  )
+}
+
+/*
+ * RegradeAllButton (و24) — «إعادة تصحيح الكل بالذكاء الاصطناعي» لكل تسليمات
+ * واجب/امتحان واحد. المستر لما يلاقي واجب طلعت نتايجه كلها غلط (تسليمات قديمة
+ * متخزنة بالكود القديم) يعملها كلها بزرار واحد — بيصحح دفعة دفعة لحد ما تخلص.
+ * kind: 'homework' → /api/homework/regrade-all { homeworkId }
+ *       'exam'     → /api/exams/regrade-all   { examId }
+ */
+export function RegradeAllButton({ kind, targetId, onDone }: { kind: 'homework' | 'exam'; targetId: string; onDone?: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const [progress, setProgress] = useState('')
+
+  const regradeAll = async function () {
+    if (busy) return
+    var label = kind === 'homework' ? 'الواجب' : 'الامتحان'
+    if (!window.confirm('هيعيد تصحيح كل تسليمات ' + label + ' ده بالذكاء الاصطناعي (كل الطلاب) — الدرجات تتحدث بالكامل. تكمل؟')) return
+    setBusy(true)
+    try {
+      var done = 0
+      var remaining = 1
+      var guard = 0
+      while (remaining > 0 && guard < 60) {
+        guard++
+        var res = await fetch('/api/' + (kind === 'homework' ? 'homework' : 'exams') + '/regrade-all', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(kind === 'homework' ? { homeworkId: targetId } : { examId: targetId }),
+        })
+        var d: any = {}
+        try { d = await res.json() } catch (e) {}
+        if (!res.ok || !d.success) {
+          toast.error(d.error || 'فشل إعادة التصحيح الجماعي — جرب تاني', { duration: 8000 })
+          break
+        }
+        done = (d.total || 0) - (d.remaining || 0)
+        remaining = d.remaining || 0
+        setProgress(done + ' / ' + (d.total || 0))
+        if (remaining > 0) await new Promise(function (r) { setTimeout(r, 800) })
+      }
+      toast.success('اتصحح ' + done + ' تسليم بالذكاء الاصطناعي ✓', { duration: 5000 })
+      if (onDone) onDone()
+    } catch (err: any) {
+      toast.error('خطأ في الاتصال: ' + (err.message || ''), { duration: 8000 })
+    }
+    setBusy(false)
+    setProgress('')
+  }
+
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      className="h-7 px-2 text-[10px] border-violet-500/40 text-violet-600 hover:bg-violet-500/10 shrink-0"
+      onClick={regradeAll}
+      disabled={busy}
+      title="إعادة تصحيح كل تسليمات الطلاب لهذا الواجب/الامتحان بالذكاء الاصطناعي — لنتايج قديمة طلعت غلط"
+    >
+      {busy ? <Loader2 className="h-3 w-3 ml-1 animate-spin" /> : '🔁'}
+      {busy ? ('بيصحح الكل… ' + (progress || '')) : 'إعادة تصحيح الكل بالذكاء'}
+    </Button>
+  )
+}

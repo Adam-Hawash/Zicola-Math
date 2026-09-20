@@ -1,0 +1,397 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String   @default("Admin")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Student {
+  id           String            @id @default(cuid())
+  name         String
+  phone        String            @unique
+  password     String            @default("")
+  grade        String
+  status       String            @default("pending")
+  parentName   String            @default("")
+  parentPhone  String            @default("")
+  loginCount   Int               @default(0)
+  lastLogin    DateTime?
+  isPaidAccess Boolean           @default(false)
+  // ربط الجهاز: الطالب بيسجل دخول من جهازه بس — المستر يقدر يسمح بكل الأجهزة
+  // deviceId = هوية فريدة عشوائية (dev_) — عمود عادي بيتحدث (تشخيص/سجل)
+  // deviceFp = بصمة "ناتج الجهاز" (dv3_) احتياطي لو بيانات المتصفح اتمسحت
+  // creationDeviceId/creationDeviceFp = جهاز إنشاء الحساب — **ثابت لا يتغير أبدًا**
+  //   بيتكتبوا مرة واحدة وقت التسجيل فقط، والدخول بيتحقق ضدهم حصريًا.
+  //   ده اللي بيمنع أي إعادة ربط بالغلط على جهاز غريب.
+  deviceId          String  @default("")
+  deviceFp          String  @default("")
+  deviceTraits      String  @default("")
+  creationDeviceId  String  @default("")
+  creationDeviceFp  String  @default("")
+  deviceType        String  @default("")
+  allowAllDevices Boolean @default(false)
+  // (2026-و29) المجموعات — الطالب عضو في مجموعة واحدة (أو ولا حاجة لو فاضي)
+  groupId      String  @default("")
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  examResults  ExamResult[]
+  activities   StudentActivity[]
+  payments     Payment[]
+}
+
+// (2026-و37) حساب ولي أمر — مربوط بحساب ابنه بـ studentId.
+// التسجيل بيتحقق من: اسم الطالب + تليفونه + باسورده + رقم ولي الأمر المسجل على حسابه.
+// ولي الأمر بيدخل برقمه الشخصي وباسورده هو — ويشوف متابعة نتايج ابنه.
+model Parent {
+  id        String   @id @default(cuid())
+  name      String   @default("")
+  phone     String   @unique
+  password  String   @default("")
+  studentId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([studentId])
+}
+
+model StudentActivity {
+  id        String   @id @default(cuid())
+  studentId String
+  action    String
+  details   String   @default("")
+  createdAt DateTime @default(now())
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([studentId, action, createdAt])
+  @@index([createdAt])
+}
+
+model Video {
+  id          String   @id @default(cuid())
+  title       String
+  url         String   @default("")
+  filePath    String   @default("")
+  fileType    String   @default("")
+  thumbnail   String   @default("")
+  grade       String
+  price       Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Homework {
+  id            String   @id @default(cuid())
+  title         String
+  content       String   @default("")
+  filePath      String   @default("")
+  fileType      String   @default("")
+  thumbnail     String   @default("")
+  answerKeyPath String   @default("")
+  answerKeyType String   @default("")
+  grade         String
+  questions     String           @default("")
+  // (25-ب1) جدولة الظهور: قبل الموعد الطالب مش شايف الواجب خالص —
+  // والأدمن شايفه ببادج «مجدول». null = يظهر فورًا.
+  scheduledAt   DateTime?
+  // (2026-و26) استهداف الطلاب — نفس نمط الفيديوهات (VideoSchedule):
+  // JSON array بids طلاب محددين — فاضي "[]" = الكل يشوفه
+  targetStudentIds String      @default("")
+  // (2026-و29) استهداف المجموعات — زي الامتحانات بالظبط
+  targetGroupIds  String      @default("")
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  results       HomeworkResult[]
+}
+
+model HomeworkResult {
+  id          String   @id @default(cuid())
+  homeworkId  String
+  studentId   String
+  score       Float    @default(0)
+  maxScore    Float    @default(100)
+  answers     String   @default("")
+  submittedAt DateTime @default(now())
+  homework    Homework @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, homeworkId])
+}
+
+model Exam {
+  id            String       @id @default(cuid())
+  title         String
+  content       String       @default("")
+  filePath      String       @default("")
+  fileType      String       @default("")
+  thumbnail     String       @default("")
+  answerKeyPath String       @default("")
+  answerKeyType String       @default("")
+  grade         String
+  questions     String       @default("")
+  // نماذج الامتحان العشوائية (طلب المستر): استخراج أكتر من ملف لنفس الامتحان
+  // كل نموذج مفصول لوحده والطالب بيشوف نموذج واحد بس عشوائي ثابت لحسابه:
+  // [{"name":"النموذج أ","filePath":"..","fileType":"..","questions":[..]}, ..]
+  models        String       @default("")
+  // طريقة توزيع النماذج (طلب المستر 2026-و: "ممكن أحط عشوائي ممكن أحط نموذج واحد بس")
+  // random = عشوائي ثابت لكل طالب | fixed = نموذج واحد ثابت للكل (fixedModel = اسمه)
+  modelMode     String       @default("random")
+  fixedModel    String       @default("")
+  passScore     Float        @default(50)
+  // (25-ب1) طلبات المستر: (1) حرية إظهار/إخفاء الإجابات بعد التسليم —
+  // false (افتراضي) = «انتظر النتيجة من المستر» بدون أي تفاصيل،
+  // true = الطالب يشوف نتيجة الاختياري والأخطاء فور التسليم.
+  showResult    Boolean      @default(false)
+  // (2) مؤقت اختياري بالدقائق — 0 = بلا وقت (الواجهة/العدّاد عند الطالب)
+  timeLimitMin  Int          @default(0)
+  // (3) جدولة الظهور: قبل الموعد الطالب مش شايف الامتحان خالص —
+  // والأدمن شايفه ببادج «مجدول». null = يظهر فورًا.
+  scheduledAt   DateTime?
+  // (2026-و26) استهداف الطلاب — نفس نمط الفيديوهات (VideoSchedule):
+  // JSON array بids طلاب محددين — فاضي "[]" = الكل يشوفه
+  targetStudentIds String      @default("")
+  // (2026-و29) استهداف المجموعات — نفس نمط الاستهداف بالطلاب بالظبط:
+  // JSON array بids المجموعات (StudentGroup) — الامتحان يظهر لأعضاء المجموعة
+  // (مع scheduledAt: مخفي تمامًا قبل الموعد — من غير عداد)
+  targetGroupIds  String      @default("")
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  results       ExamResult[]
+}
+
+model ExamResult {
+  id          String   @id @default(cuid())
+  examId      String
+  studentId   String
+  score       Float    @default(0)
+  maxScore    Float    @default(100)
+  submittedAt DateTime @default(now())
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  exam        Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([examId])
+}
+
+model Announcement {
+  id        String   @id @default(cuid())
+  title     String
+  content   String   @default("")
+  grade     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Discussion {
+  id           String   @id @default(cuid())
+  studentId    String
+  studentName  String
+  grade        String
+  content      String
+  isAdminReply Boolean  @default(false)
+  likes        Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model SiteConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   @default("")
+  updatedAt DateTime @updatedAt
+}
+
+model Media {
+  id        String   @id @default(cuid())
+  filename  String
+  filePath  String
+  fileType  String
+  fileSize  String   @default("")
+  data      String   @default("")
+  category  String   @default("general")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model VideoProgress {
+  id             String   @id @default(cuid())
+  studentId      String
+  videoId        String
+  watchedSeconds Float    @default(0)
+  totalSeconds   Float    @default(0)
+  completed      Boolean  @default(false)
+  lastWatchedAt  DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([studentId, videoId])
+}
+
+model GalleryImage {
+  id        String   @id @default(cuid())
+  title     String   @default("")
+  filePath  String   @default("")
+  type      String   @default("image")
+  videoUrl  String   @default("")
+  // (2026-و45) صورة مصغرة لعناصر الفيديو — افتراضيًا بيتجيب أوتوماتيك من
+  // رابط اليوتيوب، والأدمن يقدر يعدّلها برابط صورة من عنده
+  thumbnail String   @default("")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Payment {
+  id           String    @id @default(cuid())
+  studentId    String
+  studentName  String    @default("")
+  studentPhone String    @default("")
+  studentGrade String    @default("")
+  method       String    @default("")
+  amount       Float     @default(0)
+  videoId      String    @default("")
+  videoTitle   String    @default("")
+  receiptPath  String    @default("")
+  receiptType  String    @default("")
+  status       String    @default("pending")
+  note         String    @default("")
+  reviewedAt   DateTime?
+  reviewedBy   String    @default("")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  student      Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+}
+
+model VideoAccess {
+  id        String   @id @default(cuid())
+  videoId   String
+  studentId String
+  grantedBy String   @default("admin")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([videoId, studentId])
+}
+
+// ============================================================
+// PlayTicket — تذكرة تشغيل فيديو تُستخدم مرة واحدة ولمدة قصيرة
+// الهدف: معرف اليوتيوب أو مسار الملف لا يُرسل للطالب إطلاقاً —
+// الطالب ياخد ticket عشوائي opaque، ومشغل الصفحة (api/player/[ticket])
+// هو الوحيد اللي بيفتح الفيديو الحقيقي من على السيرفر.
+// ============================================================
+model PlayTicket {
+  id        String   @id
+  videoId   String
+  studentId String   @default("")
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  consumed  Boolean  @default(false)
+
+  @@index([expiresAt])
+}
+
+// ============================================================
+// Complaint — صفحة الشكاوي: الطالب يكتب مشكلته (الاسم والتليفون
+// بيتسجلوا تلقائي من حسابه) والشكوى تظهر للأدمن بس.
+// source = "student" (الطالب كتبها بنفسه) أو "ai" (المساعد الذكي
+// فهم إن الطالب بيشتكي من مشكلة وسجلها تلقائي).
+// ============================================================
+model Complaint {
+  id          String    @id @default(cuid())
+  studentId   String    @default("")
+  studentName String    @default("")
+  phone       String    @default("")
+  grade       String    @default("")
+  message     String
+  summary     String    @default("")
+  source      String    @default("student")
+  status      String    @default("new")
+  reply       String    @default("")
+  reviewedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now())
+
+  @@index([status])
+  @@index([studentId])
+}
+
+// ============================================================
+// (2026-و29) نظام المجموعات — طلب المستر الحرفي:
+//   «عاوزين نقسم الطلاب لمجموعتين... مجموعة التلات أو مجموعة الأحد...
+//    الفيديو يظهر لمجموعة والتانية ما يظهرلهاش غير في ميعادها»
+// ============================================================
+model StudentGroup {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  @@index([name])
+}
+
+// جدولة الفيديوهات للمجموعات — سطر لكل (فيديو × مجموعة):
+//   unlockAt = null  → المجموعة تشوف الفيديو فورًا
+//   unlockAt مستقبلي → الفيديو **مخفي تمامًا** عن المجموعة قبل الموعد
+//                       (من غير عداد — طلب المستر صريح) وبيظهر عند موعدها
+model VideoGroupSchedule {
+  id        String    @id @default(cuid())
+  videoId   String
+  groupId   String
+  unlockAt  DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([videoId])
+  @@index([groupId])
+}
+
+// ============================================================
+// (2026-و44) الإشعارات — طلب المستر: «أي حاجة يتضاف تظهر له إشعار للطالب»:
+//   • الأدمن رد على شكوى → الطالب ياخد إشعار «شكواك اتحلت/اترد عليها»
+//   • كتاب/ملزمة جديدة → إشعار للطلاب (حسب الصف)
+//   • امتحان/واجب/إعلان جديد → إشعار للطلاب المستهدفين
+// read=true يعني الطالب شافه — العداد بيبقى unreadCount بس
+// ============================================================
+model Notification {
+  id        String   @id @default(cuid())
+  studentId String
+  type      String   @default("general") // complaint_reply | book | exam | homework | announcement | general
+  title     String
+  body      String   @default("")
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([studentId, read])
+  @@index([createdAt])
+}
+
+// ============================================================
+// (2026-و40) الكتب والملازم — مكتبة PDF للطالب:
+//   الأدمن يرفع كتاب/ملزمة PDF (chunkedUpload → Media → /api/files/<id>)
+//   والطالب يفتحه أو يحمله من تاب «الكتب والملازم» في البورتال.
+//   filePath بتخزن مسار /api/files/<mediaId> زي باقي الجداول.
+// ============================================================
+model Book {
+  id          String   @id @default(cuid())
+  title       String
+  description String   @default("")
+  filePath    String   @default("")
+  fileName    String   @default("")
+  /* (و43) لينك خارجي للكتب الكبيرة (200MB+) — مش بتتخزن في قاعدة البيانات
+     خالص: filePath يفضل فاضي وsourceUrl يحفظ اللينك (Google Drive direct
+     download أو أي http/https) والطالب يفتح/يحمّل منه مباشرة */
+  sourceUrl   String   @default("")
+  fileType    String   @default("application/pdf")
+  sizeBytes   Int      @default(0)
+  grade       String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

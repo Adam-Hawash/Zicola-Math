@@ -1,0 +1,430 @@
+'use client'
+
+import { useState } from 'react'
+import Link from 'next/link'
+import { motion } from 'framer-motion'
+import { Card, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
+import { useAppStore, gradesFromConfig } from '@/stores/app-store'
+/* (و64) الترجمة الحقيقية عربي/إنجليزي */
+import { useT } from '@/lib/i18n'
+import { getDeviceId, getDeviceCandidates, getDeviceType, getDeviceTraits } from '@/lib/device'
+import { ArrowRight, Phone, Lock, GraduationCap, Users, Loader2, AlertCircle, AlertTriangle, Eye, EyeOff } from 'lucide-react'
+import { toast } from 'sonner'
+
+var fadeInUp = {
+  hidden: { opacity: 0, y: 30 },
+  visible: { opacity: 1, y: 0 },
+}
+
+var TEXT_ONLY_REGEX = /^[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFFa-zA-Z\s]+$/
+var PHONE_REGEX = /^\d{11}$/
+
+/* (2026-و29) تطبيع كلمة السر: أرقام عربية/فارسية ← لاتيني + شيل المسافات
+   الطالب اللي كاتب باسورده بأرقام عربية (١٢٣٤٥٦) كان بياخد «الرقم أو الباسورد غلط»
+   وده كان سبب رئيسي لشكاوى الدخول — التطبيع على الفورم + السيرفر مع بعض */
+function normPasswordInput(v: string): string {
+  var t = String(v || '')
+  t = t.replace(/[٠-٩]/g, function (d) { return String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)) })
+  t = t.replace(/[۰-۹]/g, function (d) { return String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)) })
+  return t.replace(/\s+/g, '').trim()
+}
+
+/* (2026-و26) لينك قسم الشكاوى — بطلب المستر: الكلمة تبقى لينك تحتيه خط،
+   اللي يدوس عليه يروح صفحة الشكاوى العامة (/complaints) ويكتب اسمه
+   ورقم تليفونه وشكواه من غير تسجيل دخول — والشكوى توصل للأدمن */
+function ComplaintsLink() {
+  return (
+    <Link
+      href="/complaints"
+      className="font-bold underline decoration-2 underline-offset-2 text-amber-700 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300 transition-colors"
+    >
+      قسم الشكاوي
+    </Link>
+  )
+}
+
+// Hidden admin entry: phone 44444444444 + this password redirects to admin login
+var ADMIN_PHONE = '44444444444'
+var ADMIN_PASSWORD = 'zicola2026#'
+
+// لافتة تحذير الجهاز الواحد — فوق صفحتين الدخول والتسجيل.
+// (دي تلاتة تنبيه جديد بطلب المستر: الحساب مربوط بجهاز واحد بس —
+// ومفيهاش أي كلام عن مسح بيانات المتصفح خالص)
+function DeviceWarningBanner({ mode }: { mode: 'login' | 'register' }) {
+  return (
+    <div className="mb-5 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 flex items-start gap-2.5" role="alert">
+      <AlertTriangle className="h-4.5 w-4.5 text-amber-500 shrink-0 mt-0.5" />
+      <p className="text-[13px] leading-relaxed text-foreground">
+        {mode === 'register' ? (
+          <>
+            <span className="font-bold">مهم جدًا:</span> الحساب بيتقفل على <span className="font-bold">جهاز واحد بس</span> — الجهاز اللي هتعمل بيه الحساب دلوقتي. اعمل الحساب من الجهاز اللي هتفتح بيه المنصة دايمًا، ولو حصلت أي مشكلة اكتبها في <ComplaintsLink />.
+          </>
+        ) : (
+          <>
+            <span className="font-bold">تنبيه مهم:</span> الجهاز اللي أنت هتعمل منه <span className="font-bold">تسجيل الدخول</span> دلوقتي هو ده الجهاز اللي هتخش منه على حسابك <span className="font-bold">على طول</span> — ما ينفعش تغيّره ولا تدخل بجهاز تاني. الحساب بيدخل بـ <span className="font-bold">جهاز واحد بس</span>، والجهاز اللي هتدخل منه ده هيفضل بتاعك. لو واجهتك أي مشكلة اكتبها في <ComplaintsLink />.
+          </>
+        )}
+      </p>
+    </div>
+  )
+}
+
+function PhoneField(props) {
+  var value = props.value
+  var onChange = props.onChange
+  var placeholder = props.placeholder
+  var id = props.id
+  var error = props.error
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id} className="text-foreground">{placeholder} <span className="text-destructive">*</span></Label>
+      <div className="relative">
+        <Phone className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input id={id} placeholder={placeholder} value={value} onChange={function (e) { var v = e.target.value.replace(/[^\d]/g, ''); if (v.length <= 11) onChange(v) }} dir="ltr" className={'pr-10 min-h-[44px]' + (error ? ' border-destructive focus-visible:ring-destructive' : '')} maxLength={11} />
+      </div>
+      {error && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="h-3 w-3" />{error}</p>}
+    </div>
+  )
+}
+
+function NameField(props) {
+  var value = props.value
+  var onChange = props.onChange
+  var placeholder = props.placeholder
+  var id = props.id
+  var error = props.error
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id} className="text-foreground text-xs">{placeholder} <span className="text-destructive">*</span></Label>
+      <Input id={id} placeholder={placeholder} value={value} onChange={function (e) { onChange(e.target.value) }} className={'min-h-[44px]' + (error ? ' border-destructive focus-visible:ring-destructive' : '')} />
+      {error && <p className="text-[10px] text-destructive flex items-center gap-1"><AlertCircle className="h-3 w-3" />{error}</p>}
+    </div>
+  )
+}
+
+function PasswordField(props) {
+  var value = props.value
+  var onChange = props.onChange
+  var placeholder = props.placeholder
+  var id = props.id
+  var error = props.error
+  var showState = useState(false)
+  var show = showState[0]
+  var setShow = showState[1]
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id} className="text-foreground">{placeholder} <span className="text-destructive">*</span></Label>
+      <div className="relative">
+        <Lock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input id={id} type={show ? 'text' : 'password'} placeholder={placeholder} value={value} onChange={function (e) { onChange(e.target.value) }} dir="ltr" className={'pr-10 pl-10 min-h-[44px]' + (error ? ' border-destructive focus-visible:ring-destructive' : '')} autoComplete={id.includes('login') ? 'current-password' : 'new-password'} />
+        <button type="button" onClick={function() { setShow(!show) }} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer">
+          {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </button>
+      </div>
+      {error && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="h-3 w-3" />{error}</p>}
+    </div>
+  )
+}
+
+export function LoginView() {
+  /* (و64) الترجمة */
+  const T = useT()
+  var store = useAppStore()
+  var setView = store.setView
+  var setCurrentStudent = store.setCurrentStudent
+  var setCurrentParent = store.setCurrentParent
+  var setShowAdminLogin = store.setShowAdminLogin
+  var phoneState = useState('')
+  var studentPhone = phoneState[0]
+  var setStudentPhone = phoneState[1]
+  var passState1 = useState('')
+  var studentPassword = passState1[0]
+  var setStudentPassword = passState1[1]
+  var loadState1 = useState(false)
+  var studentLoading = loadState1[0]
+  var setStudentLoading = loadState1[1]
+  // رسالة الجهاز الحمراء — بتظهر جوه الكارت مش توست بس عشان الطالب يشوفها واخد باله
+  var dbState = useState('')
+  var deviceBlockMsg = dbState[0]
+  var setDeviceBlockMsg = dbState[1]
+
+  var handleStudentLogin = async function () {
+    if (studentLoading) return
+    if (!studentPhone.trim()) { toast.error('الرجاء إدخال رقم الهاتف'); return }
+    if (!PHONE_REGEX.test(studentPhone.trim())) { toast.error('رقم الهاتف يجب أن يكون 11 رقم'); return }
+    if (!studentPassword.trim()) { toast.error('الرجاء إدخال كلمة المرور'); return }
+    setDeviceBlockMsg('')
+
+    // Hidden admin entry: special phone + password redirects to admin login
+    var squashPw = function (v: string) { return String(v || '').replace(/\s+/g, '') }
+    if (studentPhone.trim() === ADMIN_PHONE && squashPw(studentPassword) === squashPw(ADMIN_PASSWORD)) {
+      toast.success('جاري تحويلك إلى لوحة تحكم المشرف...')
+      setStudentPhone('')
+      setStudentPassword('')
+      setShowAdminLogin(true)
+      setView('landing')
+      return
+    }
+
+    setStudentLoading(true)
+    try {
+      /* (2026-و29) مهلة اتصال 25 ثانية — الطلب المعلق للأبد كان سبب
+         «استنى شوية» على طول من غير دخول؛ بعد المهلة رسالة واضحة والزرار يرجع */
+      var loginController = new AbortController()
+      var loginTimeout = setTimeout(function () { loginController.abort() }, 25000)
+      var res = await fetch('/api/students?phone=' + encodeURIComponent(studentPhone.trim()) + '&password=' + encodeURIComponent(normPasswordInput(studentPassword)) + '&deviceId=' + encodeURIComponent(getDeviceId()) + '&deviceIds=' + encodeURIComponent(JSON.stringify(getDeviceCandidates())) + '&deviceTraits=' + encodeURIComponent(JSON.stringify(getDeviceTraits())) + '&deviceType=' + encodeURIComponent(getDeviceType()), { signal: loginController.signal, cache: 'no-store' })
+      clearTimeout(loginTimeout)
+      var data = await res.json()
+      // ربط الجهاز: الحساب مربوط بجهاز تاني → رسالة حمراء واضحة جوه الكارت
+      if (res.status === 403 && data.deviceBlocked) {
+        var msg = data.error || '🚫 لازم تدخل بالجهاز اللي انت عملت من عليه الحساب — الحساب ده مربوط بجهاز واحد بس. لو حصلت معاك أي مشكلة اكتبها في قسم الشكاوي.'
+        setDeviceBlockMsg(msg)
+        toast.error(msg, { duration: 12000 })
+        setStudentPassword('')
+        return
+      }
+      // خطأ سيرفر (مش بيانات غلط) → رسالة صريحة مش "الباسورد غلط"
+      if (!res.ok && data.error) {
+        toast.error(data.error, { duration: 8000 })
+        return
+      }
+      var students = data.students || []
+      /* (2026-و37) مطابقة الرقم بعد التطبيع — السيرفر ممكن يرجّع الحساب
+         بالصيغة المخزنة (010…) والطالب كتب بصيغة تانية (+20…) فكانت المطابقة
+         الحرفية بتقع رغم نجاح الدخول فعليًا */
+      var normPhoneClient = function (v: string): string {
+        var digits = String(v || '').replace(/[^0-9]/g, '')
+        if (digits.length === 12 && digits.indexOf('20') === 0) digits = '0' + digits.slice(2)
+        else if (digits.length > 11) digits = digits.slice(digits.length - 11)
+        return digits
+      }
+      var typedPhone = normPhoneClient(studentPhone.trim())
+      var student: any = null
+      for (var i = 0; i < students.length; i++) {
+        if (normPhoneClient(students[i].phone) === typedPhone) { student = students[i]; break }
+      }
+      if (!student) {
+        /* (2026-و44) طلب المستر: «تسجيل ولي الأمر يبقى في نفس صفحة تسجيل الدخول —
+           لو كتب رقم التليفون والباسورد بتاعه يخش على طول» — الدخول كطالب بيتجرب
+           الأول، ولو فشل بنجرب الدخول كولي أمر من نفس الصفحة */
+        try {
+          var pRes = await fetch('/api/parents/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone: studentPhone.trim(), password: normPasswordInput(studentPassword) }),
+          })
+          var pData = await pRes.json()
+          if (pRes.ok && pData && pData.success && pData.parent && pData.parent.id) {
+            var pStu = pData.parent.student
+            setCurrentParent({
+              id: pData.parent.id,
+              name: pData.parent.name || 'ولي أمر',
+              phone: pData.parent.phone,
+              studentId: pData.parent.studentId,
+              student: pStu ? { id: pStu.id, name: pStu.name, grade: pStu.grade, status: pStu.status, isPaidAccess: !!pStu.isPaidAccess } : null,
+            })
+            setView('parent-portal')
+            toast.success('أهلاً بيك 👋 — بتتابع حساب ' + ((pStu && pStu.name) || 'ابنك'))
+            setStudentPassword('')
+            return
+          }
+        } catch (pErr) { /* مش ولي أمر — نكمل برسالة الخطأ العادية */ }
+        /* (2026-و37) رسالة مفصولة حسب السبب الحقيقي — بدل «الباسورد أو الرقم غلط»
+           الموحّدة اللي كانت بتلخبط الطالب الصح: مين فيهم الغلط؟ */
+        if (data && data.reason === 'not_found') {
+          toast.error('الرقم ده مش مسجل عندنا — اتأكد إنك كاتبه صح، ولو لسه مش عامل حساب اعمل حساب جديد', { duration: 8000 })
+        } else if (data && data.reason === 'wrong_password') {
+          toast.error('الباسورد غلط — لو نسيت اسأل المستر أو اكتب في قسم الشكاوي', { duration: 8000 })
+        } else {
+          toast.error('الباسورد أو الرقم بتاعك غلط')
+        }
+      } else if (student.status === 'pending') {
+        setCurrentStudent(student); setView('student-pending')
+        toast.info('حسابك لسه في المراجعة — جرب تعمل تسجيل دخول تاني بعدين وشوف اتقبلت ولا لسه')
+      } else if (student.status === 'approved' || student.status === 'paid') {
+        setCurrentStudent(student); setView('student-portal')
+        toast.success('مرحباً ' + student.name + '!')
+        fetch('/api/students/track-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ studentId: student.id })
+        }).catch(function () {})
+      } else if (student.status === 'rejected' || student.status === 'refused') {
+        toast.error('❌ الحساب بتاعك مرفوض من المنصة. لو عندك استفسار تواصل مع المستر', { duration: 8000 })
+        setStudentPhone('')
+        setStudentPassword('')
+      } else {
+        toast.error('تم حذف حسابك من المنصة، تواصل مع المستر')
+      }
+    } catch (e: any) {
+      /* (2026-و29) مهلة/انقطاع → رسالة واضحة بدل سطور عالقة */
+      if (e && (e.name === 'AbortError' || String(e.message || '').indexOf('abort') >= 0)) {
+        toast.error('الاتصال بطيء — تأكد من النت وجرب تاني', { duration: 8000 })
+      } else {
+        toast.error('حدث خطأ في الاتصال')
+      }
+    } finally {
+      setStudentLoading(false)
+    }
+  }
+
+  return (
+    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-12">
+      <div className="w-full max-w-md">
+        <DeviceWarningBanner mode="login" />
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-primary/10 mb-4"><GraduationCap className="h-8 w-8 text-primary" /></div>
+          <h1 className="text-2xl font-bold text-foreground mb-2">{T('تسجيل الدخول', 'Login')}</h1>
+          <p className="text-sm text-muted-foreground">{T('ادخل لحسابك وكمل تعلم', 'Log in and keep learning')}</p>
+        </div>
+        <div className="relative rounded-2xl p-[2px] bg-gradient-to-br from-gold-400 via-gold-600 to-gold-400">
+          <Card className="rounded-2xl border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="space-y-4">
+                {deviceBlockMsg && (
+                  <div className="rounded-xl border-2 border-red-500 bg-red-50 dark:bg-red-950/40 p-4 text-center" role="alert">
+                    <p className="text-sm font-extrabold text-red-700 dark:text-red-300 leading-relaxed" style={{ whiteSpace: 'pre-line' }}>{deviceBlockMsg}</p>
+                  </div>
+                )}
+                <PhoneField value={studentPhone} onChange={setStudentPhone} placeholder={T('رقم الهاتف', 'Phone number')} id="login-phone" />
+                <PasswordField value={studentPassword} onChange={setStudentPassword} placeholder={T('كلمة المرور', 'Password')} id="login-password" />
+                <button
+                  type="button"
+                  className="w-full min-h-[44px] font-semibold inline-flex items-center justify-center gap-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none transition-colors px-4 py-2 cursor-pointer relative z-10"
+                  onClick={handleStudentLogin}
+                  disabled={studentLoading}
+                  style={{ WebkitTapHighlightColor: 'transparent', position: 'relative', zIndex: 10 }}
+                >
+                  {studentLoading ? (<><Loader2 className="h-4 w-4 ml-2 animate-spin" />{T('استنى شوية...', 'One moment...')}</>) : T('ادخل لحسابك', 'Enter your account')}
+                </button>
+                <p className="text-center text-sm text-muted-foreground">{T('عندك حساب؟', 'Have an account?')} <button onClick={function () { setView('auth-register') }} className="text-primary font-medium hover:underline cursor-pointer">{T('اعمل حساب جديد', 'Create one')}</button></p>
+                {/* (و45 بطلب المستر) سطر «انت ولي أمر وعايز تتابع ابنك؟ ادخل من هنا» اتشال من
+                   صفحة الدخول — دخول ولي الأمر شغال من نفس الصفحة أوتوماتيك (و44:
+                   لو مطابقة الطالب فشلت بيتحقق /api/parents/login تلقائيًا) */}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        <div className="mt-6 text-center"><button onClick={function () { setView('landing') }} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] px-3 cursor-pointer"><ArrowRight className="h-4 w-4" />{T('العودة للرئيسية', 'Back to Home')}</button></div>
+      </div>
+    </div>
+  )
+}
+
+export function RegisterView() {
+  /* (و64) الترجمة */
+  const T = useT()
+  var store = useAppStore()
+  var setView = store.setView
+  var setCurrentStudent = store.setCurrentStudent
+  var n1s = useState(''); var name1 = n1s[0]; var setName1 = n1s[1]
+  var n2s = useState(''); var name2 = n2s[0]; var setName2 = n2s[1]
+  var n3s = useState(''); var name3 = n3s[0]; var setName3 = n3s[1]
+  var n4s = useState(''); var name4 = n4s[0]; var setName4 = n4s[1]
+  var ps = useState(''); var phone = ps[0]; var setPhone = ps[1]
+  var pwdState = useState(''); var password = pwdState[0]; var setPassword = pwdState[1]
+  var pwd2State = useState(''); var password2 = pwd2State[0]; var setPassword2 = pwd2State[1]
+  var gs = useState(''); var grade = gs[0]; var setGrade = gs[1]
+  var p1s = useState(''); var parentName1 = p1s[0]; var setParentName1 = p1s[1]
+  var p2s = useState(''); var parentName2 = p2s[0]; var setParentName2 = p2s[1]
+  var pps = useState(''); var parentPhone = pps[0]; var setParentPhone = pps[1]
+  var ls = useState(false); var loading = ls[0]; var setLoading = ls[1]
+  var es = useState<Record<string, string>>({}); var errors = es[0]; var setErrors = es[1]
+
+  var validate = function () {
+    var e: Record<string, string> = {}
+    if (!name1.trim()) e.name1 = 'مطلوب'; else if (!TEXT_ONLY_REGEX.test(name1.trim())) e.name1 = 'حروف فقط'
+    if (!name2.trim()) e.name2 = 'مطلوب'; else if (!TEXT_ONLY_REGEX.test(name2.trim())) e.name2 = 'حروف فقط'
+    if (!name3.trim()) e.name3 = 'مطلوب'; else if (!TEXT_ONLY_REGEX.test(name3.trim())) e.name3 = 'حروف فقط'
+    if (!name4.trim()) e.name4 = 'مطلوب'; else if (!TEXT_ONLY_REGEX.test(name4.trim())) e.name4 = 'حروف فقط'
+    if (!phone.trim()) e.phone = 'مطلوب'; else if (!PHONE_REGEX.test(phone.trim())) e.phone = 'يجب أن يكون 11 رقم بالضبط'
+    if (!password.trim()) e.password = 'مطلوب'; else if (password.trim().length < 4) e.password = 'كلمة المرور يجب أن تكون 4 أحرف على الأقل'
+    if (password.trim() !== password2.trim()) e.password2 = 'كلمتا المرور غير متطابقتين'
+    if (!grade) e.grade = 'مطلوب'
+    if (!parentName1.trim()) e.parentName1 = 'مطلوب'; else if (!TEXT_ONLY_REGEX.test(parentName1.trim())) e.parentName1 = 'حروف فقط'
+    if (!parentName2.trim()) e.parentName2 = 'مطلوب'; else if (!TEXT_ONLY_REGEX.test(parentName2.trim())) e.parentName2 = 'حروف فقط'
+    if (!parentPhone.trim()) e.parentPhone = 'مطلوب'; else if (!PHONE_REGEX.test(parentPhone.trim())) e.parentPhone = 'يجب أن يكون 11 رقم بالضبط'
+    setErrors(e)
+    if (Object.keys(e).length > 0) { toast.error('الرجاء تصحيح الحقول المشار إليها'); return false }
+    return true
+  }
+
+  var handleRegister = async function () {
+    if (!validate()) return
+    var fullName = name1.trim() + ' ' + name2.trim() + ' ' + name3.trim() + ' ' + name4.trim()
+    var fullParentName = parentName1.trim() + ' ' + parentName2.trim()
+    setLoading(true)
+    try {
+      var res = await fetch('/api/students', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: fullName, phone: phone.trim(), grade: grade, parentName: fullParentName, parentPhone: parentPhone.trim(), password: password.trim(), deviceId: getDeviceId(), deviceIds: getDeviceCandidates(), deviceTraits: JSON.stringify(getDeviceTraits()), deviceType: getDeviceType() }) })
+      var data = await res.json()
+      if (res.ok) { setCurrentStudent(data.student); setView('student-pending'); toast.success('تم تسجيل طلبك بنجاح! خش اعمل تسجيل دخول وشوف اتقبلت ولا لسه') }
+      else { toast.error(data.error || 'حدث خطأ في التسجيل') }
+    } catch (e) { toast.error('حدث خطأ في الاتصال') }
+    setLoading(false)
+  }
+
+  return (
+    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-8">
+      <motion.div className="w-full max-w-lg" initial="hidden" animate="visible" variants={fadeInUp} transition={{ duration: 0.5, ease: 'easeOut' }}>
+        <DeviceWarningBanner mode="register" />
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-primary/10 mb-3"><Users className="h-7 w-7 text-primary" /></div>
+          <h1 className="text-2xl font-bold text-foreground mb-1">{T('اعمل حساب جديد', 'Create Account')}</h1>
+          <p className="text-sm text-muted-foreground">سجل بياناتك وابدأ رحلتك معنا</p>
+        </div>
+        <div className="relative rounded-2xl p-[2px] bg-gradient-to-br from-gold-400 via-gold-600 to-gold-400">
+          <Card className="rounded-2xl border-0 shadow-lg">
+            <CardContent className="p-5">
+              <div className="space-y-4">
+                {/* (2026-و37) نوع الحساب: طالب أو ولي أمر — طلب المستر */}
+                <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-muted">
+                  <button type="button" className="min-h-[40px] rounded-lg bg-primary text-primary-foreground text-sm font-bold cursor-pointer" aria-current="true">حساب طالب</button>
+                  <button type="button" onClick={function () { setView('parent-register') }} className="min-h-[40px] rounded-lg text-sm font-bold text-muted-foreground hover:text-foreground transition-colors cursor-pointer">حساب ولي أمر</button>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground mb-2">اسم الطالب الرباعي</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <NameField value={name1} onChange={setName1} placeholder="الاسم الأول" id="reg-name1" error={errors.name1} />
+                    <NameField value={name2} onChange={setName2} placeholder="الاسم الثاني" id="reg-name2" error={errors.name2} />
+                    <NameField value={name3} onChange={setName3} placeholder="الاسم الثالث" id="reg-name3" error={errors.name3} />
+                    <NameField value={name4} onChange={setName4} placeholder="الاسم الرابع" id="reg-name4" error={errors.name4} />
+                  </div>
+                </div>
+                <PhoneField value={phone} onChange={setPhone} placeholder="رقم هاتف الطالب" id="reg-phone" error={errors.phone} />
+                <div className="grid grid-cols-2 gap-2">
+                  <PasswordField value={password} onChange={setPassword} placeholder="كلمة المرور" id="reg-password" error={errors.password} />
+                  <PasswordField value={password2} onChange={setPassword2} placeholder="تأكيد كلمة المرور" id="reg-password2" error={errors.password2} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="reg-grade" className="text-foreground">الصف الدراسي <span className="text-destructive">*</span></Label>
+                  <div className="relative">
+                    <GraduationCap className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <select id="reg-grade" value={grade} onChange={function (e) { setGrade(e.target.value) }} className={'flex h-11 w-full rounded-md border border-input bg-transparent pr-10 pl-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring min-h-[44px] appearance-none cursor-pointer' + (errors.grade ? ' border-destructive' : '')}>
+                      <option value="">اختر الصف الدراسي</option>
+                      {gradesFromConfig(store.siteConfig).map(function (g) { return <option key={g.ar} value={g.ar}>{(g.emoji ? g.emoji + ' ' : '') + g.ar}</option> })}
+                    </select>
+                  </div>
+                  {errors.grade && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors.grade}</p>}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground mb-2">اسم ولي الأمر</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <NameField value={parentName1} onChange={setParentName1} placeholder="الاسم الأول" id="reg-pname1" error={errors.parentName1} />
+                    <NameField value={parentName2} onChange={setParentName2} placeholder="الاسم الثاني" id="reg-pname2" error={errors.parentName2} />
+                  </div>
+                </div>
+                <PhoneField value={parentPhone} onChange={setParentPhone} placeholder="رقم هاتف ولي الأمر" id="reg-parent-phone" error={errors.parentPhone} />
+                <Button className="w-full min-h-[44px] font-semibold" onClick={handleRegister} disabled={loading}>{loading ? (<><Loader2 className="h-4 w-4 ml-2 animate-spin" />جاري التسجيل...</>) : 'اعمل الحساب'}</Button>
+                <p className="text-center text-sm text-muted-foreground">عندك حساب؟ <button onClick={function () { setView('auth-login') }} className="text-primary font-medium hover:underline cursor-pointer">سجل دخولك</button></p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        <div className="mt-6 text-center"><button onClick={function () { setView('landing') }} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] px-3 cursor-pointer"><ArrowRight className="h-4 w-4" />{T('العودة للرئيسية', 'Back to Home')}</button></div>
+      </motion.div>
+    </div>
+  )
+}

@@ -1,0 +1,5623 @@
+'use client'
+
+import { useAppStore, GRADES, type Student, type Video, type Homework, type Exam, type Announcement, type ExamResult, type GalleryImage, type Stats, gradesFromConfig, type GradeItem } from '@/stores/app-store'
+import { chunkedUpload } from '@/lib/chunked-upload'
+import { QuestionsEditorDialog, EditQuestionsButton, RegradeButton, RegradeAllButton, OverrideButton } from '@/components/admin/QuestionsEditor'
+import { GradesSchedulePanel } from '@/components/admin/GradesSchedulePanel'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
+import {
+  Users, UserCheck, Clock, ClipboardList, FileText,
+  Megaphone, Plus, Check, X, Trash2, LogOut, Loader2,
+  BarChart3, RefreshCw, Settings, Upload, MessageSquare,
+  Link2, Activity, Eye, ImagePlus, Trophy, UserX, Camera,
+  PlayCircle, Pause, Film, Search, FileDown, PictureInPicture2, Save, Sparkles, Wallet,
+  Video as VideoIcon, LinkIcon, MonitorPlay, Send,
+  MessageCircle, Copy,
+  ChevronLeft, CheckCircle2, Smartphone, RotateCcw, ShieldCheck, Monitor, Tablet, Flag, GraduationCap, UsersRound, PieChart, BookOpen, ChevronDown, Wrench
+} from 'lucide-react'
+import { AdminComplaints } from './AdminComplaints'
+import { CMSPanel } from './CMSPanel'
+/* (و64) الترجمة الحقيقية عربي/إنجليزي — الزراير الموحدة في النافبار */
+import { useT } from '@/lib/i18n'
+import { VideoProtectionSettings } from './VideoProtectionSettings'
+import { FractionText, hasMathMarkup } from '@/components/FractionText'
+import { SocialLinksPanel } from './SocialLinksPanel'
+/* (2026-و29) نظام المجموعات — تاب + منتقيات الاستهداف للمجموعات + جدولة فيديو للمجموعات */
+import { GroupsManager } from './GroupsManager'
+import { AdminItemAnalytics } from './AdminItemAnalytics'
+import { GroupTargetPicker } from './GroupTargetPicker'
+import { VideoGroupScheduleDialog } from './VideoGroupScheduleDialog'
+import { CommunityPanel } from './CommunityPanel'
+import { ActivityPanel } from './ActivityPanel'
+import { PaymentsPanel } from '@/components/PaymentsPanel'
+import { StudentTargetPicker, parseTargetStudentIds } from '@/components/admin/StudentTargetPicker'
+import { PlayerSettingsPanel } from '@/components/admin/PlayerSettingsPanel'
+import { normalizeWaPhone, DEFAULT_PARENT_TEMPLATE, fillParentTemplate, buildParentMsgData } from '@/lib/parent-message'
+import { MathKeyboard } from '@/components/student/MathKeyboard'
+/* (2026-و40) استخراج من صفحات كتاب PDF — تصوير الصفحات على المتصفح بـ pdf.js */
+import { openPdf, renderPageToJpeg } from '@/lib/pdf-pages'
+/* (2026-و40-w) ورقة العمل: قص رسومات الأسئلة + عرض الجداول/الرسومات في المراجعة */
+import { ensureFigureUrls, isWritingQuestion } from '@/lib/question-figures'
+import BidiText from '@/components/BidiText'
+import { WorksheetTableReadonly, WorksheetTableEditor, WorksheetFigure, parseTableValuesFromText } from '@/components/worksheet/WorksheetParts'
+/* (2026-و40) الكتب والملازم — تاب مكتبة الكتب للطالب */
+import { BooksManager } from './BooksManager'
+/* (و65) التقارير الجاهزة للطباعة — تقرير PDF لكل طالب + التقرير الشامل لكل الطلاب */
+import { StudentReportDialog, ClassReportDialog } from '@/components/admin/StudentReports'
+/* (و52) محرر قص الرسمات اليدوي — المستر يظبط أي رسمة مقصوصة غلط بإيده في ثواني */
+import FigureCropEditor, { type FigureCropTarget } from './FigureCropEditor'
+import { useState, useEffect, useRef, useMemo, Fragment } from 'react'
+import Image from 'next/image'
+import { toast } from 'sonner'
+
+// Extract ALL image URLs/paths from student answer text
+/* (و24) قايمة الصفوف الديناميكية من إعدادات الأدمن (grades_data) — المستر بقدر يضيف/يمسح صف ويظهر في كل المنصة فورًا */
+function useGradesList(): GradeItem[] {
+  const siteConfig = useAppStore(function (s) { return s.siteConfig })
+  return useMemo(function () { return gradesFromConfig(siteConfig) }, [siteConfig])
+}
+
+function extractAllImagePaths(text: string): string[] {
+  if (!text || typeof text !== 'string') return []
+  var matches = text.match(/\[📷\s*صورة\s*مرفقة:\s*([^\]]+?)\]/g) || []
+  var paths: string[] = []
+  matches.forEach(function(m) {
+    var idMatch = m.match(/\[📷\s*صورة\s*مرفقة:\s*([^\]]+?)\]/)
+    if (idMatch && idMatch[1]) {
+      var raw = idMatch[1].trim().replace(/^["']|["']$/g, '')
+      if (raw) paths.push(raw)
+    }
+  })
+  return paths
+}
+
+// Extract image URL/path from student answer text that contains "[📷 صورة مرفقة: PATH]" tags.
+// Returns the first matched path or '' if none.
+function extractFirstImagePath(text: string): string {
+  if (!text || typeof text !== 'string') return ''
+  var m = text.match(/\[📷\s*صورة\s*مرفقة:\s*([^\]]+?)\]/)
+  if (m && m[1]) {
+    var path = m[1].trim().replace(/^["']|["']$/g, '')
+    return path
+  }
+  return ''
+}
+
+/* (2026-و22) بادج حكم التصحيح الذكي — درجة مؤقتة بدل «AI: غلط» الوهمي
+   (طلب المستر: «بيقلب لي السؤال غلط أصلاً من غير ما يقرأه» — لما الـAI
+   مش متأكد بيحط درجة مؤقتة والمستر يعدلها، فالبادج لازم يقول كده صريح) */
+function writingVerdictBadge(aq: any): { cls: string; text: string } {
+  if (aq.needsGrading) return { cls: 'bg-gray-500/10 text-gray-600', text: 'بيتصحح بالذكاء الاصطناعي…' }
+  if (aq.aiIsCorrect === true) return { cls: 'bg-emerald-500/10 text-emerald-600', text: 'AI: صح' }
+  var awarded = Number(aq.awardedPoints || 0)
+  var maxP = Number(aq.maxPoints || aq.points || 0)
+  if (awarded > 0) return { cls: 'bg-amber-500/10 text-amber-600', text: 'درجة مؤقتة (' + awarded + '/' + maxP + ') — راجعها وعدّلها' }
+  return { cls: 'bg-red-500/10 text-red-600', text: 'AI: غلط' }
+}
+
+/* (و60-هـ) بلوك حكم المصحح الذكي الموحّد — طلب المستر: «ولا بيقول لي إن الـ
+   AI قرأ الإجابة ولا بيجيب لي ملاحظات». سبب المشكلة: بلوك الملاحظات كان
+   متداخل جوه شرط «AI قرأ الإجابة من الصورة» — يعني إجابة **نصية** من غير
+   صورة كان حكم الـ AI بيظهر في البادج بس من غير أي ملاحظة ولا مؤشر قراءة.
+   دلوقتي: بلوك واحد لكل سؤال مقالي يوضّح إن الـ AI قرأ + الحكم + الملاحظة —
+   للإجابات النصية وصور الشغل الرسمي (جاء من الحكم المخزن الحقيقي بعد
+   إصلاح progress API) */
+function AiWritingVerdictBlock(props: { aq: any }) {
+  var aq = props.aq
+  var feedback = String(aq.aiFeedback || aq.feedback || '')
+  if (feedback === 'لم يجب الطالب') return null
+  if (aq.needsGrading) {
+    return (
+      <p className="text-[9px] text-amber-600 dark:text-amber-400 mt-1">⏳ بيتصحح بالذكاء الاصطناعي… حدّث الصفحة بعد لحظات</p>
+    )
+  }
+  var hasVerdict = aq.aiIsCorrect === true || aq.aiIsCorrect === false
+  var hasRead = !!aq.aiExtractedAnswer || hasVerdict || !!feedback.trim()
+  if (!hasRead) return null
+  /* بلوك الصورة يظهر بس لو إجابة الطالب فعلًا فيها صورة — لما الإجابة نصية
+     الـ aiExtractedAnswer المخزن هو نص الطالب نفسه (مكرر وفوقه «إجابة الطالب») */
+  var isImageAnswer = extractAllImagePaths(String(aq.studentAnswer || '')).length > 0
+  return (
+    <div className="mt-1 space-y-1">
+      {aq.aiExtractedAnswer && isImageAnswer && (
+        <div className="p-1.5 rounded bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900/40">
+          <p className="text-[9px] font-bold text-blue-700 dark:text-blue-400 mb-0.5">🤖 AI قرأ الإجابة من الصورة:</p>
+          <p className="text-foreground whitespace-pre-wrap break-words" dir="auto"><BidiText text={aq.aiExtractedAnswer} /></p>
+        </div>
+      )}
+      <div className="p-1.5 rounded bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-900/40">
+        <p className="text-[9px] font-bold text-sky-700 dark:text-sky-400">
+          🤖 الـ AI قرأ{isImageAnswer ? ' إجابة الصورة' : ' إجابة الطالب'} وصحّحها
+          {aq.aiIsCorrect === true ? ' — الحكم: ✅ صح' : aq.aiIsCorrect === false ? ' — الحكم: ❌ غلط' : ''}
+        </p>
+        {feedback && <p className="text-[9px] text-muted-foreground mt-0.5" dir="auto"><BidiText text={feedback} /></p>}
+      </div>
+    </div>
+  )
+}
+
+/* (و43) كشف «شكله فيه رسمة» من النص — للتحذير في شاشة المراجعة:
+   سؤال شكله graphical من غير figure (url ولا bbox) → تحذير + رفع يدوي للرسمة */
+/* (و45) دالة isGraphicalLike اتنشلت — كانت بتشغّل تحذير «السؤال ده محتاج رسم»
+   اللي المستر طلب إلغاءه خالص (كان بينبّه غلط على أسئلة مش محتاجة رسمة) */
+
+/* ============================================================
+   (25-ب1) أدوات الجدولة + إظهار الإجابات — طلبات المستر:
+   1) حرية إظهار/إخفاء الإجابات للامتحان
+   2) مؤقت اختياري لكل امتحان (الحقل والـ APIs — واجهة العداد عند الطالب)
+   3) جدولة إخفاء للامتحانات والواجبات (موعد ظهور)
+   ============================================================ */
+
+/* التاريخ بالعربي المصري: يوم + شهر + ساعة — لبادج «مجدول — يظهر ...» */
+function formatEgyptian(d: string | Date | null | undefined): string {
+  if (!d) return ''
+  try {
+    var dt = new Date(d)
+    if (isNaN(dt.getTime())) return ''
+    return dt.toLocaleString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
+  } catch (e) { return '' }
+}
+
+/* تحويل ISO إلى قيمة datetime-local بتوقيت الجهاز (لعرضها في input) */
+function toLocalInputValue(d: string | Date | null | undefined): string {
+  if (!d) return ''
+  try {
+    var dt = new Date(d)
+    if (isNaN(dt.getTime())) return ''
+    var pad = function (n: number) { return (n < 10 ? '0' : '') + n }
+    return dt.getFullYear() + '-' + pad(dt.getMonth() + 1) + '-' + pad(dt.getDate()) + 'T' + pad(dt.getHours()) + ':' + pad(dt.getMinutes())
+  } catch (e) { return '' }
+}
+
+/* هل العنصر مجدول في المستقبل (بادج «مجدول»)؟ */
+function isScheduledFuture(d: string | Date | null | undefined): boolean {
+  if (!d) return false
+  try { var t = new Date(d).getTime(); return !isNaN(t) && t > Date.now() } catch (e) { return false }
+}
+
+// Global image modal helper - opens an overlay showing the full image
+function ImageModal({ imageSrc, onClose }: { imageSrc: string | null; onClose: () => void }) {
+  if (!imageSrc) return null
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80"
+      onClick={onClose}
+    >
+      <div className="relative max-w-[90vw] max-h-[90vh]" onClick={function(e) { e.stopPropagation() }}>
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute -top-2 -right-2 z-10 h-9 w-9 rounded-full bg-red-500 text-white hover:bg-red-600 flex items-center justify-center shadow-lg"
+          aria-label="إغلاق"
+        >
+          <X className="h-5 w-5" />
+        </button>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={imageSrc}
+          alt="Student answer"
+          className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
+          onError={function(e) {
+            var t = e.currentTarget as HTMLImageElement
+            if (t.parentElement) {
+              t.parentElement.innerHTML = '<div class="bg-white text-black p-8 rounded-lg text-center">تعذر تحميل الصورة</div>'
+            }
+          }}
+        />
+      </div>
+    </div>
+  )
+}
+
+export function AdminDashboard() {
+  const { adminTab, setAdminTab, logout, currentAdmin, setCurrentAdmin } = useAppStore()
+  /* (و64) الترجمة الحقيقية — عربي/إنجليزي */
+  const T = useT()
+  const [stats, setStats] = useState<Stats | null>(null)
+  const [showSettings, setShowSettings] = useState(false)
+  const [imageModalSrc, setImageModalSrc] = useState<string | null>(null)
+  const [settingsOldPass, setSettingsOldPass] = useState('')
+  const [settingsEmail, setSettingsEmail] = useState('')
+  const [settingsNewPass, setSettingsNewPass] = useState('')
+  const [settingsSaving, setSettingsSaving] = useState(false)
+  const [settingsLoading, setSettingsLoading] = useState(false)
+  const [resendApiKey, setResendApiKey] = useState('')
+  const [resendSaving, setResendSaving] = useState(false)
+  const [heroDevUrl, setHeroDevUrl] = useState('')
+  const [heroDevSaving, setHeroDevSaving] = useState(false)
+  const [vodafoneCash, setVodafoneCash] = useState('')
+  const [instapay, setInstapay] = useState('')
+  const [fawry, setFawry] = useState('')
+  const [paymentSaving, setPaymentSaving] = useState(false)
+  // عداد الشكاوى الجديدة — بيدور كل دقيقة عشان المستر يشوف الشكاوى أول بأول
+  const [newComplaints, setNewComplaints] = useState(0)
+  useEffect(function () {
+    var alive = true
+    async function loadComplaintCount() {
+      try {
+        var r = await fetch('/api/complaints?status=new')
+        var d = await r.json()
+        if (alive) setNewComplaints(Number(d.newCount || 0))
+      } catch (e) { /* صامت */ }
+    }
+    loadComplaintCount()
+    var t = setInterval(loadComplaintCount, 60000)
+    return function () { alive = false; clearInterval(t) }
+  }, [])
+
+  /* ===== (و46) بادج «المجتمعات» — طلب المستر: «في المجتمع لو حد بعت رسالة
+     يجي له إشعار» — رسايل الطلاب الجديدة (بعد آخر فتح للمجتمع) بتظهر كعداد
+     على التاب — وفتح التاب بيسجل إنها اتشافت. بيدور كل 60 ثانية. */
+  const [newCommunityCount, setNewCommunityCount] = useState(0)
+  const adminCommunitySeenKey = 'mg_admin_community_seen'
+  useEffect(function () {
+    var alive = true
+    var check = async function () {
+      try {
+        var r = await fetch('/api/discussions?pageSize=100', { cache: 'no-store' })
+        var j = await r.json()
+        var list: any[] = Array.isArray(j && j.discussions) ? j.discussions : []
+        if (!alive) return
+        var seen = ''
+        try { seen = localStorage.getItem(adminCommunitySeenKey) || '' } catch (e) {}
+        if (adminTab === 'community') {
+          /* التاب مفتوح دلوقتي = كله اتشاف */
+          try { localStorage.setItem(adminCommunitySeenKey, new Date().toISOString()) } catch (e) {}
+          setNewCommunityCount(0)
+          return
+        }
+        if (!seen) { try { localStorage.setItem(adminCommunitySeenKey, new Date().toISOString()) } catch (e) {} return }
+        var seenTime = new Date(seen).getTime()
+        if (isNaN(seenTime)) return
+        var n = list.filter(function (d: any) {
+          if (!d || d.isAdminReply || d.studentId === 'admin') return false
+          var t = new Date(d.createdAt || '').getTime()
+          return isFinite(t) && t > seenTime
+        }).length
+        setNewCommunityCount(n)
+      } catch (e) { /* صامت */ }
+    }
+    check()
+    var t2 = setInterval(check, 60000)
+    return function () { alive = false; clearInterval(t2) }
+  }, [adminTab])
+
+  const fetchStats = async () => {
+    try {
+      const res = await fetch('/api/stats')
+      const data = await res.json()
+      setStats(data)
+    } catch { /* silent */ }
+  }
+
+  useEffect(() => { fetchStats() }, [])
+
+  // التصحيح التلقائي الشامل: أول ما الأدمن يفتح اللوحة بنضف النتايج اليتيمة
+  // (واجبات/امتحانات اتحذفت ودرجاتها فضلت) وبنصحح أي نتيجة قديمة ناقصة
+  // بالذكاء الاصطناعي — لحد ما مفيش "يحتاج تصحيح يدوي" خالص. المستر يقدر
+  // يعدّل أي درجة بعدها عادي من زرار التعديل.
+  const sweepRanRef = useRef(false)
+  useEffect(() => {
+    if (sweepRanRef.current) return
+    sweepRanRef.current = true
+    ;(async () => {
+      let sweptAny = false
+      try {
+        for (let i = 0; i < 40; i++) {
+          const res = await fetch('/api/grading/sweep', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ limit: 5 }),
+          })
+          const data = await res.json()
+          if (data && (data.fixed > 0 || (data.cleanedOrphans && (data.cleanedOrphans.homework > 0 || data.cleanedOrphans.exam > 0)))) sweptAny = true
+          if (!data || data.done || data.remaining === 0) break
+        }
+      } catch { /* silent — التنضيف بيتعمل كمان من routes تانية */ }
+      if (sweptAny) fetchStats()
+    })()
+  }, [])
+
+  const openSettings = async () => {
+    setShowSettings(true)
+    setSettingsLoading(true)
+    try {
+      const res = await fetch('/api/admin/settings')
+      const data = await res.json()
+      if (data.admin) {
+        setSettingsEmail(data.admin.email || '')
+        if (data.admin.email && setCurrentAdmin) setCurrentAdmin({ ...currentAdmin!, email: data.admin.email })
+      }
+      // Load Resend API key
+      try {
+        const cfgRes = await fetch('/api/config')
+        const cfgData = await cfgRes.json()
+        setResendApiKey(cfgData.resend_api_key || '')
+        setHeroDevUrl(cfgData.hero_developer_url || '')
+        setVodafoneCash(cfgData.payment_vodafone_cash || '')
+        setInstapay(cfgData.payment_instapay || '')
+        setFawry(cfgData.payment_fawry || '')
+      } catch { /* silent */ }
+    } catch { /* silent */ }
+    setSettingsLoading(false)
+  }
+
+  const saveSettings = async () => {
+    if (!settingsOldPass) { toast.error('أدخل كلمة المرور الحالية'); return }
+    setSettingsSaving(true)
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ oldPassword: settingsOldPass, newEmail: settingsEmail, newPassword: settingsNewPass }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        toast.success('تم تحديث الإعدادات')
+        if (data.admin && setCurrentAdmin) setCurrentAdmin(data.admin)
+        setSettingsOldPass(''); setSettingsNewPass(''); setShowSettings(false)
+      } else {
+        try { const d = await res.json(); toast.error(d.error || 'خطأ') } catch { toast.error('خطأ في السيرفر') }
+      }
+    } catch { toast.error('خطأ في الاتصال') }
+    setSettingsSaving(false)
+  }
+
+  return (
+    <div className="flex-1 py-6 px-4 sm:px-6">
+      <div className="mx-auto max-w-7xl">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold">{T('لوحة التحكم', 'Admin Dashboard')}</h1>
+            <p className="text-sm text-muted-foreground mt-1">{T('إدارة المنصة التعليمية بالكامل', 'Manage the full platform')}</p>
+          </div>
+          <div className="flex gap-2">
+            {/* (و64) الزراير الموحدة في النافبار فوق — ممنوع التكرار هنا */}
+            <Button variant="outline" size="sm" onClick={fetchStats}><RefreshCw className="h-4 w-4 ml-1" />{T('تحديث', 'Refresh')}</Button>
+            <Button variant="outline" size="sm" onClick={openSettings}><Settings className="h-4 w-4 ml-1" />{T('الإعدادات', 'Settings')}</Button>
+            <Button variant="outline" size="sm" onClick={logout}><LogOut className="h-4 w-4 ml-1" />{T('خروج', 'Logout')}</Button>
+          </div>
+        </div>
+
+        {stats && (
+          <div className="grid gap-4 grid-cols-2 lg:grid-cols-5 mb-6">
+            <StatCard icon={Users} label="إجمالي الطلاب" value={stats.totalStudents} color="bg-[#C49A38]/10 text-[#C49A38]" />
+            <StatCard icon={Clock} label="بانتظار الموافقة" value={stats.pendingStudents} color="bg-amber-500/10 text-amber-600 dark:text-amber-400" />
+            <StatCard icon={UserCheck} label="طلاب مفعلين" value={stats.approvedStudents} color="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" />
+            <StatCard icon={VideoIcon} label="إجمالي الفيديوهات" value={stats.totalVideos} color="bg-purple-500/10 text-purple-600 dark:text-purple-400" />
+            <StatCard icon={Wallet} label="مدفوعات معلقة" value={(stats as any).pendingPayments || 0} color="bg-amber-500/10 text-amber-600 dark:text-amber-400" />
+          </div>
+        )}
+
+        <Tabs value={adminTab} onValueChange={setAdminTab} className="space-y-6">
+          <TabsList className="flex flex-wrap h-auto gap-1 bg-muted/50 p-1">
+            <TabsTrigger value="students" className="text-xs sm:text-sm gap-1"><Users className="h-4 w-4" /><span className="hidden sm:inline">{T('الطلاب', 'Students')}</span></TabsTrigger>
+            {/* (2026-و29) تاب المجموعات — طلب المستر: تقسيم الطلاب مجموعات بأسماء الأيام */}
+            <TabsTrigger value="groups" className="text-xs sm:text-sm gap-1"><UsersRound className="h-4 w-4" /><span className="hidden sm:inline">{T('المجموعات', 'Groups')}</span></TabsTrigger>
+            <TabsTrigger value="my-students" className="text-xs sm:text-sm gap-1"><BarChart3 className="h-4 w-4" /><span className="hidden sm:inline">{T('طلابي', 'My Students')}</span></TabsTrigger>
+            <TabsTrigger value="videos" className="text-xs sm:text-sm gap-1"><VideoIcon className="h-4 w-4" /><span className="hidden sm:inline">{T('الفيديوهات', 'Videos')}</span></TabsTrigger>
+            <TabsTrigger value="homework" className="text-xs sm:text-sm gap-1"><ClipboardList className="h-4 w-4" /><span className="hidden sm:inline">{T('الواجبات', 'Homework')}</span></TabsTrigger>
+            <TabsTrigger value="exams" className="text-xs sm:text-sm gap-1"><FileText className="h-4 w-4" /><span className="hidden sm:inline">{T('الامتحانات', 'Exams')}</span></TabsTrigger>
+            {/* (2026-و38) تحليلات الأسئلة — أكتر سؤال الطلاب غلطت فيه + أساميهم — طلب المستر */}
+            <TabsTrigger value="item-analytics" className="text-xs sm:text-sm gap-1 text-violet-600 dark:text-violet-400"><PieChart className="h-4 w-4" /><span className="hidden sm:inline">{T('تحليلات الأسئلة', 'Analytics')}</span></TabsTrigger>
+            <TabsTrigger value="announcements" className="text-xs sm:text-sm gap-1"><Megaphone className="h-4 w-4" /><span className="hidden sm:inline">{T('الإعلانات', 'Announcements')}</span></TabsTrigger>
+            <TabsTrigger value="community" className="text-xs sm:text-sm gap-1"><MessageSquare className="h-4 w-4" /><span className="hidden sm:inline">{T('المجتمعات', 'Communities')}</span>{newCommunityCount > 0 && <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-emerald-500 text-white text-[10px] font-bold">{newCommunityCount > 99 ? '99+' : newCommunityCount}</span>}</TabsTrigger>
+            <TabsTrigger value="activity" className="text-xs sm:text-sm gap-1"><Activity className="h-4 w-4" /><span className="hidden sm:inline">{T('المتابعة', 'Activity')}</span></TabsTrigger>
+            <TabsTrigger value="gallery" className="text-xs sm:text-sm gap-1"><Camera className="h-4 w-4" /><span className="hidden sm:inline">{T('معرض الصور', 'Gallery')}</span></TabsTrigger>
+            <TabsTrigger value="cms" className="text-xs sm:text-sm gap-1"><Settings className="h-4 w-4" /><span className="hidden sm:inline">{T('المحتوى', 'Content')}</span></TabsTrigger>
+            <TabsTrigger value="social" className="text-xs sm:text-sm gap-1"><Link2 className="h-4 w-4" /><span className="hidden sm:inline">{T('الروابط', 'Links')}</span></TabsTrigger>
+            <TabsTrigger value="payments" className="text-xs sm:text-sm gap-1 text-amber-600 dark:text-amber-400"><Wallet className="h-4 w-4" /><span className="hidden sm:inline">{T('المدفوعات', 'Payments')}</span></TabsTrigger>
+            <TabsTrigger value="ai-extract" className="text-xs sm:text-sm gap-1 text-purple-600 dark:text-purple-400"><Sparkles className="h-4 w-4" /><span className="hidden sm:inline">{T('استخراج AI', 'AI Extract')}</span></TabsTrigger>
+            <TabsTrigger value="complaints" className="text-xs sm:text-sm gap-1 text-red-600 dark:text-red-400"><Flag className="h-4 w-4" /><span className="hidden sm:inline">{T('الشكاوي', 'Complaints')}</span>{newComplaints > 0 && <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">{newComplaints}</span>}</TabsTrigger>
+            <TabsTrigger value="grades-schedule" className="text-xs sm:text-sm gap-1 text-emerald-600 dark:text-emerald-400"><GraduationCap className="h-4 w-4" /><span className="hidden sm:inline">{T('الصفوف والمواعيد', 'Grades')}</span></TabsTrigger>
+            {/* (2026-و40) الكتب والملازم — مكتبة PDF الطالب يفتحها/يحملها */}
+            <TabsTrigger value="books" className="text-xs sm:text-sm gap-1 text-sky-600 dark:text-sky-400"><BookOpen className="h-4 w-4" /><span className="hidden sm:inline">{T('الكتب والملازم', 'Books')}</span></TabsTrigger>
+            <TabsTrigger value="player-settings" className="text-xs sm:text-sm gap-1 text-indigo-600 dark:text-indigo-400"><MonitorPlay className="h-4 w-4" /><span className="hidden sm:inline">{T('إعدادات الفيديو والووترمارك', 'Video & Watermark')}</span></TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="students"><StudentsManager onStatsRefresh={fetchStats} onViewImage={setImageModalSrc} /></TabsContent>
+          {/* (2026-و29) تاب المجموعات */}
+          <TabsContent value="groups"><GroupsManager /></TabsContent>
+          <TabsContent value="my-students"><MyStudentsPanel onViewImage={setImageModalSrc} /></TabsContent>
+          <TabsContent value="videos"><VideoManager onStatsRefresh={fetchStats} /></TabsContent>
+          <TabsContent value="homework">
+            <ContentManager<Homework> title="إدارة الواجبات | Homework" apiPath="/api/homework" itemName="homework"
+              fields={{ title: { label: 'عنوان الواجب | HW Title', type: 'text' }, content: { label: 'المحتوى | Content', type: 'textarea' } }}
+              renderTitle={(item) => item.title} renderSubtitle={(item) => item.content?.substring(0, 80) || (item.filePath ? `📎 ${item.fileType}` : '')}
+              supportFileUpload fileCategory="homework" acceptedTypes=".pdf,.doc,.docx,image/*" supportAnswerKey supportThumbnail supportMCQ onRefresh={fetchStats} />
+          </TabsContent>
+          <TabsContent value="exams"><ExamTrackingPanel onViewImage={setImageModalSrc} /></TabsContent>
+          <TabsContent value="item-analytics"><AdminItemAnalytics /></TabsContent>
+          <TabsContent value="announcements">
+            <ContentManager<Announcement> title="إدارة الإعلانات | Announcements" apiPath="/api/announcements" itemName="announcements"
+              fields={{ title: { label: 'عنوان | Title', type: 'text' }, content: { label: 'المحتوى | Content', type: 'textarea' } }}
+              renderTitle={(item) => item.title} renderSubtitle={(item) => item.content?.substring(0, 100) + '...'} onRefresh={fetchStats} />
+          </TabsContent>
+          <TabsContent value="community"><CommunityPanel /></TabsContent>
+          <TabsContent value="activity"><ActivityPanel /></TabsContent>
+          <TabsContent value="gallery"><GalleryManager /></TabsContent>
+          <TabsContent value="cms"><CMSPanel /></TabsContent>
+          <TabsContent value="social"><SocialLinksPanel /></TabsContent>
+          <TabsContent value="payments"><PaymentsPanel onRefresh={fetchStats} /></TabsContent>
+          <TabsContent value="ai-extract"><AIExtractionPanel onRefresh={fetchStats} adminId={(currentAdmin && currentAdmin.id) || ''} /></TabsContent>
+          <TabsContent value="complaints"><AdminComplaints /></TabsContent>
+          {/* (و24) طلب المستر: إدارة الصفوف الدراسية (إضافة/حذف صف + عربي/إنجليزي/إيموجي) + مواعيد السنتر (حذف/إضافة يوم وحصة) */}
+          <TabsContent value="grades-schedule"><GradesSchedulePanel /></TabsContent>
+          {/* (2026-و40) الكتب والملازم */}
+          <TabsContent value="books"><BooksManager /></TabsContent>
+          <TabsContent value="player-settings"><PlayerSettingsPanel /></TabsContent>
+        </Tabs>
+
+        {/* Admin Settings Dialog */}
+        {showSettings && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowSettings(false)}>
+            <div className="bg-card border rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-lg font-bold flex items-center gap-2"><Settings className="h-5 w-5 text-primary" />إعدادات الحساب</h3>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowSettings(false)}><X className="h-4 w-4" /></Button>
+              </div>
+              {settingsLoading ? (
+                <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">البريد الإلكتروني الجديد</Label>
+                    <Input value={settingsEmail} onChange={(e) => setSettingsEmail(e.target.value)} placeholder="admin@example.com" dir="ltr" type="email" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">كلمة المرور الجديدة (اختياري)</Label>
+                    <Input value={settingsNewPass} onChange={(e) => setSettingsNewPass(e.target.value)} placeholder="6 حروف على الأقل" type="password" />
+                  </div>
+                  <div className="border-t pt-4">
+                    <p className="text-[10px] text-muted-foreground mb-2">لكي تحفظ التغييرات، أدخل كلمة المرور الحالية:</p>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">كلمة المرور الحالية *</Label>
+                      <Input value={settingsOldPass} onChange={(e) => setSettingsOldPass(e.target.value)} placeholder="أدخل كلمة المرور الحالية" type="password" className="border-destructive/30 focus-visible:ring-destructive/30" />
+                    </div>
+                  </div>
+                  {/* Resend API Key */}
+                  <div className="border-t pt-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold text-muted-foreground">مفتاح Resend API للإيميلات</p>
+                      <Button size="sm" variant="outline" onClick={async () => {
+                        setResendSaving(true)
+                        try {
+                          await fetch('/api/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resend_api_key: resendApiKey }) })
+                          toast.success('تم حفظ مفتاح Resend')
+                        } catch { toast.error('خطأ في الحفظ') }
+                        setResendSaving(false)
+                      }} disabled={resendSaving}>
+                        {resendSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                      </Button>
+                    </div>
+                    <Input value={resendApiKey} onChange={(e) => setResendApiKey(e.target.value)} placeholder="re_xxxxxxxxxxxx" dir="ltr" type="password" className="font-mono text-xs" />
+                    <p className="text-[10px] text-muted-foreground">يُستخدم لإرسال إشعارات بالبريد للطلاب. احصل عليه من resend.com</p>
+                  </div>
+                  {/* Hero Developer Portfolio URL */}
+                  <div className="border-t pt-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold text-muted-foreground">رابط Hero Developer Portfolio</p>
+                      <Button size="sm" variant="outline" onClick={async () => {
+                        setHeroDevSaving(true)
+                        try {
+                          const res = await fetch('/api/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hero_developer_url: heroDevUrl }) })
+                          if (res.ok) {
+                            // Update siteConfig in store so footer/hero reflect instantly
+                            const cfg = useAppStore.getState().siteConfig
+                            useAppStore.getState().setSiteConfig({ ...cfg, hero_developer_url: heroDevUrl })
+                            toast.success('تم حفظ رابط Hero Developer')
+                          } else { toast.error('خطأ في الحفظ') }
+                        } catch { toast.error('خطأ في الحفظ') }
+                        setHeroDevSaving(false)
+                      }} disabled={heroDevSaving}>
+                        {heroDevSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                      </Button>
+                    </div>
+                    <Input value={heroDevUrl} onChange={(e) => setHeroDevUrl(e.target.value)} placeholder="https://hero-developer-portfolio-11.vercel.app" dir="ltr" type="url" className="font-mono text-xs" />
+                    <p className="text-[10px] text-muted-foreground">الرابط يظهر في الهيدر (Hero Developer) والفوتر (Developed by Adam Hawash). غيّره في أي وقت وبيتنعكس فوراً.</p>
+                  </div>
+                  {/* Payment Numbers */}
+                  <div className="border-t pt-4 space-y-3">
+                    <p className="text-xs font-semibold text-muted-foreground">أرقام الدفع (تظهر للطالب عند الدفع)</p>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">فودافون كاش</Label>
+                      <Input value={vodafoneCash} onChange={(e) => setVodafoneCash(e.target.value)} placeholder="01012345678" dir="ltr" className="font-mono text-xs" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">إنستا باي</Label>
+                      <Input value={instapay} onChange={(e) => setInstapay(e.target.value)} placeholder="@username" dir="ltr" className="font-mono text-xs" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">فوري</Label>
+                      <Input value={fawry} onChange={(e) => setFawry(e.target.value)} placeholder="01098765432" dir="ltr" className="font-mono text-xs" />
+                    </div>
+                    <Button size="sm" variant="outline" onClick={async () => {
+                      setPaymentSaving(true)
+                      try {
+                        const res = await fetch('/api/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payment_vodafone_cash: vodafoneCash, payment_instapay: instapay, payment_fawry: fawry }) })
+                        if (res.ok) {
+                          const cfg = useAppStore.getState().siteConfig
+                          useAppStore.getState().setSiteConfig({ ...cfg, payment_vodafone_cash: vodafoneCash, payment_instapay: instapay, payment_fawry: fawry })
+                          toast.success('تم حفظ أرقام الدفع')
+                        } else { toast.error('خطأ في الحفظ') }
+                      } catch { toast.error('خطأ في الحفظ') }
+                      setPaymentSaving(false)
+                    }} disabled={paymentSaving}>
+                      {paymentSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                    </Button>
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <Button onClick={saveSettings} disabled={settingsSaving || !settingsOldPass} className="flex-1">
+                      {settingsSaving ? <Loader2 className="h-4 w-4 ml-1 animate-spin" /> : <Save className="h-4 w-4 ml-1" />}
+                      {settingsSaving ? 'جاري الحفظ...' : 'حفظ التغييرات'}
+                    </Button>
+                    <Button variant="outline" onClick={() => { setShowSettings(false); setSettingsOldPass(''); setSettingsNewPass('') }}>إلغاء</Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+      {/* Image modal for viewing student answer images */}
+      <ImageModal imageSrc={imageModalSrc} onClose={function() { setImageModalSrc(null) }} />
+    </div>
+  )
+}
+
+/* ========== STAT CARD ========== */
+function StatCard({ icon: Icon, label, value, color }: { icon: any; label: string; value: number; color: string }) {
+  return (
+    <Card>
+      <CardContent className="p-4 flex items-center gap-3">
+        <div className={`h-10 w-10 rounded-lg flex items-center justify-center shrink-0 ${color}`}><Icon className="h-5 w-5" /></div>
+        <div><p className="text-2xl font-bold">{value}</p><p className="text-xs text-muted-foreground">{label}</p></div>
+      </CardContent>
+    </Card>
+  )
+}
+
+/* ========== STUDENTS MANAGER ========== */
+/* (2026-و60) نقاط الطالب من الدفتر — للعرض والتحكم (زود/خصم) */
+type PointsInfo = { id: string; name: string; grade: string; totalPoints: number; examPoints: number; homeworkPoints: number; manualPoints: number; manualRows: { resultId: string; points: number; note: string; updatedAt: string }[] }
+
+/* ============================================================
+   (MG-1 + MG-2) رسالة واتساب لولي الأمر — الأدوات اتنقلت لـ lib/parent-message
+   (القالب المصري الودود + تطبيع الرقم + ملامة البلايسهولدرز) — عشان
+   تتبقى مشتركة بين المودال ولوحة الإعدادات وتتخزن في الداتابيز.
+   ============================================================ */
+
+function StudentsManager({ onStatsRefresh, onViewImage }: { onStatsRefresh: () => void; onViewImage: (src: string) => void }) {
+  const gradesList = useGradesList()
+  const [students, setStudents] = useState<Student[]>([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'paid'>('pending')
+  const [filterGrade, setFilterGrade] = useState('')
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
+  const [studentProgress, setStudentProgress] = useState<any>(null)
+  /* (و60) تحكم المستر في النقاط: زود له أو خصم منه — طلب المستر الحرفي */
+  const [pointsMap, setPointsMap] = useState<Record<string, PointsInfo>>({})
+  const [pointsDialogFor, setPointsDialogFor] = useState<Student | null>(null)
+  const [pointsMode, setPointsMode] = useState<'add' | 'sub'>('add')
+  const [pointsAmount, setPointsAmount] = useState('')
+  const [pointsNote, setPointsNote] = useState('')
+  const [pointsBusy, setPointsBusy] = useState(false)
+  const [loadingProgress, setLoadingProgress] = useState(false)
+  /* (و65) التقارير الجاهزة للطباعة — طلب المستر: «أطبع ملف PDF تقرير لحاله لكل طالب» + «ملف لكل الطلاب» */
+  const T = useT()
+  const [reportFor, setReportFor] = useState<Student | null>(null)
+  const [classReportOpen, setClassReportOpen] = useState(false)
+  /* (MG-1) بحث فوري في الطلاب: بالاسم أو رقم الموبايل أو الصف (من غير طلب سيرفر) */
+  const [search, setSearch] = useState('')
+  /* (MG-1) رسالة واتساب لولي الأمر — النتايج بتتسحب من /api/admin/reports?type=student */
+  const [waFor, setWaFor] = useState<Student | null>(null)
+  const [waLoading, setWaLoading] = useState(false)
+  const [waMessage, setWaMessage] = useState('')
+
+  const loadStudents = async (showLoader = true) => {
+    if (showLoader) setLoading(true)
+    try {
+      const params = new URLSearchParams({ pageSize: '100' })
+      if (filter !== 'all') params.set('status', filter)
+      if (filterGrade) params.set('grade', filterGrade)
+      const res = await fetch(`/api/students?${params}`)
+      const data = await res.json()
+      setStudents(data.students || [])
+    } catch { toast.error('خطأ في تحميل الطلاب') }
+    setLoading(false)
+  }
+
+  useEffect(() => { loadStudents() }, [filter, filterGrade])
+
+  /* (MG-1) الفلترة الفعلية للبحث — غير حساسة لحالة الأحرف + بتفهم الأرقام العربية (٠١٢٣) */
+  const filteredStudents = useMemo(() => {
+    const norm = (v: any) => String(v || '').replace(/[٠-٩]/g, (x) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(x))).trim().toLowerCase()
+    const q = norm(search)
+    if (!q) return students
+    return students.filter((s) => norm(s.name).includes(q) || norm(s.phone).includes(q) || norm(s.grade).includes(q))
+  }, [students, search])
+
+  /* (و60) تحميل نقاط كل الطلاب من الدفتر (تراكمي: قديم + جديد + يدوي) */
+  const loadPoints = async () => {
+    try {
+      const res = await fetch('/api/points')
+      const data = await res.json()
+      var m: Record<string, PointsInfo> = {}
+      ;(data.students || []).forEach(function (s: PointsInfo) { m[s.id] = s })
+      setPointsMap(m)
+    } catch { /* صامت — البادج يظهر لما يوصل */ }
+  }
+  useEffect(() => { loadPoints() }, [])
+
+  // ملاحظة: قفل الأجهزة بقى صارم ودايمًا (شغال على السيرفر من غير مفتاح) —
+  // الحساب بيتقفل على الجهاز اللي اتعمل بيه بس، والتحكم بيبقى لكل طالب
+  // من زرار "سماح" في إدارة الطلاب.
+
+  const loadStudentProgress = async (studentId: string) => {
+    setSelectedStudentId(studentId)
+    setLoadingProgress(true)
+    try {
+      const res = await fetch(`/api/students/${studentId}/progress`)
+      const data = await res.json()
+      setStudentProgress(data)
+    } catch { toast.error('خطأ في تحميل بيانات الطالب') }
+    setLoadingProgress(false)
+  }
+
+  const closeStudentDetails = () => {
+    setSelectedStudentId(null)
+    setStudentProgress(null)
+  }
+
+  const handleAction = async (id: string, status: 'approved' | 'paid' | 'rejected') => {
+    try {
+      await fetch(`/api/students/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) })
+      toast.success(status === 'approved' ? 'تم قبول الطالب - مجاني' : status === 'paid' ? 'تم تحويل الطالب لبفلوس' : 'تم رفض الطالب - مش هيدخل على المنصة تاني')
+      loadStudents(false); onStatsRefresh()
+    } catch { toast.error('خطأ في تحديث حالة الطالب') }
+  }
+
+  const handleDelete = async (id: string) => {
+    try { await fetch(`/api/students/${id}`, { method: 'DELETE' }); toast.success('تم حذف الطالب'); loadStudents(false); onStatsRefresh() }
+    catch { toast.error('خطأ في حذف الطالب') }
+  }
+
+  // ===== فك ربط الجهاز — الزرار الوحيد للمستر (منظومة الجهاز الواحد) =====
+  // بعد فك الربط: أول جهاز يعمله الطالب تسجيل دخول بيبقى جهاز حسابه **للأبد**
+  const handleUnbind = async (id: string) => {
+    if (!window.confirm('فك ربط الجهاز؟ بعد كده أول جهاز يعمله الطالب تسجيل دخول هيبقى هو جهاز حسابه للأبد.')) return
+    try {
+      const res = await fetch(`/api/students/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resetDevice: true }) })
+      if (!res.ok) throw new Error()
+      toast.success('تم فك الربط — أول جهاز يسجل دخول بعد كده هيبقى هو جهاز الحساب للأبد')
+      loadStudents(false)
+    } catch { toast.error('خطأ في فك الربط — جرب تاني') }
+  }
+
+  // ===== (و60) التحكم في نقاط الطالب — زود/خصم/تراجع =====
+  const openPointsDialog = (s: Student) => {
+    setPointsDialogFor(s); setPointsMode('add'); setPointsAmount(''); setPointsNote('')
+  }
+  const submitPointsAdjust = async () => {
+    if (!pointsDialogFor || pointsBusy) return
+    var amt = Number(pointsAmount)
+    if (!isFinite(amt) || amt === 0) { toast.error('اكتب قيمة النقاط الأول (مش صفر)'); return }
+    var delta = pointsMode === 'add' ? Math.abs(amt) : -Math.abs(amt)
+    setPointsBusy(true)
+    try {
+      const res = await fetch('/api/points', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ studentId: pointsDialogFor.id, delta: delta, note: pointsNote }) })
+      const data = await res.json()
+      if (!res.ok || data.error) { toast.error(String(data.error || 'حصل خطأ')); setPointsBusy(false); return }
+      toast.success((delta > 0 ? 'زودت ' + Math.abs(delta) + ' نقطة لـ ' : 'خصمت ' + Math.abs(delta) + ' نقطة من ') + pointsDialogFor.name)
+      setPointsDialogFor(null)
+      loadPoints()
+    } catch { toast.error('حصل خطأ في حفظ التعديل') }
+    setPointsBusy(false)
+  }
+  const undoManualPoints = async (resultId: string) => {
+    if (!window.confirm('تراجع عن التعديل اليدوي ده؟ النقاط هترجع زي ما كانت قبله.')) return
+    try {
+      const res = await fetch('/api/points', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resultId: resultId }) })
+      const data = await res.json()
+      if (!res.ok || data.error) { toast.error(String(data.error || 'حصل خطأ')); return }
+      toast.success('تم التراجع عن التعديل')
+      loadPoints()
+    } catch { toast.error('حصل خطأ في التراجع') }
+  }
+
+  /* (MG-1 + MG-2) رسالة ولي الأمر: القالب من الداتابيز (أو الافتراضي المصري)
+     + سحب نتايج الطالب + ملامة البلايسهولدرز — والرسالة قابلة للتعديل */
+  const openWaDialog = (s: Student) => {
+    setWaFor(s); setWaMessage(''); setWaLoading(true)
+    const reportP = fetch('/api/admin/reports?type=student&id=' + encodeURIComponent(s.id)).then((r) => r.json())
+    const tplP = fetch('/api/admin/parent-msg-template').then((r) => r.json()).catch(() => null)
+    Promise.all([reportP, tplP])
+      .then(([data, tplData]) => {
+        const tpl = (tplData && tplData.template) || (tplData && tplData.fallback) || DEFAULT_PARENT_TEMPLATE
+        setWaMessage(fillParentTemplate(tpl, buildParentMsgData(s.name, data || {})))
+      })
+      .catch(() => {
+        setWaMessage(fillParentTemplate(DEFAULT_PARENT_TEMPLATE, buildParentMsgData(s.name, null)))
+        toast.error('معرفش أجيب نتايج الطالب من السيرفر — الرسالة هتتبعت من غير نتايج')
+      })
+      .finally(() => setWaLoading(false))
+  }
+  /* الرقم المفضل: ولي الأمر (parentPhone) لو صالح — وإلا موبايل الطالب نفسه */
+  const waPhone = waFor ? (normalizeWaPhone(waFor.parentPhone || '') || normalizeWaPhone(waFor.phone || '')) : ''
+  const waPhoneIsParent = !!(waFor && normalizeWaPhone(waFor.parentPhone || ''))
+  const sendWa = () => {
+    if (!waPhone) { toast.error('مفيش رقم موبايل صالح لولي الأمر — راجع رقم الطالب في بياناته'); return }
+    const url = 'https://wa.me/' + waPhone + '?text=' + encodeURIComponent(waMessage)
+    window.open(url, '_blank')
+  }
+  /* (MG-2) الإرسال من المنصة: لو فيه مزود مفعّل بيبعت له فعليًا —
+     لو مفيش السيرفر بيرجع waLink ونفتحه زي الإرسال اليدوي بالظبط */
+  const [waSending, setWaSending] = useState(false)
+  const sendViaPlatform = async () => {
+    if (!waFor) return
+    setWaSending(true)
+    try {
+      const res = await fetch('/api/admin/messages/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: waPhone || '', message: waMessage }) })
+      const d = await res.json()
+      if (d && d.ok && d.mode === 'manual') {
+        toast.info('الإرسال التلقائي مش مفعّل — فتحتلك واتساب جاهز بالإرسال اليدوي')
+        window.open(d.waLink, '_blank')
+      } else if (d && d.ok) {
+        toast.success('اتبعتت الرسالة لولي الأمر عبر المنصة (' + (d.provider || d.mode) + ')')
+      } else {
+        toast.error((d && d.error) || 'فشل الإرسال — جرب الإرسال اليدوي')
+      }
+    } catch { toast.error('حصل خطأ في الاتصال') }
+    setWaSending(false)
+  }
+  /* (MG-2) حفظ الرسالة الحالية كقالب افتراضي — اسم الطالب بيتبدل بـ {student}
+     عشان القالب يفضل عام لكل الطلاب */
+  const [waSavingTpl, setWaSavingTpl] = useState(false)
+  const saveAsTemplate = async () => {
+    if (!waFor) return
+    setWaSavingTpl(true)
+    try {
+      const tpl = waMessage.split(waFor.name).join('{student}')
+      const res = await fetch('/api/admin/parent-msg-template', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ template: tpl }) })
+      const d = await res.json()
+      if (d && d.ok) toast.success('اتحفظ كقالب افتراضي — اسم الطالب اتعوض بـ {student} عشان القالب يفضل عام')
+      else toast.error((d && d.error) || 'حصل خطأ في الحفظ')
+    } catch { toast.error('حصل خطأ في الاتصال') }
+    setWaSavingTpl(false)
+  }
+  const copyWa = async () => {
+    try { await navigator.clipboard.writeText(waMessage); toast.success('تم نسخ الرسالة — ابعتها لولي الأمر') }
+    catch { toast.error('معرفش أنسخ — انسخ الرسالة يدويًا من الصندوق') }
+  }
+
+  const statusColors: Record<string, string> = { pending: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', approved: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', paid: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', refused: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' }
+  // أسماء أنواع الأجهزة بالعربي — تظهر في بادج الطالب
+  const deviceTypeLabels: Record<string, string> = { mobile: 'موبايل', tablet: 'تابلت', computer: 'كمبيوتر' }
+  const deviceIcon = (t?: string) => t === 'computer' ? <Monitor className="h-2.5 w-2.5" /> : t === 'tablet' ? <Tablet className="h-2.5 w-2.5" /> : <Smartphone className="h-2.5 w-2.5" />
+  const statusLabels: Record<string, string> = { pending: 'قيد المراجعة', approved: 'مقبول (مجاني)', paid: 'بفلوس', rejected: 'مرفوض', refused: 'مرفوض' }
+
+  // Student Details Panel
+  if (selectedStudentId && studentProgress) {
+    const { summary, videoProgress: vp, examResults: er } = studentProgress
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">تفاصيل الطالب: {studentProgress.student.name}</CardTitle>
+            <Button variant="outline" size="sm" onClick={closeStudentDetails}>رجوع</Button>
+          </div>
+          <p className="text-xs text-muted-foreground">الصف: {studentProgress.student.grade}</p>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Summary Stats */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="text-center p-3 rounded-lg bg-purple-500/10"><p className="text-xl font-bold text-purple-600 dark:text-purple-400">{summary.totalVideosWatched}</p><p className="text-[10px] text-muted-foreground">فيديو شاهده</p></div>
+            <div className="text-center p-3 rounded-lg bg-blue-500/10"><p className="text-xl font-bold text-blue-600 dark:text-blue-400">{summary.avgWatchPercent}%</p><p className="text-[10px] text-muted-foreground">متوسط المشاهدة</p></div>
+            <div className="text-center p-3 rounded-lg bg-emerald-500/10"><p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{summary.avgExamScore}</p><p className="text-[10px] text-muted-foreground">متوسط الامتحانات</p></div>
+            <div className="text-center p-3 rounded-lg bg-amber-500/10"><p className="text-xl font-bold text-amber-600 dark:text-amber-400">{summary.examsPassed}/{summary.totalExamsTaken}</p><p className="text-[10px] text-muted-foreground">ناجح/إجمالي</p></div>
+          </div>
+
+          {/* Video Progress */}
+          <div>
+            <h4 className="font-semibold text-sm mb-3 flex items-center gap-2"><PlayCircle className="h-4 w-4 text-purple-500" />تقدم الفيديوهات ({summary.completedVideos} مكتمل من {summary.totalVideosWatched})</h4>
+            {vp.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-4">لم يشاهد أي فيديو بعد</p>
+            ) : (
+              <div className="space-y-2 max-h-[250px] overflow-y-auto custom-scrollbar">
+                {vp.map((v: any) => (
+                  <div key={v.id} className="flex items-center gap-3 p-2 rounded-lg border bg-card">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium truncate">{v.videoTitle}</p>
+                      <p className="text-[10px] text-muted-foreground">{v.videoGrade} | آخر مشاهدة: {new Date(v.lastWatchedAt).toLocaleDateString('ar-EG')}</p>
+                    </div>
+                    <div className="shrink-0 text-left" style={{ minWidth: '60px' }}>
+                      <div className={`text-xs font-bold ${v.percent >= 90 ? 'text-emerald-600' : v.percent >= 50 ? 'text-amber-600' : 'text-red-500'}`}>{v.percent}%</div>
+                      <div className="h-1.5 w-full bg-muted rounded-full mt-1"><div className={`h-full rounded-full ${v.percent >= 90 ? 'bg-emerald-500' : v.percent >= 50 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${v.percent}%` }} /></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Exam Results */}
+          <div>
+            <h4 className="font-semibold text-sm mb-3 flex items-center gap-2"><Trophy className="h-4 w-4 text-amber-500" />نتائج الامتحانات</h4>
+            {er.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-4">لم يؤدِ أي امتحان بعد</p>
+            ) : (
+              <div className="space-y-2 max-h-[250px] overflow-y-auto custom-scrollbar">
+                {er.map((e: any) => (
+                  <div key={e.id} className="flex items-center gap-3 p-2 rounded-lg border bg-card">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium truncate">{e.examTitle}</p>
+                      <p className="text-[10px] text-muted-foreground">{e.examGrade} | {new Date(e.submittedAt).toLocaleDateString('ar-EG')}</p>
+                    </div>
+                    <div className="shrink-0 text-left" style={{ minWidth: '60px' }}>
+                      <div className={`text-xs font-bold ${e.passed ? 'text-emerald-600' : 'text-red-500'}`}>{e.score}/{e.maxScore}</div>
+                      <Badge className={`text-[9px] mt-1 ${e.passed ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{e.passed ? 'ناجح' : 'عايز مراجعة'}</Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  // Loading student details
+  if (selectedStudentId && loadingProgress) {
+    return (
+      <Card>
+        <CardContent className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <CardTitle className="text-lg">إدارة الطلاب</CardTitle>
+          <div className="flex gap-1 flex-wrap items-center">
+            <select value={filterGrade} onChange={(e) => setFilterGrade(e.target.value)} className="h-8 rounded-md border border-input bg-transparent px-2 text-xs">
+              <option value="">كل الصفوف</option>
+              {gradesList.map((g) => <option key={g.ar} value={g.ar}>{(g.emoji ? g.emoji + ' ' : '') + g.ar}</option>)}
+            </select>
+            <div className="flex gap-1 bg-muted rounded-lg p-1">
+              {(['pending', 'all', 'approved', 'paid'] as const).map((f) => (
+                <Button key={f} variant={filter === f ? 'default' : 'ghost'} size="sm" className="text-xs h-7 px-2" onClick={() => setFilter(f)}>
+                  {f === 'pending' ? 'بانتظار' : f === 'approved' ? 'مقبول (مجاني)' : f === 'paid' ? 'بفلوس' : 'الكل'}
+                </Button>
+              ))}
+            </div>
+            {/* (و65) التقرير الشامل — ملف PDF واحد لكل الطلاب (حسب الصف المختار) */}
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs gap-1.5 border-emerald-400 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
+              onClick={() => setClassReportOpen(true)}
+              title="ملف PDF واحد لكل الطلاب: الفيديوهات اللي مش شافهاش + الواجبات المقدمة + الامتحانات والدرجات"
+            >
+              <FileDown className="h-3.5 w-3.5" />
+              {filterGrade ? T('تقرير الصف PDF', 'Grade PDF Report') : T('تقرير شامل PDF', 'Full PDF Report')}
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {/* (MG-1) بحث فوري بالاسم أو رقم الموبايل أو الصف — بيفلتر اللستة تحت مباشرة */}
+        <div className="relative mb-3">
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="ابحث بالاسم أو رقم الموبايل أو الصف..."
+            className="h-9 pr-10 text-sm"
+          />
+        </div>
+        {loading ? <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div> : students.length === 0 ? (
+          <p className="text-center text-muted-foreground py-10 text-sm">لا يوجد طلاب</p>
+        ) : filteredStudents.length === 0 ? (
+          <p className="text-center text-muted-foreground py-10 text-sm">مفيش نتايج مطابقة للبحث — جرب اسم أو رقم أو صف تاني</p>
+        ) : (
+          <div className="space-y-3 max-h-[500px] overflow-y-auto custom-scrollbar">
+            {filteredStudents.map((s) => (
+              <div key={s.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 rounded-lg border bg-card">
+                <div className="space-y-1 min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-sm">{s.name}</span>
+                    {/* (و60) نقاط الطالب المتراكمة — دوس عليه يفتح التحكم (زود/خصم) */}
+                    {pointsMap[s.id] && (
+                      <button
+                        type="button"
+                        className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#C49A38]/10 text-[#8A6D22] dark:text-[#E5BE5A] hover:bg-[#C49A38]/20 transition-colors cursor-pointer"
+                        title="اضغط للتحكم في نقاط الطالب (زود له أو خصم منه)"
+                        onClick={() => openPointsDialog(s)}
+                      >⭐ {pointsMap[s.id].totalPoints} نقطة</button>
+                    )}
+                    <Badge variant="secondary" className={`text-[10px] ${statusColors[s.status]}`}>{statusLabels[s.status]}</Badge>
+                    {(s as any).allowAllDevices === true ? (
+                      <Badge className="text-[9px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 flex items-center gap-0.5"><ShieldCheck className="h-2.5 w-2.5" />سماح كل الأجهزة</Badge>
+                    ) : ((s as any).deviceId || (s as any).creationDeviceId) ? (
+                      <Badge variant="outline" className="text-[9px] border-primary/40 text-primary flex items-center gap-0.5">{deviceIcon((s as any).deviceType)}مربوط بجهاز{deviceTypeLabels[(s as any).deviceType] ? ' — ' + deviceTypeLabels[(s as any).deviceType] : ''}</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[9px] text-muted-foreground">هيتربط بأول ما يدخل</Badge>
+                    )}
+                    {s.loginCount > 0 && <span className="text-[10px] text-muted-foreground flex items-center gap-0.5"><Eye className="h-3 w-3" />{s.loginCount} دخول</span>}
+                    {(s as any).watchedVideoCount > 0 && <span className="text-[10px] text-purple-600 dark:text-purple-400 flex items-center gap-0.5"><VideoIcon className="h-3 w-3" />{(s as any).watchedVideoCount} فيديو</span>}
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap" dir="ltr">
+                    <p className="text-xs text-muted-foreground">{s.phone}</p>
+                    {/* (2026-و29) طلب المستر الحرفي: الرقم والباسورد اللي الطالب دخل بيه
+                        ظاهرين في اللوحة عشان نساعده لما ينسى — زرار نسخ جنب كل واحد */}
+                    {(s as any).password ? (
+                      <button
+                        type="button"
+                        className="text-[10px] font-mono bg-muted hover:bg-muted/70 border border-border rounded px-1.5 py-0.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                        title="اضغط لنسخ كلمة السر"
+                        onClick={function () {
+                          try {
+                            navigator.clipboard.writeText(String((s as any).password || ''))
+                            toast.success('تم نسخ كلمة السر — ابعتها للطالب')
+                          } catch (e) { toast.error('انسخها يدويًا: ' + (s as any).password) }
+                        }}
+                      >🔑 {(s as any).password}</button>
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground">🔑 —</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">ولي الأمر: {s.parentName} <span dir="ltr">({s.parentPhone})</span></p>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <Badge variant="outline" className="text-[10px]">{s.grade}</Badge>
+                    {s.lastLogin && <p className="text-[10px] text-muted-foreground">آخر دخول: {new Date(s.lastLogin).toLocaleDateString('ar-EG')}</p>}
+                  </div>
+                  {/* محاولات الدخول الممنوعة — سطر نظيف بالعربي من غير أي أكواد تقنية */}
+                  {(s as any).lastDeviceBlock?.createdAt && (s as any).allowAllDevices !== true && (
+                    <p className="text-[10px] text-red-600 dark:text-red-400 leading-relaxed">
+                      ⛔ في محاولات دخول من جهاز تاني اترفضت — آخر محاولة: {new Date((s as any).lastDeviceBlock.createdAt).toLocaleString('ar-EG', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                  <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20" onClick={() => loadStudentProgress(s.id)} title="تفاصيل"><BarChart3 className="h-4 w-4" /></Button>
+                  {/* (و65) تقرير PDF للطالب — امتحاناته + واجباته + نسبة مشاهدة الفيديوهات */}
+                  <Button size="icon" variant="ghost" className="h-8 w-8 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20" onClick={() => setReportFor(s)} title="تقرير PDF للطالب (امتحاناته وواجباته ونسبة مشاهدة الفيديوهات)"><FileDown className="h-4 w-4" /></Button>
+                  {/* (MG-1) رسالة واتساب لولي الأمر — نتايج الامتحانات والواجبات ونسبة المشاهدة في رسالة قابلة للتعديل */}
+                  <Button size="sm" variant="outline" className="h-8 px-2.5 text-xs gap-1 border-green-500 text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20" onClick={() => openWaDialog(s)} title="رسالة واتساب لولي الأمر بنتايج الامتحانات والواجبات ونسبة المشاهدة">
+                    <MessageCircle className="h-3.5 w-3.5" />
+                    رسالة لولي الأمر
+                  </Button>
+                  {/* فك الربط — التحكم الوحيد: بعد الفك أول جهاز يدخل بيبقى جهاز الحساب للأبد */}
+                  {((s as any).deviceId || (s as any).creationDeviceId) && (s as any).allowAllDevices !== true && (
+                    <Button size="sm" variant="outline" className="h-8 px-2.5 text-xs border-amber-400 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-400" onClick={() => handleUnbind(s.id)} title="فك ربط الجهاز — أول جهاز يسجل دخول بعد كده هيبقى هو جهاز الحساب الجديد للأبد"><RotateCcw className="h-3.5 w-3.5" />فك الربط</Button>
+                  )}
+                  {s.status === 'pending' && (<>
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20" onClick={() => handleAction(s.id, 'approved')} title="مقبول - مجاني"><Check className="h-4 w-4" /></Button>
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20" onClick={() => handleAction(s.id, 'paid')} title="بفلوس"><span className="text-sm font-bold">$</span></Button>
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => handleAction(s.id, 'rejected')} title="رفض الطالب - مش هيدخل على المنصة"><X className="h-4 w-4" /></Button>
+                  </>)}
+                  {s.status === 'approved' && (
+                    <>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20" onClick={() => handleAction(s.id, 'paid')} title="تحويل لبفلوس"><span className="text-sm font-bold">$</span></Button>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => handleAction(s.id, 'rejected')} title="رفض الطالب"><X className="h-4 w-4" /></Button>
+                    </>
+                  )}
+                  {s.status === 'paid' && (
+                    <>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20" onClick={() => handleAction(s.id, 'approved')} title="تحويل لمجاني"><Check className="h-4 w-4" /></Button>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => handleAction(s.id, 'rejected')} title="رفض الطالب"><X className="h-4 w-4" /></Button>
+                    </>
+                  )}
+                  {s.status === 'rejected' && (
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20" onClick={() => handleAction(s.id, 'approved')} title="إلغاء الرفض وقبول الطالب"><Check className="h-4 w-4" /></Button>
+                  )}
+                  <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => handleDelete(s.id)} title="حذف من النظام"><Trash2 className="h-4 w-4" /></Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+
+      {/* (و60) دايلوج التحكم في نقاط الطالب — زود له أو خصم منه + تراجع عن أي تعديل يدوي */}
+      <Dialog open={!!pointsDialogFor} onOpenChange={(v) => { if (!v) setPointsDialogFor(null) }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base flex items-center gap-2">
+              ⭐ التحكم في نقاط: {pointsDialogFor?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* التفصيل التراكمي */}
+            {pointsDialogFor && pointsMap[pointsDialogFor.id] && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                <div className="p-2 rounded-lg bg-muted"><p className="text-lg font-bold text-foreground">{pointsMap[pointsDialogFor.id].totalPoints}</p><p className="text-[10px] text-muted-foreground">الإجمالي</p></div>
+                <div className="p-2 rounded-lg bg-emerald-500/10"><p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{pointsMap[pointsDialogFor.id].examPoints}</p><p className="text-[10px] text-muted-foreground">امتحانات</p></div>
+                <div className="p-2 rounded-lg bg-purple-500/10"><p className="text-lg font-bold text-purple-600 dark:text-purple-400">{pointsMap[pointsDialogFor.id].homeworkPoints}</p><p className="text-[10px] text-muted-foreground">واجبات</p></div>
+                <div className="p-2 rounded-lg bg-amber-500/10"><p className="text-lg font-bold text-amber-600 dark:text-amber-400">{pointsMap[pointsDialogFor.id].manualPoints}</p><p className="text-[10px] text-muted-foreground">تعديل يدوي</p></div>
+              </div>
+            )}
+
+            {/* زود / خصم */}
+            <div className="flex gap-1 bg-muted rounded-lg p-1">
+              <Button variant={pointsMode === 'add' ? 'default' : 'ghost'} size="sm" className="flex-1 text-xs h-8" onClick={() => setPointsMode('add')}>➕ زود</Button>
+              <Button variant={pointsMode === 'sub' ? 'default' : 'ghost'} size="sm" className="flex-1 text-xs h-8" onClick={() => setPointsMode('sub')}>➖ خصم</Button>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">قيمة النقاط</Label>
+              <Input type="number" inputMode="numeric" min={0} placeholder="مثال: 10" value={pointsAmount} onChange={(e) => setPointsAmount(e.target.value)} className="h-9" />
+              <Label className="text-xs">السبب (اختياري — بيظهر في سجل التعديلات)</Label>
+              <Input placeholder="مثال: مشاركة متميزة / خصم تأخير" value={pointsNote} onChange={(e) => setPointsNote(e.target.value)} className="h-9" />
+              <Button className="w-full" disabled={pointsBusy} onClick={submitPointsAdjust}>
+                {pointsBusy ? <Loader2 className="h-4 w-4 ml-1 animate-spin" /> : (pointsMode === 'add' ? '➕ زود النقاط' : '➖ اخصم النقاط')}
+              </Button>
+            </div>
+
+            {/* سجل التعديلات اليدوية + تراجع */}
+            {pointsDialogFor && pointsMap[pointsDialogFor.id] && pointsMap[pointsDialogFor.id].manualRows.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold mb-2">سجل تعديلاتك اليدوية (اضغط ✕ للتراجع):</p>
+                <div className="space-y-1.5 max-h-40 overflow-y-auto custom-scrollbar">
+                  {pointsMap[pointsDialogFor.id].manualRows.map(function (mr) {
+                    return (
+                      <div key={mr.resultId} className="flex items-center justify-between gap-2 p-2 rounded-lg border bg-card text-xs">
+                        <span className={mr.points >= 0 ? 'text-emerald-600 font-bold' : 'text-red-600 font-bold'}>{mr.points >= 0 ? '+' : ''}{mr.points} نقطة</span>
+                        <span className="flex-1 truncate text-muted-foreground">{mr.note || 'من غير سبب'}</span>
+                        <span className="text-[10px] text-muted-foreground shrink-0">{new Date(mr.updatedAt).toLocaleDateString('ar-EG')}</span>
+                        <button type="button" className="shrink-0 h-6 w-6 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 font-bold cursor-pointer" title="تراجع" onClick={() => undoManualPoints(mr.resultId)}>✕</button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* (و65) دايلوجات التقارير الجاهزة للطباعة — تقرير الطالب + التقرير الشامل */}
+      <StudentReportDialog student={reportFor} onOpenChange={(v) => { if (!v) setReportFor(null) }} />
+      <ClassReportDialog grade={filterGrade} open={classReportOpen} onOpenChange={setClassReportOpen} />
+
+      {/* (MG-1) رسالة واتساب لولي الأمر — نص جاهز قابل للتعديل + إرسال أو نسخ */}
+      <Dialog open={!!waFor} onOpenChange={(v) => { if (!v) setWaFor(null) }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-base flex items-center gap-2">
+              <MessageCircle className="h-4 w-4 text-green-600" />
+              رسالة لولي الأمر: {waFor?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              الرقم المستخدم:{' '}
+              {waPhone ? (
+                <span dir="ltr" className="font-bold text-foreground">+{waPhone}</span>
+              ) : (
+                <span className="font-bold text-red-500">مفيش رقم صالح</span>
+              )}
+              {' '}({waPhoneIsParent ? 'ولي الأمر' : 'الطالب'})
+            </p>
+            {waLoading ? (
+              <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+            ) : (
+              <Textarea value={waMessage} onChange={(e) => setWaMessage(e.target.value)} rows={14} className="text-sm leading-relaxed" placeholder="الرسالة بتتجهز هنا…" />
+            )}
+            <div className="flex gap-2 flex-wrap">
+              <Button className="flex-1 min-w-[140px] gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white" onClick={sendViaPlatform} disabled={waLoading || waSending || !waMessage}>
+                {waSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                إرسال عبر المنصة
+              </Button>
+              <Button className="flex-1 min-w-[140px] gap-1.5 bg-green-600 hover:bg-green-700 text-white" onClick={sendWa} disabled={waLoading || !waMessage}>
+                <MessageCircle className="h-4 w-4" />
+                إرسال واتساب
+              </Button>
+              <Button variant="outline" className="gap-1.5" onClick={copyWa} disabled={waLoading || !waMessage}>
+                <Copy className="h-4 w-4" />
+                نسخ الرسالة
+              </Button>
+              <Button variant="outline" className="gap-1.5" onClick={saveAsTemplate} disabled={waLoading || waSavingTpl || !waMessage}>
+                {waSavingTpl ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                حفظ كقالب افتراضي
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">«إرسال عبر المنصة» بيتبعت من المنصة أوتوماتيك لو فيه مزود رسائل مفعّل في «إعدادات الفيديو والووترمارك» — لو مفيش، هيفتحلك واتساب جاهز. «حفظ كقالب افتراضي» بيخلي الرسالة دي هي القالب الافتراضي لكل الطلاب (اسم الطالب بيتعوض تلقائيًا).</p>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  )
+}
+
+/* ========== VIDEO MANAGER (with REAL XHR upload progress) ========== */
+function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
+  const gradesList = useGradesList()
+  const currentAdminId = useAppStore(function (s) { return s.currentAdmin?.id || '' })
+  const [videos, setVideos] = useState<Video[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [formGrade, setFormGrade] = useState('')
+  const [formTitle, setFormTitle] = useState('')
+  const [formUrl, setFormUrl] = useState('')
+  const [formPrice, setFormPrice] = useState('')
+  const [formFile, setFormFile] = useState<File | null>(null)
+  /* (MG-3) كشف الدقة الحقيقية للملف المرفوع — علاج حيرة «الجودة ثابتة على 360»:
+     المنصة بتشغل الفيديو بدقته الأصلية حرفيًا — فلو الملف نفسه 360p يبقى ده مصدره
+     والرسالة دي بتوضح للمستر فورًا أول ما يختار الملف */
+  const [formFileRes, setFormFileRes] = useState<{ w: number; h: number } | null>(null)
+  const [formThumbnail, setFormThumbnail] = useState<File | null>(null)
+  const [formThumbnailUrl, setFormThumbnailUrl] = useState('')
+  /* (و45) قيمة الصورة المصغرة الأوتوماتيكية الأخيرة — عشان الكتابة اليدوية للأدمن
+     ما تتبدلش غلط: أوتوماتيك بيبدّل أوتوماتيك، واليدوي محترم */
+  const [autoThumbRef, setAutoThumbRef] = useState('')
+  const [thumbCapturing, setThumbCapturing] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploading, setUploading] = useState(false)
+  const [uploadStatus, setUploadStatus] = useState('')
+  const [filterGrade, setFilterGrade] = useState('')
+  // (2026-ف — رجعة نظام الجدولة القديم زي ما كان بالظبط)
+  // الجدولة: وقت فتح + طلاب هيشوفوا عداد تنازلي + إخفاء الفيديو عن طلاب
+  const [scheduleOpen, setScheduleOpen] = useState(false)
+  const [selectedVideoForSchedule, setSelectedVideoForSchedule] = useState<Video | null>(null)
+  /* (2026-و29) جدولة المجموعات للفيديو — منفصلة عن جدولة الطلاب القديمة (اللي فضلت زي ما هي) */
+  const [groupScheduleOpen, setGroupScheduleOpen] = useState(false)
+  const [selectedVideoForGroups, setSelectedVideoForGroups] = useState<Video | null>(null)
+  const [scheduleStudents, setScheduleStudents] = useState<string[]>([])
+  const [hiddenStudents, setHiddenStudents] = useState<string[]>([])
+  const [scheduleUnlockAt, setScheduleUnlockAt] = useState('')
+  const [scheduleSaving, setScheduleSaving] = useState(false)
+  const [allStudents, setAllStudents] = useState<any[]>([])
+  const videoFileRef = useRef<HTMLInputElement>(null)
+  const thumbFileRef = useRef<HTMLInputElement>(null)
+
+  const loadVideos = async (showLoader = true) => {
+    if (showLoader) setLoading(true)
+    try {
+      const params = new URLSearchParams({ pageSize: '100' })
+      if (currentAdminId) params.set('adminId', currentAdminId)
+      if (filterGrade) params.set('grade', filterGrade)
+      const res = await fetch(`/api/videos?${params}`)
+      if (!res.ok) {
+        try { const errData = await res.json(); toast.error('خطأ في تحميل الفيديوهات: ' + (errData.error || ''), { duration: 8000 }) } catch { toast.error('خطأ في السيرفر', { duration: 8000 }) }
+      } else {
+        const data = await res.json()
+        setVideos(data.videos || [])
+      }
+    } catch (err: any) { toast.error('خطأ: ' + (err.message || ''), { duration: 8000 }) }
+    setLoading(false)
+  }
+
+  useEffect(() => { loadVideos() }, [filterGrade])
+
+  // Upload using shared chunked upload utility
+  const uploadFileWithProgress = async (file: File, category: string, onProgress: (pct: number) => void, statusMsg: (msg: string) => void): Promise<string> => {
+    const result = await chunkedUpload(file, category, onProgress, statusMsg)
+    return result.filePath
+  }
+
+  const handleSubmit = async () => {
+    if (!formTitle.trim() || !formGrade) { toast.error('أدخل العنوان واختر الصف'); return }
+    if (!formUrl && !formFile) { toast.error('أدخل رابط فيديو (يوتيوب أو أي موقع) أو ارفع ملف فيديو'); return }
+    setSubmitting(true)
+    setUploading(true)
+    try {
+      let videoPath = ''
+      let videoType = ''
+      let thumbnailPath = ''
+
+      if (formFile) {
+        setUploadStatus('جاري رفع الفيديو...')
+        videoPath = await uploadFileWithProgress(formFile, 'videos', setUploadProgress, setUploadStatus)
+        videoType = formFile.type
+        /* (MG-4) تحقق بعد الرفع: بنقرأ دقة الملف المخزن على المنصة نفسه
+           ونقارنها بالملف الأصلي — إثبات حقيقي إن المنصة بتخزن نفس الدقة
+           بالظبط (بتضغط/بتصغّر حاجة) — علاج حيرة «الجودة ثابتة على 360» */
+        try {
+          var remoteRes = await (function (path: string): Promise<{ w: number; h: number }> {
+            return new Promise(function (resolve) {
+              try {
+                var vv = document.createElement('video')
+                var finished = false
+                var finish = function (w: number, h: number) {
+                  if (finished) return
+                  finished = true
+                  try { vv.removeAttribute('src'); vv.load() } catch (e) {}
+                  resolve({ w: w || 0, h: h || 0 })
+                }
+                var to = setTimeout(function () { finish(0, 0) }, 12000)
+                vv.preload = 'metadata'
+                vv.onloadedmetadata = function () { clearTimeout(to); finish(vv.videoWidth || 0, vv.videoHeight || 0) }
+                vv.onerror = function () { clearTimeout(to); finish(0, 0) }
+                vv.src = path + '?adminId=' + encodeURIComponent(currentAdminId || '')
+              } catch (e) { resolve({ w: 0, h: 0 }) }
+            })
+          })(videoPath)
+          if (remoteRes.h > 0) {
+            var localH = formFileRes && formFileRes.h ? formFileRes.h : 0
+            if (localH && remoteRes.h < localH - 16) {
+              toast.error('تنبيه: الملف المخزن على المنصة بدقة ' + remoteRes.h + 'p والملف الأصلي ' + localH + 'p — حصل اختلاف! جرب ترفع تاني وبلغ الدعم لو تكرر', { duration: 12000 })
+            } else {
+              toast.success('✓ اتأكدنا: الملف المخزن على المنصة بدقة ' + remoteRes.h + 'p' + (localH ? ' — مطابق للملف الأصلي بالظبط' : '') + ' — المنصة مش بتضغط أو تقلل الجودة أبدًا', { duration: 9000 })
+            }
+          }
+        } catch (e) {}
+      }
+
+      if (formThumbnail) {
+        setUploadStatus('جاري رفع الصورة المصغرة...')
+        setUploadProgress(0)
+        thumbnailPath = await uploadFileWithProgress(formThumbnail, 'thumbnails', setUploadProgress, setUploadStatus)
+      }
+
+      setUploadStatus('جاري الحفظ...')
+      const body: Record<string, string> = {
+        title: formTitle.trim(),
+        grade: formGrade,
+        url: formUrl.trim(),
+        price: formPrice.trim() || '0',
+      }
+      if (videoPath) { body.filePath = videoPath; body.fileType = videoType }
+      if (thumbnailPath) { body.thumbnail = thumbnailPath }
+      else if (formThumbnailUrl.trim()) { body.thumbnail = formThumbnailUrl.trim() }
+      body.adminId = currentAdminId
+
+      const res = await fetch('/api/videos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+
+      if (res.ok) {
+        toast.success('تم إضافة الفيديو بنجاح! سيظهر للصف ' + formGrade)
+        setShowForm(false)
+        setFormTitle(''); setFormUrl(''); setFormGrade(''); setFormPrice('')
+        setFormFile(null); setFormThumbnail(null); setFormThumbnailUrl(''); setAutoThumbRef('')
+        loadVideos(false)
+        onStatsRefresh()
+      } else {
+        /* (و45) رسالة الخطأ الحقيقية بتوصل للمستر — مفيش «في مشكلة» من غير سبب */
+        var errDetail = ''
+        try { const d = await res.json(); errDetail = String(d.error || d.detail || '') } catch { errDetail = 'السيرفر رجّع كود ' + res.status }
+        toast.error(errDetail ? 'الفيديو ما اتضافش: ' + errDetail : 'الفيديو ما اتضافش — حصلت مشكلة في السيرفر، حاول تاني', { duration: 10000 })
+      }
+    } catch (err: any) {
+      var netMsg = String(err && err.message ? err.message : '')
+      toast.error('الفيديو ما اتضافش — مشكلة اتصال بالسيرفر: ' + (netMsg || 'الشبكة مقطوعة'), { duration: 10000 })
+    }
+    setSubmitting(false)
+    setUploading(false)
+    setUploadProgress(0)
+    setUploadStatus('')
+  }
+
+  const handleDelete = async (id: string) => {
+    try {
+      await fetch(`/api/videos/${id}?adminId=${encodeURIComponent(currentAdminId)}`, { method: 'DELETE' })
+      toast.success('تم حذف الفيديو')
+      loadVideos(false)
+      onStatsRefresh()
+    } catch { toast.error('خطأ في الحذف') }
+  }
+
+  // ===== أدوات الجدولة القديمة (زي نظام الفيديوهات الأول بالظبط) =====
+  const loadStudentsForSchedule = async (grade: string) => {
+    try {
+      var res = await fetch('/api/students?pageSize=200' + (grade ? '&grade=' + encodeURIComponent(grade) : ''))
+      var data = await res.json()
+      setAllStudents((data.students || []).filter(function(s: any) { return s.status === 'approved' || s.status === 'paid' }))
+    } catch { setAllStudents([]) }
+  }
+
+  const loadExistingSchedule = async (videoId: string) => {
+    try {
+      var res = await fetch('/api/video-schedule?videoId=' + videoId)
+      var data = await res.json()
+      if (data.schedules && data.schedules.length > 0) {
+        var sch = data.schedules[0]
+        setScheduleStudents(sch.studentIds || [])
+        setHiddenStudents(sch.hiddenStudentIds || [])
+        if (sch.unlockAt) {
+          var d = new Date(sch.unlockAt)
+          var local = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+          setScheduleUnlockAt(local.toISOString().slice(0, 16))
+        } else {
+          setScheduleUnlockAt('')
+        }
+      } else {
+        setScheduleStudents([])
+        setHiddenStudents([])
+        setScheduleUnlockAt('')
+      }
+    } catch {}
+  }
+
+  const handleScheduleSave = async () => {
+    if (!selectedVideoForSchedule) return
+    if (!scheduleUnlockAt && scheduleStudents.length === 0 && hiddenStudents.length === 0) {
+      toast.error('حدد وقت أو طلاب للجدولة أو الإخفاء')
+      return
+    }
+    setScheduleSaving(true)
+    try {
+      var res = await fetch('/api/video-schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          videoId: selectedVideoForSchedule.id,
+          studentIds: scheduleStudents,
+          unlockAt: scheduleUnlockAt ? new Date(scheduleUnlockAt).toISOString() : null,
+          hiddenStudentIds: hiddenStudents,
+        }),
+      })
+      if (res.ok) {
+        toast.success('تم الحفظ - الجدولة والإخفاء')
+        setScheduleOpen(false)
+        setScheduleStudents([])
+        setHiddenStudents([])
+        setScheduleUnlockAt('')
+      } else {
+        toast.error('فشل الحفظ')
+      }
+    } catch { toast.error('خطأ في الاتصال') }
+    setScheduleSaving(false)
+  }
+
+  const getYouTubeId = (url: string) => {
+    /* (و45) دعم كل صيغ يوتيوب: watch?v= و youtu.be و shorts و live و embed */
+    const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/|live\/))([\w-]{11})/)
+    return match ? match[1] : null
+  }
+
+  /* ===== (و45) الصورة المصغرة الأوتوماتيكية — طلب المستر =====
+     يوتيوب → نفس صورة الفيديو من i.ytimg.com (hqdefault)
+     ملف مرفوع → لقطة حقيقية من الفيديو نفسه (canvas عند ~1 ثانية أو 10% من المدة)
+     والأدمن دايمًا يقدر يعمّل override بصورة من عنده */
+  const applyAutoThumb = function (val: string) {
+    setAutoThumbRef(val)
+    setFormThumbnailUrl(val)
+  }
+
+  const handleVideoUrlChange = function (val: string) {
+    setFormUrl(val)
+    var ytId = getYouTubeId(val)
+    var nextAuto = ytId ? 'https://i.ytimg.com/vi/' + ytId + '/hqdefault.jpg' : ''
+    if (nextAuto) {
+      applyAutoThumb(nextAuto)
+    } else if (autoThumbRef && formThumbnailUrl === autoThumbRef) {
+      /* اللينك بقي مش يوتيوب والصورة الحالية أوتوماتيك قديمة → نفرغها */
+      applyAutoThumb('')
+    }
+  }
+
+  /* لقطة من ملف الفيديو: بنحمّل أول ثانية (أو 10% من المدة) ونرسمها على canvas 640px */
+  const captureVideoFrame = async function (file: File): Promise<string> {
+    return new Promise(function (resolve) {
+      var url = ''
+      try { url = URL.createObjectURL(file) } catch (e) { resolve(''); return }
+      var v = document.createElement('video')
+      v.preload = 'metadata'; v.muted = true
+      var settled = false
+      var done = function (val: string) {
+        if (settled) return
+        settled = true
+        try { URL.revokeObjectURL(url) } catch (e) {}
+        resolve(val)
+      }
+      var timer = setTimeout(function () { done('') }, 10000)
+      v.onloadedmetadata = function () {
+        try {
+          var t = isFinite(v.duration) && v.duration > 0 ? Math.min(Math.max(v.duration * 0.1, 0.5), 3) : 1
+          v.onseeked = function () {
+            try {
+              var w = 640
+              var ratio = (v.videoWidth && v.videoHeight) ? (v.videoHeight / v.videoWidth) : 0.5625
+              var canvas = document.createElement('canvas')
+              canvas.width = w
+              canvas.height = Math.max(1, Math.round(w * ratio))
+              var ctx = canvas.getContext('2d')
+              if (!ctx) { clearTimeout(timer); done(''); return }
+              ctx.drawImage(v, 0, 0, canvas.width, canvas.height)
+              var dataUrl = canvas.toDataURL('image/jpeg', 0.82)
+              clearTimeout(timer)
+              done(dataUrl)
+            } catch (e) { clearTimeout(timer); done('') }
+          }
+          v.currentTime = t
+        } catch (e) { clearTimeout(timer); done('') }
+      }
+      v.onerror = function () { clearTimeout(timer); done('') }
+      v.src = url
+    })
+  }
+
+  const handleVideoFilePick = async function (f: File | null) {
+    setFormFile(f)
+    setFormFileRes(null)
+    if (!f) return
+    /* (MG-3) قراءة الدقة الحقيقية من ميتاداتا الفيديو نفسه — بلا رفع وبلا انتظار */
+    try {
+      var resInfo = await (function (file: File): Promise<{ w: number; h: number }> {
+        return new Promise(function (resolve) {
+          try {
+            var u = URL.createObjectURL(file)
+            var vv = document.createElement('video')
+            var finished = false
+            var finish = function (w: number, h: number) {
+              if (finished) return
+              finished = true
+              try { URL.revokeObjectURL(u) } catch (e) {}
+              resolve({ w: w || 0, h: h || 0 })
+            }
+            var to = setTimeout(function () { finish(0, 0) }, 6000)
+            vv.preload = 'metadata'
+            vv.onloadedmetadata = function () {
+              clearTimeout(to)
+              finish(vv.videoWidth || 0, vv.videoHeight || 0)
+            }
+            vv.onerror = function () { clearTimeout(to); finish(0, 0) }
+            vv.src = u
+          } catch (e) { resolve({ w: 0, h: 0 }) }
+        })
+      })(f)
+      setFormFileRes(resInfo)
+    } catch (e) {}
+    /* (و45) لقطة أوتوماتيكية من الفيديو نفسه — بترفع فورًا كصورة مصغرة */
+    setThumbCapturing(true)
+    try {
+      var dataUrl = await captureVideoFrame(f)
+      if (dataUrl) {
+        var blob = await (await fetch(dataUrl)).blob()
+        var asFile = new File([blob], 'video-thumb.jpg', { type: 'image/jpeg' })
+        var up = await chunkedUpload(asFile, 'thumbnails')
+        if (up && up.filePath) applyAutoThumb(up.filePath)
+      }
+    } catch (e) { /* اللقطة الأوتوماتيكية اختيارية — فشلها ما يمنعش إضافة الفيديو */ }
+    setThumbCapturing(false)
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <CardTitle className="text-lg flex items-center gap-2"><Film className="h-5 w-5 text-primary" />إدارة الفيديوهات</CardTitle>
+          <div className="flex gap-2 items-center flex-wrap">
+            <select value={filterGrade} onChange={(e) => setFilterGrade(e.target.value)} className="h-9 rounded-md border border-input bg-transparent px-3 text-sm">
+              <option value="">كل الصفوف</option>
+              {gradesList.map((g) => <option key={g.ar} value={g.ar}>{(g.emoji ? g.emoji + ' ' : '') + g.ar}</option>)}
+            </select>
+            <Button size="sm" onClick={() => setShowForm(!showForm)}><Plus className="h-4 w-4 ml-1" />إضافة فيديو</Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* حماية الفيديوهات — الووترمارك الذكي + منظومة التذاكر */}
+        <VideoProtectionSettings />
+
+        {/* Add Video Form */}
+        {showForm && (
+          <div className="p-4 rounded-lg border bg-muted/30 space-y-3">
+            <h4 className="font-semibold text-sm flex items-center gap-2"><Plus className="h-4 w-4" />إضافة فيديو جديد</h4>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs">الصف الدراسي *</Label>
+                <select value={formGrade} onChange={(e) => setFormGrade(e.target.value)} className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm">
+                  <option value="">اختر الصف</option>{gradesList.map((g) => <option key={g.ar} value={g.ar}>{(g.emoji ? g.emoji + ' ' : '') + g.ar}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">عنوان الدرس *</Label>
+                <Input value={formTitle} onChange={(e) => setFormTitle(e.target.value)} placeholder="مثال: الباب الأول - الكسور" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">السعر (ج.م) — اتركه فاضي للمجاني</Label>
+                <Input value={formPrice} onChange={(e) => setFormPrice(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="0" dir="ltr" type="number" min="0" step="0.01" />
+              </div>
+            </div>
+
+            {/* YouTube URL */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">رابط الفيديو — يوتيوب أو أي لينك من أي موقع (Cloudinary / Drive / Dropbox / mp4 مباشر…) — أو ارفع ملف فيديو. للتحكم في الجودات: ارفع على Cloudinary وهتلاقي قايمة جودات في المشغل</Label>
+              <Input value={formUrl} onChange={(e) => handleVideoUrlChange(e.target.value)} placeholder="https://youtube.com/watch?v=… أو https://res.cloudinary.com/…/video/upload/v…/name.mp4" dir="ltr" />
+              {/* (MG-3) توضيح الجودة للينكات اليوتيوب — علاج حيرة «الجودة ثابتة على 360» */}
+              {getYouTubeId(formUrl) && !/<\s*iframe/i.test(formUrl) && (
+                <p className="text-[10.5px] leading-relaxed rounded-lg border border-sky-500/30 bg-sky-500/5 px-3 py-2 text-muted-foreground">
+                  ℹ️ لينك يوتيوب: المنصة بتشغّل الفيديو بأعلى جودة موجودة عليه على يوتيوب تلقائيًا.
+                  لو ظهر 360p يبقى الملف المرفوع على يوتيوب نفسه 360p — أو لسه في معالجة HD (بتاخد من نص ساعة لساعات بعد الرفع على يوتيوب، وبعدها الجودة الأعلى بتظهر لوحدها من غير ما تغير أي حاجة هنا).
+                </p>
+              )}
+              {getYouTubeId(formUrl) && !/<\s*iframe/i.test(formUrl) && (
+                <div className="mt-2 w-40 aspect-video rounded-lg overflow-hidden border relative">
+                  <Image src={`https://img.youtube.com/vi/${getYouTubeId(formUrl)}/mqdefault.jpg`} alt="thumbnail" fill className="object-cover" sizes="400px" unoptimized />
+                </div>
+              )}
+            </div>
+
+            {/* Video File Upload */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">أو ارفع ملف فيديو</Label>
+              <div className="flex flex-wrap items-center gap-2">
+                <input ref={videoFileRef} type="file" accept="video/*" className="hidden" onChange={(e) => { handleVideoFilePick(e.target.files?.[0] || null) }} />
+                <Button type="button" variant="outline" size="sm" onClick={() => videoFileRef.current?.click()} disabled={thumbCapturing}>
+                  {thumbCapturing ? <Loader2 className="h-4 w-4 ml-1 animate-spin" /> : <Upload className="h-4 w-4 ml-1" />}{formFile ? formFile.name : 'اختر فيديو'}
+                </Button>
+                {formFile && <span className="text-xs text-muted-foreground">{(formFile.size / 1024 / 1024).toFixed(1)} MB</span>}
+                {/* (MG-3) الدقة الحقيقية للملف — بتظهر فورًا بعد الاختيار */}
+                {formFileRes && formFileRes.h > 0 && (
+                  <Badge variant="secondary" className={"text-xs font-bold " + (formFileRes.h >= 720 ? "text-emerald-600" : "text-amber-600")}>
+                    الدقة: {formFileRes.w}×{formFileRes.h} ({formFileRes.h}p){formFileRes.h >= 720 ? " ✓" : " ⚠"}
+                  </Badge>
+                )}
+              </div>
+              {formFileRes && formFileRes.h > 0 && formFileRes.h < 720 && (
+                <p className="text-[11px] leading-relaxed rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400 px-3 py-2">
+                  ⚠️ الفيديو ده دقته {formFileRes.h}p بس — هيظهر على المنصة بنفس الدقة دي.
+                  المنصة مش بتقلل الجودة أبدًا — الجودة اللي بتظهر هي الجودة الموجودة في الملف نفسه.
+                  <br />
+                  <span className="font-bold">أشهر سبب لفيديو 360p: الملف جاي من واتساب!</span> واتساب بيضغط أي فيديو بيبعته لـ 360p تلقائيًا —
+                  لو الفيديو وصلك واتساب أو انت بعته لنفسك واتساب، دوّر على الملف الأصلي من معرض الموبايل/الكاميرا أو من برنامج التسجيل نفسه وارفعه من هناك.
+                  <br />
+                  ولو بتستخدم فيديو يوتيوب: يوتيوب بياخد من نص ساعة لساعات بيجهز نسخة HD بعد الرفع — الجودة الأعلى بتظهر لوحدها بعد المعالجة.
+                </p>
+              )}
+              <p className="text-[10px] text-muted-foreground">لو الفيديو ملف مرفوع، هتاخد صورة مصغرة أوتوماتيك من وسط الفيديو نفسه — وتقدر تغيرها من خانة الصورة المصغرة لو عايز</p>
+            </div>
+
+            {/* Thumbnail Upload */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">صورة مصغرة للفيديو (اختياري — بتتعمل أوتوماتيك لو سبتها فاضية)</Label>
+              <div className="flex items-center gap-3">
+                <input ref={thumbFileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { setFormThumbnail(e.target.files?.[0] || null) }} />
+                <Button type="button" variant="outline" size="sm" onClick={() => thumbFileRef.current?.click()}>
+                  <PictureInPicture2 className="h-4 w-4 ml-1" />{formThumbnail ? formThumbnail.name : 'اختر صورة'}
+                </Button>
+                {formThumbnail && (
+                  <div className="w-16 h-10 rounded border overflow-hidden relative">
+                    <Image src={URL.createObjectURL(formThumbnail)} alt="thumb" fill className="object-cover" unoptimized />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Thumbnail URL */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">أو رابط صورة مصغرة (اختياري — أوتوماتيك من اليوتيوب لو سبتها فاضي)</Label>
+              <Input value={formThumbnailUrl} onChange={(e) => setFormThumbnailUrl(e.target.value)} placeholder="https://example.com/thumbnail.jpg" dir="ltr" />
+              {formThumbnailUrl && (
+                <div className="mt-2 w-40 aspect-video rounded-lg overflow-hidden border relative">
+                  <Image src={formThumbnailUrl} alt="thumbnail" fill className="object-cover" sizes="400px" unoptimized />
+                </div>
+              )}
+            </div>
+
+            {/* Upload Progress */}
+            {uploading && (
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  {uploadStatus || 'جاري الرفع...'} {uploadProgress}%
+                </div>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div className="h-full bg-primary rounded-full transition-all duration-200" style={{ width: `${uploadProgress}%` }} />
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleSubmit} disabled={submitting || uploading}>
+                {submitting || uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'حفظ ونشر'}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => { setShowForm(false); setFormTitle(''); setFormUrl(''); setFormGrade(''); setFormFile(null); setFormThumbnail(null); setFormThumbnailUrl(''); setAutoThumbRef('') }}>إلغاء</Button>
+            </div>
+          </div>
+        )}
+
+        {/* Video List */}
+        {loading ? <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div> : videos.length === 0 ? (
+          <p className="text-center text-muted-foreground py-10 text-sm">لا توجد فيديوهات. أضف أول فيديو!</p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {videos.map((v) => {
+              const ytId = getYouTubeId(v.url)
+              const thumb = v.thumbnail || (ytId ? `https://img.youtube.com/vi/${ytId}/mqdefault.jpg` : null)
+              return (
+                <div key={v.id} className="rounded-lg border bg-card overflow-hidden group">
+                  <div className="relative aspect-video bg-black">
+                    {thumb ? (
+                      <Image src={thumb} alt={v.title} fill className="object-cover" sizes="200px" unoptimized />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center"><VideoIcon className="h-8 w-8 text-white/30" /></div>
+                    )}
+                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <PlayCircle className="h-10 w-10 text-white" />
+                    </div>
+                  </div>
+                  <div className="p-3 space-y-1.5">
+                    <p className="font-semibold text-sm truncate">{v.title}</p>
+                    <div className="flex items-center justify-between">
+                      <Badge variant="outline" className="text-[10px]">{v.grade}</Badge>
+                      <div className="flex items-center gap-1">
+                        {v.filePath && <Badge variant="secondary" className="text-[10px]">📎 ملف</Badge>}
+                        {v.url && !v.filePath && <Badge variant="secondary" className="text-[10px]">▶ YouTube</Badge>}
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">{new Date(v.createdAt).toLocaleDateString('ar-EG')}</p>
+                    <div className="flex items-center gap-1">
+                      <Button size="sm" variant="ghost" className="flex-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-xs h-7" onClick={() => { setSelectedVideoForSchedule(v); setScheduleOpen(true); loadStudentsForSchedule(v.grade); loadExistingSchedule(v.id) }}>
+                        <Clock className="h-3.5 w-3.5 mr-1" />جدولة
+                      </Button>
+                      {/* (2026-و29) جدولة المجموعات — كل مجموعة بميعادها والفيديو مخفي قبل الميعاد بدون عداد */}
+                      <Button size="sm" variant="ghost" className="flex-1 text-teal-600 hover:text-teal-700 hover:bg-teal-50 dark:hover:bg-teal-900/20 text-xs h-7" onClick={() => { setSelectedVideoForGroups(v); setGroupScheduleOpen(true) }}>
+                        <UsersRound className="h-3.5 w-3.5 mr-1" />المجموعات
+                      </Button>
+                      <Button size="sm" variant="ghost" className="flex-1 text-destructive hover:text-destructive hover:bg-destructive/10 text-xs h-7" onClick={() => handleDelete(v.id)}>
+                        <Trash2 className="h-3.5 w-3.5 mr-1" />حذف
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </CardContent>
+
+      {/* Schedule popup - select students + unlock time (الجدولة القديمة زي ما كانت) */}
+      {scheduleOpen && selectedVideoForSchedule && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setScheduleOpen(false)}>
+          <div className="bg-card border border-border rounded-xl p-5 shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto" onClick={function(e) { e.stopPropagation() }}>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="font-bold text-sm">جدولة فيديو: {selectedVideoForSchedule.title}</h3>
+                <p className="text-[10px] text-muted-foreground">حدد الطلاب اللي مش هتشوف الفيديو غير بعد الوقت ده</p>
+              </div>
+              <button type="button" onClick={() => setScheduleOpen(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Unlock time */}
+            <div className="mb-3">
+              <Label className="text-xs font-semibold">وقت فتح الفيديو</Label>
+              <Input
+                type="datetime-local"
+                value={scheduleUnlockAt}
+                onChange={function(e) { setScheduleUnlockAt(e.target.value) }}
+                className="mt-1"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">الطلاب المحددين هيشوفوا عداد تنازلي لحد الوقت ده</p>
+            </div>
+
+            {/* Select students for scheduling */}
+            <div className="mb-3">
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-xs font-semibold">جدولة: الطلاب اللي هيشوفوا عداد ({scheduleStudents.length})</Label>
+                <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => { loadStudentsForSchedule(selectedVideoForSchedule.grade); loadExistingSchedule(selectedVideoForSchedule.id) }}>
+                  تحميل + عرض الموجود
+                </Button>
+              </div>
+              <div className="max-h-[150px] overflow-y-auto border rounded-md p-2 space-y-1">
+                {allStudents.length === 0 ? (
+                  <p className="text-[10px] text-muted-foreground text-center py-4">اضغط "تحميل" لعرض الطلاب</p>
+                ) : (
+                  allStudents.map(function(s) {
+                    var isSelected = scheduleStudents.includes(s.id)
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={function() {
+                          if (isSelected) { setScheduleStudents(scheduleStudents.filter(function(id) { return id !== s.id })) }
+                          else { setScheduleStudents([...scheduleStudents, s.id]) }
+                        }}
+                        className={"w-full flex items-center gap-2 p-2 rounded-md text-xs transition-colors " + (isSelected ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-500/30' : 'bg-muted/30 hover:bg-muted/50')}
+                      >
+                        <div className={"h-4 w-4 rounded border-2 flex items-center justify-center " + (isSelected ? 'border-blue-500 bg-blue-500' : 'border-muted-foreground/30')}>
+                          {isSelected && <Check className="h-3 w-3 text-white" />}
+                        </div>
+                        <span className="font-medium">{s.name}</span>
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Hide video from students */}
+            <div className="mb-3">
+              <Label className="text-xs font-semibold text-red-600">إخفاء الفيديو عن طلاب ({hiddenStudents.length})</Label>
+              <p className="text-[10px] text-muted-foreground mb-2">الطلاب دول مش هيشوفوا الفيديو خالص</p>
+              <div className="max-h-[150px] overflow-y-auto border rounded-md p-2 space-y-1">
+                {allStudents.length === 0 ? (
+                  <p className="text-[10px] text-muted-foreground text-center py-4">اضغط "تحميل" فوق</p>
+                ) : (
+                  allStudents.map(function(s) {
+                    var isHidden = hiddenStudents.includes(s.id)
+                    return (
+                      <button
+                        key={'hide-' + s.id}
+                        type="button"
+                        onClick={function() {
+                          if (isHidden) { setHiddenStudents(hiddenStudents.filter(function(id) { return id !== s.id })) }
+                          else { setHiddenStudents([...hiddenStudents, s.id]) }
+                        }}
+                        className={"w-full flex items-center gap-2 p-2 rounded-md text-xs transition-colors " + (isHidden ? 'bg-red-50 dark:bg-red-900/20 border border-red-500/30' : 'bg-muted/30 hover:bg-muted/50')}
+                      >
+                        <div className={"h-4 w-4 rounded border-2 flex items-center justify-center " + (isHidden ? 'border-red-500 bg-red-500' : 'border-muted-foreground/30')}>
+                          {isHidden && <Check className="h-3 w-3 text-white" />}
+                        </div>
+                        <span className="font-medium">{s.name}</span>
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <Button onClick={handleScheduleSave} disabled={scheduleSaving} className="flex-1">
+                {scheduleSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'حفظ الجدولة'}
+              </Button>
+              <Button variant="outline" onClick={() => setScheduleOpen(false)}>إلغاء</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* (2026-و29) نافذة جدولة المجموعات — كل مجموعة بميعادها، والفيديو مخفي قبل الميعاد بدون عداد */}
+      {selectedVideoForGroups && (
+        <VideoGroupScheduleDialog
+          open={groupScheduleOpen}
+          onOpenChange={setGroupScheduleOpen}
+          videoId={selectedVideoForGroups.id}
+          videoTitle={selectedVideoForGroups.title}
+        />
+      )}
+    </Card>
+  )
+}
+
+/* ========== EXAM TRACKING PANEL ========== */
+interface MCQQuestion {
+  q: string
+  options: string[]
+  correct: number
+  points: number
+}
+
+/* ============================================================
+   (25-ب1) صف إعدادات الامتحان المضغوط — لكل امتحان في القايمة:
+   سوتش «إظهار الإجابات للطلاب» ↔ «النتيجة عند المستر فقط» (يكتب فورًا
+   PATCH + toast) + Input دقائق صغير + حقل موعد مع زرار حفظ وزرار
+   «إلغاء الجدولة» + بادج «مجدول — يظهر {التاريخ بالعربي}»
+   ============================================================ */
+function ExamSettingsRow({ exam, adminId, onChanged }: { exam: any; adminId: string; onChanged: () => void }) {
+  const [showResult, setShowResult] = useState<boolean>(!!exam.showResult)
+  const [toggling, setToggling] = useState(false)
+  const [timeLimit, setTimeLimit] = useState<string>(Number(exam.timeLimitMin) > 0 ? String(exam.timeLimitMin) : '')
+  const [schedVal, setSchedVal] = useState<string>(toLocalInputValue(exam.scheduledAt))
+  const [savingSched, setSavingSched] = useState(false)
+  const scheduled = isScheduledFuture(exam.scheduledAt)
+  /* (2026-و26) استهداف الطلاب — زي الفيديوهات بالظبط */
+  const [targetOpen, setTargetOpen] = useState(false)
+  const targetIds = parseTargetStudentIds((exam as any).targetStudentIds)
+  /* (2026-و29) استهداف المجموعات — نفس النمط */
+  const [groupTargetOpen, setGroupTargetOpen] = useState(false)
+  const targetGids = parseTargetStudentIds((exam as any).targetGroupIds)
+
+  const patchExam = async function (payload: Record<string, unknown>, okMsg: string): Promise<boolean> {
+    if (!adminId) { toast.error('مفيش جلسة أدمن — سجل دخول تاني', { duration: 8000 }); return false }
+    try {
+      var res = await fetch('/api/exams/' + exam.id, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminId: adminId, ...payload }),
+      })
+      if (res.ok) { toast.success(okMsg); return true }
+      var d: any = {}
+      try { d = await res.json() } catch (e) {}
+      toast.error(d.error || 'خطأ في الحفظ', { duration: 8000 })
+      return false
+    } catch { toast.error('خطأ في الاتصال', { duration: 8000 }); return false }
+  }
+
+  /* سوتش الإجابات — يكتب فورًا مع toast (طلب المستر حرفيًا) */
+  const toggleShowResult = async function (checked: boolean) {
+    setShowResult(checked) /* تفاؤلي — بيرجع لو فشل */
+    setToggling(true)
+    var ok = await patchExam({ showResult: checked }, checked
+      ? 'الإجابات هتظهر للطلاب بعد التسليم (نتيجة + أخطاء)'
+      : 'النتيجة عند المستر فقط — الطالب مش هيشوف حاجة')
+    if (!ok) setShowResult(!checked)
+    setToggling(false)
+  }
+
+  const saveTimeLimit = async function () {
+    var ok = await patchExam(
+      { timeLimitMin: timeLimit.trim() === '' ? 0 : Math.max(0, Number(timeLimit) || 0) },
+      timeLimit.trim() === '' ? 'تم — الامتحان بلا وقت' : ('مدة الامتحان: ' + timeLimit + ' دقيقة')
+    )
+    if (ok) onChanged()
+  }
+
+  const saveSchedule = async function () {
+    if (!schedVal) { toast.error('اختار الموعد الأول'); return }
+    setSavingSched(true)
+    var ok = await patchExam({ scheduledAt: new Date(schedVal).toISOString() }, 'تم جدولة ظهور الامتحان للطلاب')
+    if (ok) onChanged()
+    setSavingSched(false)
+  }
+
+  const cancelSchedule = async function () {
+    setSavingSched(true)
+    var ok = await patchExam({ scheduledAt: null }, 'تم إلغاء الجدولة — الامتحان ظاهر للطلاب فورًا')
+    if (ok) { setSchedVal(''); onChanged() }
+    setSavingSched(false)
+  }
+
+  return (
+    <div className="mt-2 p-2 rounded-lg border border-dashed border-emerald-500/40 bg-emerald-500/5 space-y-1.5"
+      onClick={function (e) { e.stopPropagation() }}>
+      {/* سطر 1: سوتش الإجابات + بادج الجدولة */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Switch checked={showResult} onCheckedChange={toggleShowResult} disabled={toggling} />
+          <span className={'text-[10px] font-medium ' + (showResult ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground')}>
+            {showResult ? 'الإجابات ظاهرة للطلاب' : 'النتيجة عند المستر فقط'}
+          </span>
+        </div>
+        {scheduled && (
+          <Badge className="text-[9px] bg-blue-500 text-white">مجدول — يظهر {formatEgyptian(exam.scheduledAt)}</Badge>
+        )}
+      </div>
+      {/* سطر 2: المؤقت بالدقائق + موعد الظهور */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <Input type="number" min={0} value={timeLimit} onChange={function (e) { setTimeLimit(e.target.value) }}
+          placeholder="بلا وقت" className="w-20 h-7 text-[11px]" title="مدة الامتحان بالدقائق (فارغ = بلا وقت)" />
+        <Button type="button" variant="ghost" size="sm" className="h-7 text-[10px] px-2" onClick={saveTimeLimit}>حفظ المدة</Button>
+        <Input type="datetime-local" value={schedVal} onChange={function (e) { setSchedVal(e.target.value) }}
+          placeholder="يظهر فورًا" className="h-7 text-[11px] flex-1 min-w-[150px]" title="موعد ظهور الامتحان للطلاب (فارغ = يظهر فورًا)" />
+        <Button type="button" variant="outline" size="sm" className="h-7 text-[10px] px-2" disabled={!schedVal || savingSched} onClick={saveSchedule}>حفظ الموعد</Button>
+        {scheduled && (
+          <Button type="button" variant="ghost" size="sm" className="h-7 text-[10px] px-2 text-destructive" disabled={savingSched} onClick={cancelSchedule}>إلغاء الجدولة</Button>
+        )}
+      </div>
+      {/* (2026-و26) سطر 3: استهداف الطلاب — مين يشوف الامتحان (زي الفيديوهات) */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <Badge variant={targetIds.length === 0 ? 'secondary' : 'default'} className="text-[9px] gap-1 cursor-pointer"
+          onClick={function () { setTargetOpen(true) }}>
+          👥 {targetIds.length === 0 ? 'ظاهر لكل الطلاب' : ('موجه لـ ' + targetIds.length + ' طالب')}
+        </Badge>
+        <Button type="button" variant="ghost" size="sm" className="h-7 text-[10px] px-2"
+          onClick={function () { setTargetOpen(true) }}>
+          تحديد الطلاب
+        </Button>
+        {/* (2026-و29) استهداف المجموعات — مجموعة السبت/التلات... مع ميعاد الظهور */}
+        <Badge variant={targetGids.length === 0 ? 'secondary' : 'default'} className="text-[9px] gap-1 cursor-pointer bg-teal-600 text-white border-teal-600"
+          onClick={function () { setGroupTargetOpen(true) }}>
+          🧑‍🤝‍🧑 {targetGids.length === 0 ? 'كل المجموعات' : ('موجه لـ ' + targetGids.length + ' مجموعة')}
+        </Badge>
+        <Button type="button" variant="ghost" size="sm" className="h-7 text-[10px] px-2"
+          onClick={function () { setGroupTargetOpen(true) }}>
+          تحديد المجموعات
+        </Button>
+      </div>
+      <StudentTargetPicker
+        open={targetOpen}
+        onOpenChange={setTargetOpen}
+        apiPath="/api/exams"
+        itemId={exam.id}
+        initialIds={targetIds}
+        itemTitle={exam.title}
+        adminId={adminId}
+        onSaved={function () { onChanged() }}
+      />
+      <GroupTargetPicker
+        open={groupTargetOpen}
+        onOpenChange={setGroupTargetOpen}
+        apiPath="/api/exams"
+        itemId={exam.id}
+        initialIds={targetGids}
+        itemTitle={exam.title}
+        adminId={adminId}
+        onSaved={function () { onChanged() }}
+      />
+    </div>
+  )
+}
+
+function ExamTrackingPanel({ onViewImage }: { onViewImage?: (src: string) => void }) {
+  const gradesList = useGradesList()
+  /* (25-ب1) إثبات الأدمن للـ GET (شوف العناصر المجدولة) + للـ PATCH */
+  const currentAdminId = useAppStore(function (s) { return s.currentAdmin?.id || '' })
+  const [examEditTarget, setExamEditTarget] = useState<any>(null)
+  const [exams, setExams] = useState<Exam[]>([])
+  const [selectedExam, setSelectedExam] = useState<string>('')
+  const [results, setResults] = useState<ExamResult[]>([])
+  const [notTaken, setNotTaken] = useState<any[]>([])
+  const [expandedResult, setExpandedResult] = useState<string | null>(null)
+  const [examInfo, setExamInfo] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [formGrade, setFormGrade] = useState('')
+  const [formTitle, setFormTitle] = useState('')
+  const [formContent, setFormContent] = useState('')
+  const [formFile, setFormFile] = useState<File | null>(null)
+  const [formFilePath, setFormFilePath] = useState('')
+  const [formFileType, setFormFileType] = useState('')
+  const [formFileUrl, setFormFileUrl] = useState('')
+  const [formPassScore, setFormPassScore] = useState(50)
+  const [formQuestions, setFormQuestions] = useState<MCQQuestion[]>([])
+  const [showQBuilder, setShowQBuilder] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadStatusMsg, setUploadStatusMsg] = useState('')
+  const [answerKeyFile, setAnswerKeyFile] = useState<File | null>(null)
+  const [answerKeyPath, setAnswerKeyPath] = useState('')
+  const [answerKeyType, setAnswerKeyType] = useState('')
+  const [answerKeyUrl, setAnswerKeyUrl] = useState('')
+  const [uploadingAnswerKey, setUploadingAnswerKey] = useState(false)
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null)
+  const [thumbnailPath, setThumbnailPath] = useState('')
+  const [thumbnailUrl, setThumbnailUrl] = useState('')
+  /* نماذج الامتحان العشوائية (طلب المستر): استخراج أكتر من ملف لنفس الامتحان،
+     كل نموذج مفصول لوحده — والطالب بيشوف نموذج واحد بس بيتحدد عشوائيًا
+     ثابت لحسابه على السيرفر (في /api/exams لما الطلب يكون بstudentId) */
+  const [examModels, setExamModels] = useState<Array<{ name: string; filePath: string; fileType: string; questions: any[] }>>([])
+  /* (2026-و) طلب المستر: التوزيع مش إجباري يكون عشوائي — عشوائي 🎲 أو نموذج واحد ثابت للكل 📌 */
+  const [modelMode, setModelMode] = useState<'random' | 'fixed'>('random')
+  const [fixedModelName, setFixedModelName] = useState('')
+  const [modelExtracting, setModelExtracting] = useState(false)
+  /* (25-ب1) إعدادات الامتحان في الإنشاء اليدوي: إظهار الإجابات + المؤقت + موعد الظهور */
+  const [formShowResult, setFormShowResult] = useState(false)
+  const [formTimeLimit, setFormTimeLimit] = useState('')
+  const [formScheduledAt, setFormScheduledAt] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
+  const answerKeyRef = useRef<HTMLInputElement>(null)
+  const thumbnailRef = useRef<HTMLInputElement>(null)
+
+  const loadExams = async (showLoader = true) => {
+    if (showLoader) setLoading(true)
+    try {
+      /* (25-ب1) adminId → الأدمن يشوف العناصر المجدولة كمان (ببادج) */
+      const params = new URLSearchParams({ pageSize: '100' })
+      if (currentAdminId) params.set('adminId', currentAdminId)
+      const res = await fetch('/api/exams?' + params.toString())
+      if (!res.ok) {
+        try { const errData = await res.json(); toast.error('خطأ في تحميل الامتحانات: ' + (errData.error || ''), { duration: 8000 }) } catch { toast.error('خطأ في السيرفر', { duration: 8000 }) }
+      } else {
+        const data = await res.json()
+        setExams(data.exams || [])
+      }
+    } catch (err: any) { toast.error('خطأ: ' + (err.message || ''), { duration: 8000 }) }
+    setLoading(false)
+  }
+
+  useEffect(() => { loadExams() }, [])
+
+  const loadExamResults = async (examId: string) => {
+    if (!examId) { setResults([]); setNotTaken([]); setExamInfo(null); return }
+    try {
+      const res = await fetch(`/api/exam-results?examId=${examId}`)
+      const data = await res.json()
+      setResults(data.results || [])
+      setNotTaken(data.notTaken || [])
+      setExamInfo(data.examInfo || null)
+    } catch { toast.error('خطأ في تحميل النتائج') }
+  }
+
+  const handleExamSelect = (examId: string) => {
+    setSelectedExam(examId)
+    loadExamResults(examId)
+  }
+
+  const handleAddExam = async () => {
+    if (!formTitle.trim() || !formGrade) { toast.error('أدخل العنوان واختر الصف'); return }
+    setSubmitting(true)
+    try {
+      // Use local variables to avoid React state batching issues
+      let localFilePath = formFilePath || ''
+      let localFileType = formFileType || ''
+      let localAnswerKeyPath = answerKeyPath || ''
+      let localAnswerKeyType = answerKeyType || ''
+      let localThumbnailPath = thumbnailPath || ''
+
+      // Upload question paper (URL fallback or file upload)
+      if (!localFilePath && (formFile || formFileUrl.trim())) {
+        if (formFileUrl.trim()) {
+          localFilePath = formFileUrl.trim()
+          localFileType = ''
+          setFormFilePath(localFilePath)
+          setFormFileType('')
+        } else if (formFile) {
+          setUploading(true)
+          setUploadStatusMsg('جاري رفع نموذج الأسئلة...')
+          try {
+            const upData = await chunkedUpload(formFile, 'exams', undefined, (msg) => setUploadStatusMsg(msg))
+            localFilePath = upData.filePath
+            localFileType = upData.fileType
+            setFormFilePath(upData.filePath)
+            setFormFileType(upData.fileType)
+          } catch (err: any) {
+            toast.error(err.message || 'فشل رفع نموذج الأسئلة')
+            setUploading(false); setUploadStatusMsg(''); setSubmitting(false); return
+          }
+          setUploading(false)
+        }
+      }
+      // Upload answer key (URL fallback or file upload)
+      if (!localAnswerKeyPath && (answerKeyFile || answerKeyUrl.trim())) {
+        if (answerKeyUrl.trim()) {
+          localAnswerKeyPath = answerKeyUrl.trim()
+          localAnswerKeyType = ''
+          setAnswerKeyPath(localAnswerKeyPath)
+          setAnswerKeyType('')
+        } else if (answerKeyFile) {
+          setUploadingAnswerKey(true)
+          setUploadStatusMsg('جاري رفع نموذج الإجابة...')
+          try {
+            const upData = await chunkedUpload(answerKeyFile, 'exams', undefined, (msg) => setUploadStatusMsg(msg))
+            localAnswerKeyPath = upData.filePath
+            localAnswerKeyType = upData.fileType
+            setAnswerKeyPath(upData.filePath)
+            setAnswerKeyType(upData.fileType)
+          } catch (err: any) {
+            toast.error(err.message || 'فشل رفع نموذج الإجابة')
+            setUploadingAnswerKey(false); setUploadStatusMsg(''); setSubmitting(false); return
+          }
+          setUploadingAnswerKey(false)
+        }
+      }
+      // Upload thumbnail (URL fallback or file upload)
+      if (!localThumbnailPath && (thumbnailFile || thumbnailUrl.trim())) {
+        if (thumbnailUrl.trim()) {
+          localThumbnailPath = thumbnailUrl.trim()
+          setThumbnailPath(localThumbnailPath)
+        } else if (thumbnailFile) {
+          setUploading(true)
+          setUploadStatusMsg('جاري رفع الصورة المصغرة...')
+          try {
+            const upData = await chunkedUpload(thumbnailFile, 'exams', undefined, (msg) => setUploadStatusMsg(msg))
+            localThumbnailPath = upData.filePath
+            setThumbnailPath(upData.filePath)
+          } catch (err: any) {
+            toast.error(err.message || 'فشل رفع الصورة المصغرة')
+            setUploading(false); setUploadStatusMsg(''); setSubmitting(false); return
+          }
+          setUploading(false)
+        }
+      }
+      setUploadStatusMsg('')
+      const body: Record<string, string> = { title: formTitle, grade: formGrade, content: formContent }
+      if (localFilePath) { body.filePath = localFilePath; body.fileType = localFileType }
+      if (localAnswerKeyPath) { body.answerKeyPath = localAnswerKeyPath; body.answerKeyType = localAnswerKeyType }
+      if (localThumbnailPath) { body.thumbnail = localThumbnailPath }
+      if (formQuestions.length > 0) { body.questions = JSON.stringify(formQuestions); body.passScore = String(formPassScore) }
+      // نماذج الامتحان — مع طريقة التوزيع (عشوائي أو نموذج واحد ثابت للكل)
+      if (examModels.length > 0) {
+        body.models = JSON.stringify(examModels)
+        body.modelMode = modelMode
+        if (modelMode === 'fixed') { body.fixedModel = fixedModelName || examModels[0].name }
+      }
+      /* (25-ب1) إعدادات الامتحان الجديدة — نفس الاتلات بتاعة الاستخراج */
+      body.showResult = formShowResult ? 'true' : 'false'
+      body.timeLimitMin = formTimeLimit.trim() === '' ? '0' : String(Math.max(0, Number(formTimeLimit) || 0))
+      if (formScheduledAt.trim()) {
+        try { body.scheduledAt = new Date(formScheduledAt).toISOString() } catch (e) {}
+      }
+      const res = await fetch('/api/exams', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      if (res.ok) {
+        toast.success('تم إضافة الامتحان'); setShowForm(false); setFormTitle(''); setFormContent(''); setFormGrade(''); setFormFile(null); setFormFilePath(''); setFormFileType(''); setFormFileUrl(''); setFormQuestions([]); setFormPassScore(50); setAnswerKeyFile(null); setAnswerKeyPath(''); setAnswerKeyType(''); setAnswerKeyUrl(''); setThumbnailFile(null); setThumbnailPath(''); setThumbnailUrl(''); setExamModels([]); setModelMode('random'); setFixedModelName(''); setFormShowResult(false); setFormTimeLimit(''); setFormScheduledAt(''); loadExams(false)
+      } else { try { const d = await res.json(); toast.error(d.error || 'خطأ', { duration: 8000 }) } catch { toast.error('خطأ في السيرفر - حاول تاني', { duration: 8000 }) } }
+    } catch (err: any) { toast.error('خطأ في الاتصال: ' + (err.message || ''), { duration: 8000 }) }
+    setSubmitting(false)
+  }
+
+  const handleDeleteExam = async (id: string) => {
+    try { await fetch(`/api/exams/${id}`, { method: 'DELETE' }); toast.success('تم حذف الامتحان'); loadExams(); if (selectedExam === id) { setSelectedExam(''); setResults([]); setNotTaken([]) } } catch { toast.error('خطأ') }
+  }
+
+  /* استخراج نموذج جديد للامتحان (نماذج عشوائية — طلب المستر):
+     نفس ملف الأسئلة المختار + نموذج الإجابة → رفع الملف + استخراج أسئلته
+     → بيتضاف كنموذج مستقل (مفصول عن الباقي) وبعدين بنفضي الملف عشان
+     المستر يختار ملف النموذج اللي بعده */
+  const handleAIExtractModel = async () => {
+    if (modelExtracting) return
+    if (!formFile && !formFileUrl.trim()) { toast.error('ارفع ملف النموذج الأول أو حط رابط'); return }
+    setModelExtracting(true)
+    var savedName = ''
+    try {
+      var path = ''
+      var type = ''
+      if (formFile) {
+        setUploading(true)
+        setUploadStatusMsg('جاري رفع ملف النموذج...')
+        const upData = await chunkedUpload(formFile, 'exams', undefined, (msg) => setUploadStatusMsg(msg))
+        path = upData.filePath
+        type = upData.fileType
+        setUploading(false)
+      } else if (formFileUrl.trim()) {
+        path = formFileUrl.trim()
+      }
+      setUploadStatusMsg('جاري استخراج أسئلة النموذج بالذكاء الاصطناعي...')
+      var fd = new FormData()
+      if (formFile) { fd.append('file', formFile) }
+      else if (formFileUrl.trim()) { fd.append('fileUrl', formFileUrl.trim()) }
+      fd.append('type', 'exam')
+      fd.append('grade', formGrade)
+      var ctrl = new AbortController()
+      var tmr = setTimeout(function () { ctrl.abort() }, 180000)
+      var res = await fetch('/api/ai-extract', { method: 'POST', body: fd, signal: ctrl.signal })
+      clearTimeout(tmr)
+      var data = await res.json()
+      if (res.ok && data.extracted && data.extracted.questions && data.extracted.questions.length > 0) {
+        var extracted = data.extracted.questions.map(function (q: any) {
+          if (isWritingQuestion(q)) {
+            return { q: q.question || '', options: [] as string[], correct: -1, points: q.points || 5, type: 'writing', modelAnswer: q.modelAnswer || '', acceptedAnswers: q.acceptedAnswers || [] }
+          }
+          return { q: q.question || '', options: (q.options || ['','','','']).slice(0, 4), correct: q.correct || 0, points: q.points || 1, type: 'mcq', modelAnswer: q.modelAnswer || '' }
+        })
+        setExamModels(function (prev) {
+          var letters = ['أ', 'ب', 'ج', 'د', 'هـ', 'و', 'ز', 'ح']
+          var nm = 'النموذج ' + (letters[prev.length] || String(prev.length + 1))
+          savedName = nm
+          return prev.concat([{ name: nm, filePath: path, fileType: type, questions: extracted }])
+        })
+        /* نفضي الملف عشان النموذج اللي بعده يكون ملف مختلف */
+        setFormFile(null); setFormFileUrl(''); setFormFilePath(''); setFormFileType('')
+        if (fileRef.current) fileRef.current.value = ''
+      } else { toast.error(data.error || 'لم يتم استخراج أسئلة — تأكد من وجود GEMINI_API_KEY في الإعدادات') }
+    } catch (err: any) {
+      if (err && err.name === 'AbortError') { toast.error('انتهت مهلة الاستخراج - حاول مرة أخرى') }
+      else { toast.error('خطأ: ' + (err.message || '')) }
+    }
+    setUploading(false)
+    setModelExtracting(false)
+    setUploadStatusMsg('')
+    if (savedName) toast.success('تم إضافة ' + savedName + ' — كل طالب هيشوف نموذج واحد بس عشوائي')
+  }
+
+  const avgScore = results.length > 0 ? (results.reduce((sum, r) => sum + (Number(r.score) || 0), 0) / results.length).toFixed(1) : '—'
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <CardTitle className="text-lg flex items-center gap-2"><Trophy className="h-5 w-5 text-primary" />تتبع الامتحانات</CardTitle>
+          <Button size="sm" onClick={() => { setShowForm(!showForm); if (!showForm) { setExamModels([]); setModelMode('random'); setFixedModelName('') } }}><Plus className="h-4 w-4 ml-1" />إضافة امتحان</Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {showForm && (
+          <div className="p-4 rounded-lg border bg-muted/30 space-y-3">
+            <h4 className="font-semibold text-sm">إضافة امتحان جديد</h4>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5"><Label className="text-xs">الصف</Label>
+                <select value={formGrade} onChange={(e) => setFormGrade(e.target.value)} className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm">
+                  <option value="">اختر الصف</option>{gradesList.map((g) => <option key={g.ar} value={g.ar}>{(g.emoji ? g.emoji + ' ' : '') + g.ar}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1.5"><Label className="text-xs">العنوان</Label>
+                <Input value={formTitle} onChange={(e) => setFormTitle(e.target.value)} placeholder="عنوان الامتحان" /></div>
+            </div>
+            <div className="space-y-1.5"><Label className="text-xs">المحتوى</Label>
+              <Textarea value={formContent} onChange={(e) => setFormContent(e.target.value)} rows={3} /></div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">نموذج الأسئلة (رفع ملف أو رابط) - يعرض للطلاب</Label>
+              <div className="flex items-center gap-2">
+                <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,image/*" className="hidden" onChange={(e) => { setFormFile(e.target.files?.[0] || null); setFormFilePath(''); setFormFileUrl('') }} />
+                <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4 ml-1" />{formFile ? formFile.name : 'رفع ملف'}</Button>
+                {formFile && <span className="text-xs text-muted-foreground">{(formFile.size / 1024 / 1024).toFixed(1)} MB</span>}
+                {uploading && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-muted-foreground shrink-0">أو رابط:</span>
+                <Input placeholder="https://..." value={formFileUrl} onChange={(e) => { setFormFileUrl(e.target.value); if (e.target.value.trim()) { setFormFile(null); setFormFilePath('') } }} dir="ltr" className="h-8 text-xs" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">نموذج الإجابة (رفع ملف أو رابط) - للتصحيح</Label>
+              <div className="flex items-center gap-2">
+                <input ref={answerKeyRef} type="file" accept=".pdf,.doc,.docx,image/*" className="hidden" onChange={(e) => { setAnswerKeyFile(e.target.files?.[0] || null); setAnswerKeyPath(''); setAnswerKeyUrl('') }} />
+                <Button type="button" variant="outline" size="sm" onClick={() => answerKeyRef.current?.click()}><FileDown className="h-4 w-4 ml-1" />{answerKeyFile ? answerKeyFile.name : 'رفع ملف'}</Button>
+                {answerKeyFile && <span className="text-xs text-muted-foreground">{(answerKeyFile.size / 1024 / 1024).toFixed(1)} MB</span>}
+                {uploadingAnswerKey && <Loader2 className="h-4 w-4 animate-spin text-amber-500" />}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-muted-foreground shrink-0">أو رابط:</span>
+                <Input placeholder="https://..." value={answerKeyUrl} onChange={(e) => { setAnswerKeyUrl(e.target.value); if (e.target.value.trim()) { setAnswerKeyFile(null); setAnswerKeyPath('') } }} dir="ltr" className="h-8 text-xs" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">صورة مصغرة (اختياري - رفع أو رابط)</Label>
+              <div className="flex items-center gap-3">
+                <input ref={thumbnailRef} type="file" accept="image/*" className="hidden" onChange={(e) => { setThumbnailFile(e.target.files?.[0] || null); setThumbnailPath(''); setThumbnailUrl('') }} />
+                <Button type="button" variant="outline" size="sm" onClick={() => thumbnailRef.current?.click()}><PictureInPicture2 className="h-4 w-4 ml-1" />{thumbnailFile ? thumbnailFile.name : 'رفع صورة'}</Button>
+                {thumbnailPath && <div className="w-12 h-8 rounded border overflow-hidden relative"><Image src={thumbnailPath} alt="thumb" fill className="object-cover" sizes="48px" unoptimized /></div>}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-muted-foreground shrink-0">أو رابط:</span>
+                <Input placeholder="https://..." value={thumbnailUrl} onChange={(e) => { setThumbnailUrl(e.target.value); if (e.target.value.trim()) { setThumbnailFile(null); setThumbnailPath('') } }} dir="ltr" className="h-8 text-xs" />
+              </div>
+            </div>
+            {uploadStatusMsg && <p className="text-xs text-primary animate-pulse">{uploadStatusMsg}</p>}
+
+            {/* MCQ Question Builder */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">أسئلة اختيار من متعدد (اختياري - تصحيح أوتوماتيك)</Label>
+                <Button type="button" variant="ghost" size="sm" onClick={() => setShowQBuilder(!showQBuilder)}>
+                  {showQBuilder ? 'إخفاء' : '+ إضافة أسئلة MCQ'}
+                </Button>
+              </div>
+              {showQBuilder && (
+                <div className="space-y-3 p-3 rounded-lg border bg-card">
+                  <div className="flex items-center gap-3">
+                    <Label className="text-xs shrink-0">درجة النجاح</Label>
+                    <Input type="number" value={formPassScore} onChange={(e) => setFormPassScore(Number(e.target.value))} className="w-20 h-8 text-sm" min={0} max={100} />
+                    <span className="text-xs text-muted-foreground">/ 100</span>
+                    <span className="text-xs text-muted-foreground mr-auto">{formQuestions.length} سؤال | {formQuestions.reduce((s, q) => s + q.points, 0)} درجة</span>
+                  </div>
+                  {formQuestions.map((q, qi) => (
+                    <div key={qi} className="p-3 rounded-lg border bg-muted/30 space-y-2">
+                      <div className="flex items-start gap-2">
+                        <span className="text-xs font-bold text-primary mt-1.5">{qi + 1}</span>
+                        <Input value={q.q} onChange={(e) => { const n = [...formQuestions]; n[qi] = { ...n[qi], q: e.target.value }; setFormQuestions(n) }} placeholder="نص السؤال" className="text-sm" />
+                        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-destructive" onClick={() => setFormQuestions(formQuestions.filter((_, i) => i !== qi))}><Trash2 className="h-3.5 w-3.5" /></Button>
+                      </div>
+                      {/* المعاينة الحية — زي ما الطالب هيشوف بالظبط (كسور وأسوس مُنسّقة) */}
+                      {q.q.trim() && (
+                        <div className="mr-6 rounded-md border bg-background p-2">
+                          <p className="text-[9px] font-bold text-muted-foreground mb-1">👁️ المعاينة (زي ما الطالب هيشوفها):</p>
+                          <p className="text-sm" dir="ltr" style={{ textAlign: 'left' }}><FractionText text={q.q} /></p>
+                          {q.options.some((o) => o.trim()) && (
+                            <div className="mt-1.5 space-y-0.5">
+                              {q.options.map((o, oi2) => o.trim() ? (
+                                <p key={oi2} className={'text-xs ' + (q.correct === oi2 ? 'text-emerald-600 font-bold' : 'text-foreground/80')} dir="ltr" style={{ textAlign: 'left' }}>
+                                  {String.fromCharCode(65 + oi2)}. <FractionText text={o} /> {q.correct === oi2 ? '✓' : ''}
+                                </p>
+                              ) : null)}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {q.options.map((opt, oi) => (
+                        <div key={oi} className="flex items-center gap-2 mr-6">
+                          <button type="button" className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] transition-colors ${q.correct === oi ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/30'}`}
+                            onClick={() => { const n = [...formQuestions]; n[qi] = { ...n[qi], correct: oi }; setFormQuestions(n) }}>{String.fromCharCode(65 + oi)}</button>
+                          <Input value={opt} onChange={(e) => { const n = [...formQuestions]; const newOpts = [...n[qi].options]; newOpts[oi] = e.target.value; n[qi] = { ...n[qi], options: newOpts }; setFormQuestions(n) }} placeholder={`الخيار ${String.fromCharCode(65 + oi)}`} className="h-8 text-sm" />
+                        </div>
+                      ))}
+                      <div className="flex gap-2 mr-6">
+                        {q.options.length < 6 && <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { const n = [...formQuestions]; n[qi] = { ...n[qi], options: [...n[qi].options, ''] }; setFormQuestions(n) }}>+ خيار</Button>}
+                        <Label className="text-xs mr-auto flex items-center gap-1">الدرجة: <Input type="number" value={q.points} onChange={(e) => { const n = [...formQuestions]; n[qi] = { ...n[qi], points: Number(e.target.value) || 0 }; setFormQuestions(n) }} className="w-14 h-7 text-xs" min={1} /></Label>
+                      </div>
+                    </div>
+                  ))}
+                  <Button variant="outline" size="sm" className="w-full" onClick={() => setFormQuestions([...formQuestions, { q: '', options: ['', '', '', ''], correct: 0, points: Math.max(1, Math.floor(100 / (formQuestions.length + 1))) }])}><Plus className="h-4 w-4 ml-1" />إضافة سؤال</Button>
+                </div>
+              )}
+            </div>
+
+            {/* ===== النماذج العشوائية للامتحان (طلب المستر) =====
+                استخراج أكتر من ملف لنفس الامتحان — كل نموذج مفصول لوحده،
+                والطالب بيشوف نموذج واحد بس بيتحدد عشوائيًا ثابت لحسابه */}
+            <div className="space-y-3 p-3 rounded-lg border border-dashed border-purple-400/50 bg-purple-500/5">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <Label className="text-sm font-semibold text-purple-600 dark:text-purple-400">نماذج عشوائية للامتحان</Label>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">ارفع ملف النموذج فوق واعمل استخراج — كل نموذج بيتضاف مفصول لوحده، والطالب هيشوف نموذج واحد بس عشوائي (مرة أ ومرة ب)</p>
+                </div>
+                <Button type="button" size="sm" variant="outline" className="h-7 text-xs border-purple-500/50 text-purple-600 hover:bg-purple-500/10 shrink-0" onClick={handleAIExtractModel} disabled={modelExtracting || uploading || (!formFile && !formFileUrl.trim())}>
+                  {modelExtracting ? <Loader2 className="h-3 w-3 ml-1 animate-spin" /> : <Sparkles className="h-3 w-3 ml-1" />}
+                  استخراج نموذج جديد
+                </Button>
+              </div>
+              {examModels.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground text-center py-1.5">مفيش نماذج لسه — لو ضفت نموذجين أو أكتر تقدر تختار العشوائية أو نموذج واحد ثابت</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {examModels.map((m, mi) => (
+                    <div key={mi} className="flex items-center justify-between gap-2 p-2 rounded-lg border bg-background">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Badge className="bg-purple-500 text-white text-[10px] shrink-0">{m.name}</Badge>
+                        <span className="text-[11px] text-muted-foreground truncate">{m.questions.length} سؤال {m.filePath ? '• الملف مرفوع ✓' : ''}</span>
+                      </div>
+                      <Button type="button" variant="ghost" size="icon" className="h-6 w-6 p-0 text-destructive shrink-0" onClick={() => { setExamModels(examModels.filter((_, i) => i !== mi)); if (fixedModelName === m.name) setFixedModelName('') }}><Trash2 className="h-3 w-3" /></Button>
+                    </div>
+                  ))}
+                  {/* (2026-و) طريقة التوزيع: عشوائي أو نموذج واحد ثابت للكل */}
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <span className="text-[11px] font-semibold shrink-0">طريقة التوزيع:</span>
+                    <select value={modelMode} onChange={(e) => { setModelMode(e.target.value as 'random' | 'fixed'); if (e.target.value === 'random') setFixedModelName('') }} className="h-7 rounded-md border border-input bg-transparent px-2 text-[11px]">
+                      <option value="random">🎲 عشوائي — كل طالب نموذج مختلف</option>
+                      <option value="fixed">📌 نموذج واحد ثابت للكل</option>
+                    </select>
+                    {modelMode === 'fixed' && (
+                      <select value={fixedModelName} onChange={(e) => setFixedModelName(e.target.value)} className="h-7 rounded-md border border-purple-500/50 bg-transparent px-2 text-[11px] text-purple-600 dark:text-purple-400">
+                        <option value="">اختر النموذج الثابت…</option>
+                        {examModels.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
+                      </select>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">
+                    {modelMode === 'fixed'
+                      ? '📌 كل الطلاب هيشوفوا ' + (fixedModelName || examModels[0].name) + ' بس (نموذج واحد ثابت للكل)'
+                      : '✅ الامتحان هيبقى عشوائي: ' + examModels.length + ' نماذج — كل طالب هياخد واحد بس منهم'}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* ===== (25-ب1) إعدادات الامتحان في الإنشاء اليدوي:
+                 سوتش إظهار الإجابات (افتراضي مطفأ) + المؤقت + موعد الظهور ===== */}
+            <div className="space-y-3 p-3 rounded-lg border border-dashed border-emerald-400/50 bg-emerald-500/5">
+              <div>
+                <Label className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">إعدادات الامتحان</Label>
+                <p className="text-[10px] text-muted-foreground mt-0.5">تقدر تعدلها في أي وقت من القايمة تحت (صف الإعدادات لكل امتحان)</p>
+              </div>
+              <div className="flex items-center justify-between gap-3 p-2 rounded-lg border bg-background">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium">إظهار الإجابات للطالب بعد التسليم</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {formShowResult
+                      ? 'الطالب هيشوف نتيجة الاختياري والأخطاء فور التسليم'
+                      : 'الطالب هيشوف «انتظر النتيجة من المستر» فقط (افتراضي)'}
+                  </p>
+                </div>
+                <Switch checked={formShowResult} onCheckedChange={function (v) { setFormShowResult(v) }} />
+              </div>
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">مدة الامتحان بالدقائق (اختياري)</Label>
+                  <Input type="number" min={1} value={formTimeLimit}
+                    onChange={function (e) { setFormTimeLimit(e.target.value) }}
+                    placeholder="بلا وقت" className="w-36 h-8 text-xs" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">موعد ظهور الامتحان للطلاب (اختياري)</Label>
+                  <Input type="datetime-local" value={formScheduledAt}
+                    onChange={function (e) { setFormScheduledAt(e.target.value) }}
+                    placeholder="يظهر فورًا" className="h-8 text-xs" />
+                </div>
+                {formScheduledAt && (
+                  <Button type="button" variant="ghost" size="sm" className="h-8 text-[11px] text-destructive"
+                    onClick={function () { setFormScheduledAt('') }}>إلغاء الموعد (يظهر فورًا)</Button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleAddExam} disabled={submitting || uploading || uploadingAnswerKey}>{submitting || uploading || uploadingAnswerKey ? <Loader2 className="h-4 w-4 animate-spin" /> : 'حفظ'}</Button>
+              <Button size="sm" variant="outline" onClick={() => setShowForm(false)}>إلغاء</Button>
+            </div>
+          </div>
+        )}
+
+        {loading ? <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div> : (
+          <div className="grid gap-4 lg:grid-cols-3">
+            <div className="space-y-2 max-h-[500px] overflow-y-auto custom-scrollbar lg:col-span-1">
+              <p className="text-xs font-medium text-muted-foreground mb-2">اختر امتحان لعرض النتائج</p>
+              {exams.length === 0 ? <p className="text-xs text-muted-foreground text-center py-6">لا توجد امتحانات</p> : exams.map((exam) => (
+                <div key={exam.id} className={`p-3 rounded-lg border cursor-pointer transition-colors hover:bg-muted/50 ${selectedExam === exam.id ? 'border-primary bg-primary/5' : 'bg-card'}`}
+                  onClick={() => handleExamSelect(exam.id)}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm truncate">{exam.title}</p>
+                      <p className="text-[10px] text-muted-foreground">{exam.grade}</p>
+                      <div className="flex gap-1 mt-1">
+                        {(exam as any).thumbnail && <Badge variant="outline" className="text-[9px] border-purple-500/40 text-purple-600">صورة</Badge>}
+                        {(exam as any).filePath && <Badge variant="outline" className="text-[9px] border-primary/40 text-primary">أسئلة</Badge>}
+                        {(exam as any).answerKeyPath && <Badge variant="outline" className="text-[9px] border-amber-500/40 text-amber-600">إجابة</Badge>}
+                        {(exam as any).questions && (exam as any).questions !== '' && <Badge variant="outline" className="text-[9px] border-emerald-500/40 text-emerald-600">MCQ</Badge>}
+                        {(exam as any).models && ((exam as any).modelMode === 'fixed'
+                          ? <Badge className="text-[9px] bg-amber-500 text-white">📌 نموذج ثابت</Badge>
+                          : <Badge className="text-[9px] bg-purple-500 text-white">نماذج عشوائية</Badge>)}
+                        {/* (25-ب1) بادجات الميزات الجديدة */}
+                        {(exam as any).showResult && <Badge variant="outline" className="text-[9px] border-emerald-500/40 text-emerald-600">إجابات ظاهرة</Badge>}
+                        {Number((exam as any).timeLimitMin) > 0 && <Badge variant="outline" className="text-[9px] border-red-500/40 text-red-600">⏱ {Number((exam as any).timeLimitMin)} د</Badge>}
+                        {isScheduledFuture((exam as any).scheduledAt) && <Badge className="text-[9px] bg-blue-500 text-white">مجدول</Badge>}
+                        {/* (2026-و26) بادج الاستهداف */}
+                        {parseTargetStudentIds((exam as any).targetStudentIds).length > 0 && <Badge className="text-[9px] bg-teal-600 text-white">👥 موجه لـ {parseTargetStudentIds((exam as any).targetStudentIds).length} طالب</Badge>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-primary hover:text-primary hover:bg-primary/10 shrink-0"
+                        title="تعديل أسئلة الامتحان"
+                        onClick={(e) => { e.stopPropagation(); setExamEditTarget(exam as any) }}>
+                        ✏️
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
+                        onClick={(e) => { e.stopPropagation(); handleDeleteExam(exam.id) }}><Trash2 className="h-3.5 w-3.5" /></Button>
+                    </div>
+                  </div>
+                  {/* (25-ب1) صف الإعدادات المضغوط: إظهار الإجابات + المؤقت + الجدولة */}
+                  <ExamSettingsRow exam={exam} adminId={currentAdminId} onChanged={function () { loadExams(false) }} />
+                </div>
+              ))}
+            </div>
+            <div className="lg:col-span-2 space-y-4">
+              <QuestionsEditorDialog
+                open={!!examEditTarget}
+                onOpenChange={function (o) { if (!o) setExamEditTarget(null) }}
+                title={examEditTarget ? (examEditTarget.title || '') : ''}
+                apiPath="/api/exams"
+                itemId={examEditTarget ? examEditTarget.id : ''}
+                initialQuestionsRaw={examEditTarget ? (examEditTarget as any).questions : null}
+                onSaved={function () { if (selectedExam) loadExamResults(selectedExam) }}
+              />
+              {!selectedExam ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <FileText className="h-10 w-10 text-muted-foreground/30 mb-3" />
+                  <p className="text-sm text-muted-foreground">اختر امتحان من القائمة لعرض النتائج</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <div className="text-center px-4 py-2 rounded-lg bg-primary/10"><p className="text-lg font-bold text-primary">{results.length}</p><p className="text-[10px] text-muted-foreground">قدموا</p></div>
+                    <div className="text-center px-4 py-2 rounded-lg bg-emerald-500/10"><p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{avgScore}</p><p className="text-[10px] text-muted-foreground">متوسط الدرجات</p></div>
+                    <div className="text-center px-4 py-2 rounded-lg bg-red-500/10"><p className="text-lg font-bold text-red-600 dark:text-red-400">{notTaken.length}</p><p className="text-[10px] text-muted-foreground">لم يقدموا بعد</p></div>
+                    {/* (و24) إعادة تصحيح كل تسليمات الامتحان ده بالذكاء الاصطناعي — لنتايج قديمة طلعت غلط */}
+                    {selectedExam && <span onClick={function (e) { e.stopPropagation() }}><RegradeAllButton kind="exam" targetId={selectedExam} onDone={function () { if (selectedExam) loadExamResults(selectedExam) }} /></span>}
+                  </div>
+                  {examInfo && (
+                    <div className="flex items-center gap-2 flex-wrap text-[10px] text-muted-foreground bg-muted/30 p-2 rounded-lg">
+                      <Badge variant="outline" className="text-[9px] border-blue-500/40 text-blue-600">اختياري: {examInfo.totalMcq || 0}</Badge>
+                      {examInfo.totalWriting > 0 && <Badge variant="outline" className="text-[9px] border-amber-500/40 text-amber-600">مقالي: {examInfo.totalWriting}</Badge>}
+                      <span>درجة النجاح: {examInfo.passScore || 50}%</span>
+                    </div>
+                  )}
+                  {results.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">الطلاب الذين قدموا الامتحان (اضغط على الطالب لرؤية التفاصيل)</p>
+                      <div className="max-h-[500px] overflow-y-auto custom-scrollbar space-y-2">
+                        {results.map((r: any) => {
+                          var isExpanded = expandedResult === r.id
+                          var allQs = r.allQuestions || []
+                          var writingAns = r.writingAnswers || []
+                          var wrongQs = r.wrongQuestions || []
+                          return (
+                            <div key={r.id} className={`rounded-lg border overflow-hidden transition-all ${isExpanded ? 'border-primary' : 'border-border bg-card'}`}>
+                              <button
+                                type="button"
+                                onClick={() => setExpandedResult(isExpanded ? null : r.id)}
+                                className="w-full flex items-center justify-between p-3 text-right hover:bg-muted/30 transition-colors"
+                              >
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                  <div className={"h-8 w-8 rounded-lg flex items-center justify-center shrink-0 " + (r.passed ? 'bg-emerald-500/10' : 'bg-red-500/10')}>
+                                    <span className={"text-xs font-bold " + (r.passed ? 'text-emerald-600' : 'text-red-500')}>{r.score}/{r.maxScore}</span>
+                                  </div>
+                                  <div className="min-w-0 text-right">
+                                    <p className="font-medium text-sm truncate">{r.student?.name || '—'}</p>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                      <span className="text-[10px] text-muted-foreground" dir="ltr">{r.student?.phone || ''}</span>
+                                      <span className="text-[10px] text-muted-foreground">{new Date(r.submittedAt).toLocaleDateString('ar-EG')}</span>
+                                      {wrongQs.length > 0 && (
+                                        <Badge variant="outline" className="text-[9px] border-red-500/40 text-red-600">{wrongQs.length} خطأ</Badge>
+                                      )}
+                                      {writingAns.length > 0 && (
+                                        <Badge variant="outline" className="text-[9px] border-amber-500/40 text-amber-600">{writingAns.length} مقالي</Badge>
+                                      )}
+                                      <span onClick={function (e) { e.stopPropagation() }}>
+                                        <RegradeButton kind="exam" resultId={r.id} onDone={function () { if (selectedExam) loadExamResults(selectedExam) }} />
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <Badge variant={r.passed ? 'default' : 'outline'} className={`text-[9px] h-5 ${r.passed ? '' : 'border-amber-500 text-amber-600'}`}>
+                                    {r.passed ? 'ناجح' : 'محتاج مراجعة'}
+                                  </Badge>
+                                  <ChevronLeft className={"h-4 w-4 text-muted-foreground transition-transform " + (isExpanded ? 'rotate-90' : '')} />
+                                </div>
+                              </button>
+                              {isExpanded && (
+                                <div className="border-t bg-muted/20 p-3 space-y-2">
+                                  {/* All questions review */}
+                                  {allQs.length > 0 ? (
+                                    <div className="space-y-1.5">
+                                      <p className="text-[10px] font-semibold text-muted-foreground">جميع الأسئلة ({allQs.length}):</p>
+                                      {allQs.map((aq: any, qi: number) => (
+                                        <div key={qi} className="text-[10px] p-2 rounded border bg-card" dir="ltr">
+                                          <div className="flex items-start gap-1.5">
+                                            <span className={`shrink-0 font-bold px-1.5 py-0.5 rounded-full text-[9px] ${
+                                              aq.type === 'writing'
+                                                ? writingVerdictBadge(aq).cls
+                                                : aq.isCorrect
+                                                  ? 'bg-emerald-500/10 text-emerald-600'
+                                                  : 'bg-red-500/10 text-red-600'
+                                            }`}>
+                                              {aq.type === 'writing'
+                                                ? writingVerdictBadge(aq).text
+                                                : aq.isCorrect ? 'Correct' : 'Wrong'}
+                                            </span>
+                                            <p className="font-medium flex-1" style={{ textAlign: 'left' }}>{qi + 1}. <FractionText text={aq.question} /></p>
+                                          </div>
+                                          {/* (2026-و40-w) جدول السؤال معبى بقيم الطالب + رسمته — عرض فقط */}
+                                          {(aq.table || aq.figure) && (
+                                            <div className="mt-1 pl-6">
+                                              {aq.table && <WorksheetTableReadonly table={aq.table} values={Array.isArray(aq.tableAnswers) ? aq.tableAnswers : parseTableValuesFromText(aq.studentAnswer || '', aq.table)} />}
+                                              {aq.figure && <WorksheetFigure figure={aq.figure} />}
+                                            </div>
+                                          )}
+                                          <div className="mt-1 pl-6 space-y-0.5">
+                                            {aq.type === 'writing' ? (
+                                              <div className="space-y-1 p-2 rounded bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/40">
+                                                <p className="text-[9px] font-semibold text-muted-foreground mb-0.5">إجابة الطالب:</p>
+                                                <p className="text-foreground whitespace-pre-wrap break-words" dir="auto"><FractionText text={aq.studentAnswer || '(فارغ)'} /></p>
+                                                {/* Image preview - click to enlarge - show ALL images */}
+                                                {extractAllImagePaths(aq.studentAnswer).length > 0 && onViewImage && (
+                                                  <div className="mt-1 flex flex-wrap gap-2">
+                                                    {extractAllImagePaths(aq.studentAnswer).map(function(imgPath, imgIdx) {
+                                                      return (
+                                                        <button
+                                                          key={imgIdx}
+                                                          type="button"
+                                                          onClick={function() { onViewImage(imgPath) }}
+                                                          className="group relative block rounded-md border border-amber-200 dark:border-amber-900/40 overflow-hidden hover:border-amber-500 transition-colors cursor-pointer"
+                                                        >
+                                                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                          <img
+                                                            src={imgPath}
+                                                            alt={'Student answer image ' + (imgIdx + 1) + ' - click to enlarge'}
+                                                            className="w-[300px] h-[250px] object-contain bg-white"
+                                                            onError={function(e) { var t = e.currentTarget as HTMLImageElement; if (t.parentElement) t.parentElement.style.display = 'none' }}
+                                                          />
+                                                          <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[9px] px-1.5 py-0.5 rounded">🔍 صورة {imgIdx + 1} - اعرض</span>
+                                                        </button>
+                                                      )
+                                                    })}
+                                                  </div>
+                                                )}
+                                                {/* (و60-هـ) حكم الـ AI الموحد: مؤشر قراءة + ملاحظات للنصي والصورة */}
+                                                <AiWritingVerdictBlock aq={aq} />
+                                                {aq.correctAnswer && (
+                                                  <>
+                                                    <p className="text-[9px] font-semibold text-emerald-700 dark:text-emerald-400 mb-0.5 mt-1">الإجابة النموذجية:</p>
+                                                    <p className="text-emerald-900 dark:text-emerald-200 whitespace-pre-wrap break-words" dir="auto"><FractionText text={aq.correctAnswer} /></p>
+                                                  </>
+                                                )}
+                                              </div>
+                                            ) : (
+                                              <>
+                                                <p className="text-red-600">إجابة الطالب: <span dir="ltr"><FractionText text={aq.studentAnswer} /></span></p>
+                                                <p className="text-emerald-600">الإجابة الصحيحة: <span dir="ltr"><FractionText text={aq.correctAnswer} /></span></p>
+                                              </>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : wrongQs.length > 0 ? (
+                                    <div className="space-y-1">
+                                      <p className="text-[10px] font-semibold text-red-600">الأسئلة الخاطئة ({wrongQs.length}):</p>
+                                      {wrongQs.map((wq: any, wi: number) => (
+                                        <div key={wi} className="flex items-start gap-2 text-[10px] p-1.5 rounded bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/40">
+                                          <span className="shrink-0 font-bold text-red-500">{wi + 1}.</span>
+                                          <div className="min-w-0">
+                                            <p className="font-medium" dir="ltr" style={{ textAlign: 'left' }}><FractionText text={wq.question} /></p>
+                                            <p className="text-red-600 mt-0.5">إجابة الطالب: <span dir="ltr">{wq.studentAnswer}</span></p>
+                                            <p className="text-emerald-600">الإجابة الصحيحة: <span dir="ltr">{wq.correctAnswer}</span></p>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-center text-muted-foreground text-xs py-2">لا توجد تفاصيل أسئلة محفوظة</p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  {notTaken.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-red-500">لم يقدموا الامتحان بعد</p>
+                      <div className="max-h-[200px] overflow-y-auto custom-scrollbar space-y-1">
+                        {notTaken.map((s) => (
+                          <div key={s.id} className="flex items-center justify-between p-2 rounded-lg border border-red-200 dark:border-red-900/30 bg-red-50/50 dark:bg-red-900/10 text-sm">
+                            <div><span className="font-medium">{s.name}</span> <span className="text-[10px] text-muted-foreground" dir="ltr">{s.phone}</span></div>
+                            <UserX className="h-4 w-4 text-red-400" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+/* ========== GALLERY MANAGER ========== */
+function GalleryManager() {
+  var [images, setImages] = useState<GalleryImage[]>([])
+  var [loading, setLoading] = useState(true)
+  var [showForm, setShowForm] = useState(false)
+  var [uploading, setUploading] = useState(false)
+  var [saving, setSaving] = useState(false)
+  var fileRef = useRef<HTMLInputElement>(null)
+  var [imgUrl, setImgUrl] = useState('')
+  var [imgOrder, setImgOrder] = useState('0')
+  var [vidUrl, setVidUrl] = useState('')
+  var [vidThumb, setVidThumb] = useState('')
+  var [vidOrder, setVidOrder] = useState('0')
+
+  var loadGallery = async function() {
+    setLoading(true)
+    try {
+      var res = await fetch('/api/gallery')
+      var data = await res.json()
+      setImages(data.images || [])
+    } catch { toast.error('خطأ في تحميل المعرض') }
+    setLoading(false)
+  }
+
+  /* (و45) صورة مصغرة أوتوماتيكية للفيديو — يوتيوب من i.ytimg.com */
+  var getYtThumb = function (url: string) {
+    var yt = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/|live\/))([\w-]{11})/)
+    return yt ? 'https://i.ytimg.com/vi/' + yt[1] + '/hqdefault.jpg' : ''
+  }
+
+  useEffect(function() { loadGallery() }, [])
+
+  var resetAll = function() {
+    setImgUrl(''); setImgOrder('0')
+    setVidUrl(''); setVidThumb(''); setVidOrder('0')
+    setUploading(false); setSaving(false)
+  }
+
+  var handleImgUpload = async function(file: File) {
+    setUploading(true)
+    try {
+      var upData = await chunkedUpload(file, 'gallery')
+      await fetch('/api/gallery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: file.name,
+          filePath: upData.filePath,
+          type: 'image',
+          sortOrder: parseInt(imgOrder) || 0
+        })
+      })
+      toast.success('تم رفع الصورة بنجاح')
+      resetAll(); loadGallery()
+    } catch (err: any) { toast.error(err.message || 'خطأ في رفع الصورة') }
+    setUploading(false)
+  }
+
+  var handleImgLink = async function() {
+    if (!imgUrl.trim()) { toast.error('الرجاء إدخال رابط الصورة'); return }
+    setSaving(true)
+    try {
+      var res = await fetch('/api/gallery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: 'صورة',
+          filePath: imgUrl.trim(),
+          type: 'image',
+          sortOrder: parseInt(imgOrder) || 0
+        })
+      })
+      if (res.ok) {
+        toast.success('تم إضافة الصورة بنجاح')
+        setImgUrl(''); loadGallery()
+      } else { toast.error('خطأ في الإضافة') }
+    } catch { toast.error('خطأ في الاتصال') }
+    setSaving(false)
+  }
+
+  var handleVidAdd = async function() {
+    if (!vidUrl.trim()) { toast.error('الرجاء إدخال رابط الفيديو'); return }
+    setSaving(true)
+    try {
+      var body: any = {
+        title: 'فيديو',
+        videoUrl: vidUrl.trim(),
+        type: 'video',
+        sortOrder: parseInt(vidOrder) || 0
+      }
+      /* (و45) الصورة المصغرة: رابط يدوي ← أوتوماتيك من اليوتيوب (والسيرفر كمان بيتعامل مع الحالتين) */
+      if (vidThumb.trim()) { body.thumbnail = vidThumb.trim() }
+      var res = await fetch('/api/gallery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+      if (res.ok) {
+        toast.success('تم إضافة الفيديو بنجاح')
+        setVidUrl(''); setVidThumb(''); loadGallery()
+      } else {
+        var gErr = ''
+        try { var gData = await res.json(); gErr = String(gData.error || '') } catch { gErr = 'كود ' + res.status }
+        toast.error('الفيديو ما اتضافش: ' + gErr)
+      }
+    } catch { toast.error('خطأ في الاتصال') }
+    setSaving(false)
+  }
+
+  var handleDelete = async function(id: string) {
+    try {
+      await fetch('/api/gallery/' + id, { method: 'DELETE' })
+      toast.success('تم الحذف')
+      loadGallery()
+    } catch { toast.error('خطأ') }
+  }
+
+  var getVideoThumb = function(url: string) {
+    /* (و45) كل صيغ اليوتيوب زي الصفحة العامة */
+    var yt = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/|live\/))([\w-]{11})/)
+    if (yt) return 'https://img.youtube.com/vi/' + yt[1] + '/mqdefault.jpg'
+    return ''
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Camera className="h-5 w-5 text-primary" />
+            المعرض | Gallery
+          </CardTitle>
+          <Button size="sm" onClick={function() { setShowForm(!showForm) }}>
+            {showForm ? <X className="h-4 w-4 ml-1" /> : <Plus className="h-4 w-4 ml-1" />}
+            {showForm ? 'إغلاق' : 'إضافة'}
+          </Button>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-6">
+        {/* ===== ADD FORMS ===== */}
+        {showForm && (
+          <div className="space-y-4 p-4 rounded-xl border bg-muted/30">
+            {/* === صورة === */}
+            <div className="space-y-3 p-4 rounded-lg border bg-card">
+              <h3 className="font-semibold text-sm flex items-center gap-2">
+                <ImagePlus className="h-4 w-4 text-emerald-600" />
+                إضافة صورة
+              </h3>
+
+              {/* رفع ملف */}
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">رفع صورة من الجهاز</Label>
+                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={function(e) { var f = e.target.files?.[0]; if (f) handleImgUpload(f); e.target.value = '' }} />
+                <Button variant="outline" size="sm" className="border-dashed w-full" onClick={function() { fileRef.current?.click() }} disabled={uploading}>
+                  {uploading ? <Loader2 className="h-4 w-4 animate-spin ml-2" /> : <Upload className="h-4 w-4 ml-2" />}
+                  {uploading ? 'جاري الرفع...' : 'اختر صورة للرفع'}
+                </Button>
+              </div>
+
+              {/* فاصل */}
+              <div className="flex items-center gap-3">
+                <div className="flex-grow h-px bg-border" />
+                <span className="text-[11px] text-muted-foreground">أو</span>
+                <div className="flex-grow h-px bg-border" />
+              </div>
+
+              {/* لينك صورة + ترتيب */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1 sm:col-span-2">
+                  <Label className="text-xs text-muted-foreground">رابط الصورة</Label>
+                  <Input placeholder="https://example.com/image.jpg" value={imgUrl} onChange={function(e) { setImgUrl(e.target.value) }} dir="ltr" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">الترتيب</Label>
+                  <Input type="number" placeholder="0" value={imgOrder} onChange={function(e) { setImgOrder(e.target.value) }} />
+                </div>
+              </div>
+
+              <Button size="sm" onClick={handleImgLink} disabled={saving || !imgUrl.trim()}>
+                {saving ? <Loader2 className="h-4 w-4 animate-spin ml-1" /> : <Plus className="h-4 w-4 ml-1" />}
+                إضافة الصورة بالرابط
+              </Button>
+            </div>
+
+            {/* === فيديو === */}
+            <div className="space-y-3 p-4 rounded-lg border bg-card">
+              <h3 className="font-semibold text-sm flex items-center gap-2">
+                <PlayCircle className="h-4 w-4 text-blue-600" />
+                إضافة فيديو
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">رابط الفيديو</Label>
+                  <Input placeholder="https://youtube.com/watch?v=..." value={vidUrl} onChange={function(e) { setVidUrl(e.target.value) }} dir="ltr" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">رابط صورة مصغرة (اختياري — أوتوماتيك من اليوتيوب لو سبتها فاضية)</Label>
+                  <Input placeholder="https://example.com/thumb.jpg" value={vidThumb} onChange={function(e) { setVidThumb(e.target.value) }} dir="ltr" />
+                  {vidUrl.trim() && !vidThumb.trim() && getYtThumb(vidUrl) && (
+                    <div className="flex items-center gap-2 mt-1">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={getYtThumb(vidUrl)} alt="الصورة المصغرة الأوتوماتيكية" className="h-12 w-20 object-cover rounded border border-border bg-white" />
+                      <p className="text-[10px] text-muted-foreground">هتتحط أوتوماتيك من اليوتيوب لو مكتتبتش حاجة</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-1 w-full sm:w-1/3">
+                <Label className="text-xs text-muted-foreground">الترتيب</Label>
+                <Input type="number" placeholder="0" value={vidOrder} onChange={function(e) { setVidOrder(e.target.value) }} />
+                <p className="text-[10px] text-muted-foreground">كلما كان الرقم أصغر، كلما ظهر أولاً</p>
+              </div>
+
+              <Button size="sm" variant="outline" onClick={handleVidAdd} disabled={saving || !vidUrl.trim()}>
+                {saving ? <Loader2 className="h-4 w-4 animate-spin ml-1" /> : <Plus className="h-4 w-4 ml-1" />}
+                إضافة الفيديو
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ===== GALLERY GRID ===== */}
+        {loading ? (
+          <div className="flex justify-center py-10">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          </div>
+        ) : images.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <Camera className="h-10 w-10 text-muted-foreground/30 mb-3" />
+            <p className="text-sm text-muted-foreground">لا توجد صور أو فيديوهات بعد. اضغط &quot;إضافة&quot; للبدء!</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[500px] overflow-y-auto custom-scrollbar">
+            {images.map(function(img) {
+              var isVideo = img.type === 'video'
+              var thumb = isVideo ? ((img as any).thumbnail || getVideoThumb(img.videoUrl) || img.filePath || '') : img.filePath
+              var src = isVideo ? thumb : img.filePath
+              return (
+                <div key={img.id} className="relative group rounded-lg overflow-hidden border bg-card aspect-square">
+                  {src ? (
+                    <Image src={src} alt={img.title} fill className="object-cover" sizes="200px" unoptimized />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-muted">
+                      <PlayCircle className="h-8 w-8 text-muted-foreground/30" />
+                    </div>
+                  )}
+                  {isVideo && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="w-10 h-10 rounded-full bg-black/60 flex items-center justify-center">
+                        <PlayCircle className="h-5 w-5 text-white" />
+                      </div>
+                    </div>
+                  )}
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Badge variant="secondary" className="bg-black/50 text-white border-0 text-[10px] backdrop-blur-sm">
+                      {isVideo ? 'فيديو' : 'صورة'}
+                    </Badge>
+                  </div>
+                  <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Badge variant="secondary" className="bg-black/50 text-white border-0 text-[10px] backdrop-blur-sm">
+                      ترتيب: {img.sortOrder}
+                    </Badge>
+                  </div>
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Button size="icon" variant="destructive" className="h-8 w-8" onClick={function() { handleDelete(img.id) }}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+/* ========== MY STUDENTS PANEL (طلابي) ========== */
+interface StudentAnalytics {
+  id: string; name: string; phone: string; grade: string
+  loginCount: number; lastLogin: string | null; createdAt: string
+  watchedVideos: number; completedVideos: number; totalVideos: number
+  avgWatchPercent: number
+  examsTaken: number; examsPassed: number; totalExams: number
+  avgExamScore: number; activityScore: number
+  firstExamAt?: number | null; lastExamAt?: number | null; bestExamScore?: number
+  homeworkDone?: number; totalHomework?: number; avgHwScore?: number
+}
+
+function MyStudentsPanel({ onViewImage }: { onViewImage?: (src: string) => void }) {
+  const gradesList = useGradesList()
+  const [grade, setGrade] = useState('')
+  const [students, setStudents] = useState<StudentAnalytics[]>([])
+  const [summary, setSummary] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [selectedStudent, setSelectedStudent] = useState<StudentAnalytics | null>(null)
+  const [detail, setDetail] = useState<any>(null)
+  const [loadingDetail, setLoadingDetail] = useState(false)
+  /* 2026-و23 — خانة بحث الطلاب بالاسم أو الرقم (طلب المستر الحرفي:
+     «أنا بدور على طالب معين فبفضل أنزل أنزل — أضيف لي خانة بحث
+     أكتب اسم الطالب وهو يظهر لي») — فلترة فورية من غير أي طلب شبكة */
+  const [search, setSearch] = useState('')
+  /* (2026-و58) ترتيب آخر امتحان — طلب المستر: «لما أنزل امتحان جديد عاوز
+     ترتيب اللي بيعملوا الامتحان ده يظهر — القديم يتمسح والجديد يظهر تلقائي».
+     بيتحمس مع كل تحميل للصف: آخر امتحان (بالـ createdAt) + نتايجه هو بس. */
+  const [latestRanking, setLatestRanking] = useState<{ examTitle: string; rows: Array<{ studentId: string; name: string; score: number; maxScore: number; submittedAt: string }> } | null>(null)
+  /* (و65) التقارير الجاهزة للطباعة — تقرير PDF لكل طالب + التقرير الشامل للصف */
+  const T = useT()
+  const [reportFor, setReportFor] = useState<any>(null)
+  const [classReportOpen, setClassReportOpen] = useState(false)
+  const filteredStudents = search.trim()
+    ? students.filter(function (s) {
+        var q = search.trim().toLowerCase()
+        return (s.name || '').toLowerCase().indexOf(q) !== -1 || (s.phone || '').indexOf(q) !== -1
+      })
+    : students
+
+  const loadData = async () => {
+    if (!grade) { setStudents([]); setSummary(null); setLatestRanking(null); return }
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/students/analytics?grade=${encodeURIComponent(grade)}`)
+      const data = await res.json()
+      setStudents(data.students || [])
+      setSummary(data.gradeSummary)
+    } catch { toast.error('خطأ في تحميل البيانات') }
+    setLoading(false)
+    /* (2026-و58) تحميل ترتيب آخر امتحان — القديم بيتمسح والجديد بيظهر تلقائي */
+    try {
+      const exRes = await fetch(`/api/exams?grade=${encodeURIComponent(grade)}&pageSize=1`)
+      const exData = await exRes.json()
+      const newest = (exData.exams || [])[0]
+      if (newest && newest.id) {
+        const rRes = await fetch(`/api/exam-results?examId=${encodeURIComponent(newest.id)}`)
+        const rData = await rRes.json()
+        const rrows = (rData.results || []).map(function (r: any) {
+          return {
+            studentId: String(r.studentId || ''),
+            name: (r.student && r.student.name) || 'طالب',
+            score: Number(r.score) || 0,
+            maxScore: Number(r.maxScore) || 100,
+            submittedAt: String(r.submittedAt || ''),
+          }
+        })
+        setLatestRanking({ examTitle: String(newest.title || ''), rows: rrows })
+      } else {
+        setLatestRanking(null)
+      }
+    } catch { setLatestRanking(null) }
+  }
+
+  useEffect(() => { loadData() }, [grade])
+
+  const loadDetail = async (studentId: string) => {
+    var student = students.find(function(s) { return s.id === studentId })
+    setSelectedStudent(student || null)
+    setDetail(null)
+    setLoadingDetail(true)
+    try {
+      const res = await Promise.race([
+        fetch(`/api/students/${studentId}/progress`),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 30000)),
+      ])
+      if (!res.ok) {
+        console.error('Progress API error:', res.status, res.statusText)
+        toast.error('خطأ في تحميل التفاصيل (HTTP ' + res.status + ')')
+      } else {
+        var data = await res.json()
+        if (data.error) {
+          toast.error('خطأ: ' + data.error)
+        }
+        setDetail(data)
+      }
+    } catch (err) {
+      console.error('loadDetail error:', err)
+      toast.error('بطء في تحميل التفاصيل - حاول تاني')
+    }
+    setLoadingDetail(false)
+  }
+
+  const getActivityColor = (score: number) => {
+    if (score >= 70) return 'text-emerald-600 dark:text-emerald-400'
+    if (score >= 40) return 'text-amber-600 dark:text-amber-400'
+    return 'text-red-500'
+  }
+
+  const getActivityBg = (score: number) => {
+    if (score >= 70) return 'bg-emerald-500/10'
+    if (score >= 40) return 'bg-amber-500/10'
+    return 'bg-red-500/10'
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <CardTitle className="text-lg flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary" />طلابي | My Students</CardTitle>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <div className="relative">
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="🔍 ابحث باسم الطالب أو رقمه..."
+                  className="h-9 rounded-md border border-input bg-transparent pl-3 pr-9 text-sm min-w-[220px]"
+                  aria-label="ابحث عن طالب بالاسم أو رقم الهاتف"
+                />
+              </div>
+              <select value={grade} onChange={(e) => setGrade(e.target.value)} className="h-9 rounded-md border border-input bg-transparent px-3 text-sm min-w-[200px]">
+                <option value="">اختر الصف لعرض التحليلات</option>
+                {gradesList.map((g) => <option key={g.ar} value={g.ar}>{(g.emoji ? g.emoji + ' ' : '') + g.ar}</option>)}
+              </select>
+              {/* (و65) التقرير الشامل للصف — ملف PDF واحد لكل طلاب الصف */}
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!grade}
+                className="h-9 text-xs gap-1.5 border-emerald-400 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
+                onClick={() => setClassReportOpen(true)}
+                title="ملف PDF واحد لكل طلاب الصف: الفيديوهات اللي مش شافهاش + الواجبات المقدمة + الامتحانات والدرجات"
+              >
+                <FileDown className="h-3.5 w-3.5" />
+                {T('تقرير PDF', 'PDF Report')}
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {!grade ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <BarChart3 className="h-10 w-10 text-muted-foreground/30 mb-3" />
+              <p className="text-sm text-muted-foreground">اختر صفًا دراسيًا لعرض تحليلات الطلاب</p>
+            </div>
+          ) : loading ? (
+            /* (و24) هيكل تحميل (skeleton) بدل السبينر — شكل الجدول بيبان من أول ثانية والتحميل يحس أسرع */
+            <div className="space-y-3 animate-pulse" aria-busy="true" aria-label="جاري تحميل الطلاب">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[0, 1, 2, 3].map(function (i) { return <Skeleton key={i} className="h-16 rounded-lg" /> })}
+              </div>
+              {[0, 1, 2, 3, 4, 5].map(function (i) {
+                return (
+                  <div key={i} className="flex items-center gap-3 p-3 rounded-lg border">
+                    <Skeleton className="h-9 w-9 rounded-full shrink-0" />
+                    <div className="flex-1 space-y-1.5">
+                      <Skeleton className="h-3 w-1/3" />
+                      <Skeleton className="h-2.5 w-1/4" />
+                    </div>
+                    <Skeleton className="h-8 w-24 rounded-md hidden sm:block" />
+                  </div>
+                )
+              })}
+            </div>
+          ) : students.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <Users className="h-10 w-10 text-muted-foreground/30 mb-3" />
+              <p className="text-sm text-muted-foreground">لا يوجد طلاب مفعلون في هذا الصف</p>
+            </div>
+          ) : filteredStudents.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <Search className="h-10 w-10 text-muted-foreground/30 mb-3" />
+              <p className="text-sm font-medium">مفيش طالب بالاسم أو الرقم «{search}»</p>
+              <p className="text-xs text-muted-foreground mt-1">جرب جزء من الاسم أو الرقم</p>
+            </div>
+          ) : (
+            <>
+              {/* Grade Summary Cards */}
+              {summary && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+                  <div className="text-center p-3 rounded-lg bg-primary/10"><p className="text-xl font-bold text-primary">{summary.totalStudents}</p><p className="text-[10px] text-muted-foreground">طلاب مفعلون</p></div>
+                  <div className="text-center p-3 rounded-lg bg-emerald-500/10"><p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{summary.avgWatchPercent}%</p><p className="text-[10px] text-muted-foreground">متوسط المشاهدة</p></div>
+                  <div className="text-center p-3 rounded-lg bg-amber-500/10"><p className="text-xl font-bold text-amber-600 dark:text-amber-400">{summary.avgExamScore}</p><p className="text-[10px] text-muted-foreground">متوسط الدرجات</p></div>
+                  <div className="text-center p-3 rounded-lg bg-purple-500/10"><p className="text-xl font-bold text-purple-600 dark:text-purple-400">{summary.avgActivity}%</p><p className="text-[10px] text-muted-foreground">متوسط النشاط</p></div>
+                </div>
+              )}
+
+              {/* (2026-و58) ترتيب آخر امتحان — طلب المستر: لما ينزل امتحان جديد
+                 الترتيب القديم يتمسح والجديد يظهر تلقائي — الترتيب هنا
+                 لأمتحان واحد بس: آخر واحد اتنزل، مرتب بمن خلّص الأول */}
+              {(() => {
+                if (!latestRanking) return null
+                const ranked = latestRanking.rows
+                  .slice()
+                  .sort(function (a, b) { return new Date(a.submittedAt || 0).getTime() - new Date(b.submittedAt || 0).getTime() })
+                const medal = function (i: number) { return i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : String(i + 1) }
+                return (
+                  <div className="mb-6 rounded-lg border border-amber-500/30 bg-amber-500/5 overflow-hidden">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/10 border-b border-amber-500/30 flex-wrap">
+                      <Trophy className="h-4 w-4 text-amber-500 shrink-0" />
+                      <p className="text-sm font-bold">ترتيب امتحان «{latestRanking.examTitle}» — اللي خلصوا الأول الأول</p>
+                      <span className="text-[10px] text-muted-foreground">(بيتحدّث تلقائيًا مع كل امتحان جديد)</span>
+                    </div>
+                    {ranked.length === 0 ? (
+                      <p className="text-xs text-muted-foreground text-center py-4">لسه مفيش تسليمات في الامتحان ده — أول ما الطلاب تسلّم هيظهروا هنا بالترتيب</p>
+                    ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead><tr className="border-b text-xs text-muted-foreground">
+                          <th className="text-center py-2 px-2 font-medium w-10">#</th>
+                          <th className="text-right py-2 px-2 font-medium">الطالب</th>
+                          <th className="text-center py-2 px-1 font-medium">سلّم في</th>
+                          <th className="text-center py-2 px-1 font-medium">الدرجة</th>
+                        </tr></thead>
+                        <tbody>
+                          {ranked.map((s, i) => (
+                            <tr key={s.studentId + '-' + i} className="border-b hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => loadDetail(s.studentId)}>
+                              <td className="text-center py-2 px-2 font-bold text-xs">{medal(i)}</td>
+                              <td className="py-2 px-2">
+                                <p className="font-medium text-xs truncate max-w-[150px]">{s.name}</p>
+                              </td>
+                              <td className="text-center py-2 px-1">
+                                <span className="text-[10px] font-medium">{new Date(s.submittedAt).toLocaleDateString('ar-EG')}</span>
+                                <p className="text-[9px] text-muted-foreground" dir="ltr">{new Date(s.submittedAt).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</p>
+                              </td>
+                              <td className="text-center py-2 px-1">
+                                <span className={`text-xs font-bold ${s.score >= s.maxScore / 2 ? 'text-emerald-600' : 'text-red-500'}`}>{s.score}<span className="text-[9px] text-muted-foreground">/{s.maxScore}</span></span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    )}
+                  </div>
+                )
+              })()}
+
+              {/* Student Analytics Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead><tr className="border-b text-xs text-muted-foreground">
+                    <th className="text-right py-2 px-2 font-medium">الطالب</th>
+                    <th className="text-center py-2 px-1 font-medium">المشاهدة</th>
+                    <th className="text-center py-2 px-1 font-medium">الامتحانات</th>
+                    <th className="text-center py-2 px-1 font-medium">الدرجة</th>
+                    <th className="text-center py-2 px-1 font-medium">الواجبات</th>
+                    <th className="text-center py-2 px-1 font-medium">النشاط</th>
+                    <th className="text-center py-2 px-1 font-medium">آخر دخول</th>
+                    <th className="text-center py-2 px-1 font-medium">تفاصيل</th>
+                  </tr></thead>
+                  <tbody>
+                    {filteredStudents.map((s) => (
+                      <tr key={s.id} className="border-b hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => loadDetail(s.id)}>
+                        <td className="py-2.5 px-2">
+                          <p className="font-medium text-xs truncate max-w-[150px]">{s.name}</p>
+                          <p className="text-[10px] text-muted-foreground" dir="ltr">{s.phone}</p>
+                        </td>
+                        <td className="text-center py-2 px-1">
+                          <div className={`text-xs font-bold ${s.avgWatchPercent >= 70 ? 'text-emerald-600' : s.avgWatchPercent >= 40 ? 'text-amber-600' : 'text-red-500'}`}>{s.avgWatchPercent}%</div>
+                          <p className="text-[9px] text-muted-foreground">{s.watchedVideos}/{s.totalVideos}</p>
+                        </td>
+                        <td className="text-center py-2 px-1">
+                          <div className="text-xs font-medium">{s.examsTaken}/{s.totalExams}</div>
+                          <p className={`text-[9px] ${s.examsPassed === s.examsTaken && s.examsTaken > 0 ? 'text-emerald-600' : 'text-muted-foreground'}`}>{s.examsPassed} نجح</p>
+                        </td>
+                        <td className="text-center py-2 px-1">
+                          <span className={`text-xs font-bold ${s.avgExamScore >= 50 ? 'text-emerald-600' : s.avgExamScore > 0 ? 'text-red-500' : 'text-muted-foreground'}`}>{s.avgExamScore || '—'}</span>
+                        </td>
+                        <td className="text-center py-2 px-1">
+                          <div className="text-xs font-medium">{(s as any).homeworkDone || 0}/{(s as any).totalHomework || 0}</div>
+                          <p className={`text-[9px] ${(s as any).avgHwScore >= 50 ? 'text-emerald-600' : (s as any).homeworkDone > 0 ? 'text-red-500' : 'text-muted-foreground'}`}>{(s as any).avgHwScore || 0}°</p>
+                        </td>
+                        <td className="text-center py-2 px-1">
+                          <div className={`inline-flex items-center justify-center w-10 h-10 rounded-full text-xs font-bold ${getActivityColor(s.activityScore)} ${getActivityBg(s.activityScore)}`}>{s.activityScore}</div>
+                        </td>
+                        <td className="text-center py-2 px-1">
+                          <span className="text-[10px] text-muted-foreground">{s.lastLogin ? new Date(s.lastLogin).toLocaleDateString('ar-EG') : 'لم يسجل'}</span>
+                        </td>
+                        <td className="text-center py-2 px-1">
+                          {/* (و65) تقرير PDF للطالب */}
+                          <Button size="icon" variant="ghost" className="h-7 w-7 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20" onClick={(e) => { e.stopPropagation(); setReportFor(s) }} title="تقرير PDF للطالب (امتحاناته وواجباته ونسبة مشاهدة الفيديوهات)"><FileDown className="h-3.5 w-3.5" /></Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); loadDetail(s.id) }}><Eye className="h-3.5 w-3.5" /></Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Student Detail Panel */}
+      {selectedStudent && (
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm">تحليلات: {selectedStudent.name}</CardTitle>
+              <Button size="sm" variant="ghost" onClick={() => { setSelectedStudent(null); setDetail(null) }}><X className="h-4 w-4" /></Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {loadingDetail ? (
+              <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+            ) : detail ? (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="text-center p-3 rounded-lg border"><p className="text-lg font-bold text-primary">{detail.summary?.totalVideosWatched || 0}</p><p className="text-[10px] text-muted-foreground">فيديوهات شاهدها</p></div>
+                <div className="text-center p-3 rounded-lg border"><p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{detail.summary?.avgWatchPercent || 0}%</p><p className="text-[10px] text-muted-foreground">متوسط المشاهدة</p></div>
+                <div className="text-center p-3 rounded-lg border"><p className="text-lg font-bold text-amber-600 dark:text-amber-400">{detail.summary?.avgExamScore || 0}</p><p className="text-[10px] text-muted-foreground">متوسط الدرجات</p></div>
+                <div className="text-center p-3 rounded-lg border"><p className="text-lg font-bold text-purple-600 dark:text-purple-400">{detail.summary?.examsPassed || 0}/{detail.summary?.totalExamsTaken || 0}</p><p className="text-[10px] text-muted-foreground">نجح/قدم</p></div>
+
+                {/* Video Progress Detail */}
+                {detail.videoProgress && detail.videoProgress.length > 0 && (
+                  <div className="sm:col-span-2">
+                    <h4 className="text-xs font-semibold mb-2 flex items-center gap-1"><VideoIcon className="h-3.5 w-3.5" />تقدم الفيديوهات</h4>
+                    <div className="space-y-1.5 max-h-[200px] overflow-y-auto custom-scrollbar">
+                      {detail.videoProgress.slice(0, 10).map((vp: any) => (
+                        <div key={vp.id} className="flex items-center gap-2 p-1.5 rounded border bg-card">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[11px] font-medium truncate">{vp.videoTitle}</p>
+                          </div>
+                          <div className="shrink-0" style={{ minWidth: '50px' }}>
+                            <span className={`text-[11px] font-bold ${vp.percent >= 90 ? 'text-emerald-600' : vp.percent >= 50 ? 'text-amber-600' : 'text-red-500'}`}>{vp.percent}%</span>
+                          </div>
+                          <div className="h-1.5 w-16 bg-muted rounded-full shrink-0"><div className={`h-full rounded-full ${vp.percent >= 90 ? 'bg-emerald-500' : vp.percent >= 50 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${vp.percent}%` }} /></div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Exam Results Detail */}
+                {detail.examResults && detail.examResults.length > 0 && (
+                  <div className="sm:col-span-2 lg:col-span-4">
+                    <h4 className="text-xs font-semibold mb-2 flex items-center gap-1"><Trophy className="h-3.5 w-3.5 text-amber-500" />نتائج الامتحانات</h4>
+                    <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar">
+                      {detail.examResults.map((er: any) => (
+                        <div key={er.id} className="border rounded-lg p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-semibold truncate max-w-[250px]">{er.examTitle}</p>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className={`text-xs font-bold ${er.passed ? 'text-emerald-600' : 'text-red-500'}`}>{er.score}/{er.maxScore}</span>
+                              <Badge variant={er.passed ? 'default' : 'outline'} className={`text-[9px] h-5 ${er.passed ? '' : 'border-amber-500 text-amber-600'}`}>{er.passed ? 'ناجح' : 'عايز مراجعة'}</Badge>
+                              <span onClick={function (e) { e.stopPropagation() }}>
+                                <RegradeButton kind="exam" resultId={er.id} onDone={function () { if (selectedStudent && selectedStudent.id) loadDetail(selectedStudent.id) }} />
+                              </span>
+                              {er.examId && (
+                                <span onClick={function (e) { e.stopPropagation() }}>
+                                  <RegradeAllButton kind="exam" targetId={er.examId} onDone={function () { if (selectedStudent && selectedStudent.id) loadDetail(selectedStudent.id) }} />
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {/* All Questions Review (correct + wrong) */}
+                          {er.allQuestions && er.allQuestions.length > 0 ? (
+                            <div className="mt-1 space-y-1">
+                              <p className="text-[10px] font-semibold text-muted-foreground">جميع الأسئلة ({er.allQuestions.length}):</p>
+                              {er.allQuestions.map((aq: any, qi: number) => (
+                                <div key={qi} className="text-[10px] p-1.5 rounded border" dir="ltr">
+                                  <div className="flex items-start gap-1.5">
+                                    <span className={`shrink-0 font-bold px-1.5 py-0.5 rounded-full text-[9px] ${
+                                      aq.overridden
+                                        ? 'bg-purple-500/10 text-purple-600'
+                                        : aq.type === 'writing'
+                                          ? writingVerdictBadge(aq).cls
+                                          : aq.isCorrect
+                                            ? 'bg-emerald-500/10 text-emerald-600'
+                                            : 'bg-red-500/10 text-red-600'
+                                    }`}>
+                                      {aq.overridden
+                                        ? (aq.isCorrect ? 'صح (يدوي ✓)' : 'غلط (يدوي ✗)')
+                                        : aq.type === 'writing'
+                                          ? writingVerdictBadge(aq).text
+                                          : aq.isCorrect ? 'Correct' : 'Wrong'}
+                                    </span>
+                                    <span onClick={function (e) { e.stopPropagation() }} className="shrink-0">
+                                      <OverrideButton
+                                        kind="exam"
+                                        resultId={er.id}
+                                        qIndex={typeof aq.origIdx === 'number' ? aq.origIdx : qi}
+                                        isCorrect={!!aq.isCorrect}
+                                        onDone={function () { if (selectedStudent && selectedStudent.id) loadDetail(selectedStudent.id) }}
+                                      />
+                                    </span>
+                                    <p className="font-medium flex-1" style={{ textAlign: 'left' }}>{qi + 1}. <FractionText text={aq.question} /></p>
+                                  </div>
+                                  {/* (2026-و40-w) جدول السؤال معبى بقيم الطالب + رسمته — عرض فقط */}
+                                  {(aq.table || aq.figure) && (
+                                    <div className="mt-1 pl-6">
+                                      {aq.table && <WorksheetTableReadonly table={aq.table} values={Array.isArray(aq.tableAnswers) ? aq.tableAnswers : parseTableValuesFromText(aq.studentAnswer || '', aq.table)} />}
+                                      {aq.figure && <WorksheetFigure figure={aq.figure} />}
+                                    </div>
+                                  )}
+                                  <div className="mt-1 pl-6 space-y-0.5">
+                                    {aq.type === 'writing' ? (
+                                      <>
+                                        <p className="text-[9px] font-semibold text-muted-foreground">إجابة الطالب:</p>
+                                        <p className="text-foreground whitespace-pre-wrap break-words" dir="auto"><FractionText text={aq.studentAnswer || '(فارغ)'} /></p>
+                                        {/* Image preview - click to enlarge - show ALL images */}
+                                        {extractAllImagePaths(aq.studentAnswer).length > 0 && onViewImage && (
+                                          <div className="mt-1 flex flex-wrap gap-2">
+                                            {extractAllImagePaths(aq.studentAnswer).map(function(imgPath, imgIdx) {
+                                              return (
+                                                <button
+                                                  key={imgIdx}
+                                                  type="button"
+                                                  onClick={function() { onViewImage(imgPath) }}
+                                                  className="group relative block rounded-md border border-amber-200 dark:border-amber-900/40 overflow-hidden hover:border-amber-500 transition-colors cursor-pointer"
+                                                >
+                                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                  <img
+                                                    src={imgPath}
+                                                    alt={'Student answer image ' + (imgIdx + 1) + ' - click to enlarge'}
+                                                    className="w-[300px] h-[250px] object-contain bg-white"
+                                                    onError={function(e) { var t = e.currentTarget as HTMLImageElement; if (t.parentElement) t.parentElement.style.display = 'none' }}
+                                                  />
+                                                  <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[9px] px-1.5 py-0.5 rounded">🔍 صورة {imgIdx + 1} - اعرض</span>
+                                                </button>
+                                              )
+                                            })}
+                                          </div>
+                                        )}
+                                        {/* (و60-هـ) حكم الـ AI الموحد: مؤشر قراءة + ملاحظات للنصي والصورة */}
+                                        <AiWritingVerdictBlock aq={aq} />
+                                        {aq.correctAnswer && (
+                                          <p className="text-emerald-600 whitespace-pre-wrap break-words" dir="auto">الإجابة الصحيحة: <FractionText text={aq.correctAnswer} /></p>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <>
+                                        <p className="text-red-600">Student answer: <span dir="ltr"><FractionText text={aq.studentAnswer} /></span></p>
+                                        <p className="text-emerald-600">Correct answer: <span dir="ltr"><FractionText text={aq.correctAnswer} /></span></p>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <>
+                              {er.wrongQuestions && er.wrongQuestions.length > 0 && (
+                                <div className="mt-1 space-y-1">
+                                  <p className="text-[10px] font-semibold text-red-600">الأسئلة الخاطئة ({er.wrongQuestions.length}):</p>
+                                  {er.wrongQuestions.map((wq: any, wi: number) => (
+                                    <div key={wi} className="flex items-start gap-2 text-[10px] p-1.5 rounded bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/40">
+                                      <span className="shrink-0 font-bold text-red-500">{wi + 1}.</span>
+                                      <div className="min-w-0">
+                                        <p className="font-medium" dir="ltr" style={{ textAlign: 'left' }}><FractionText text={wq.question} /></p>
+                                        <p className="text-red-600 mt-0.5">إجابة الطالب: <span dir="ltr">{wq.studentAnswer}</span></p>
+                                        <p className="text-emerald-600">الإجابة الصحيحة: <span dir="ltr">{wq.correctAnswer}</span></p>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {(!er.wrongQuestions || er.wrongQuestions.length === 0) && null}
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Homework Results Detail */}
+                <div className="sm:col-span-2 lg:col-span-4">
+                    <h4 className="text-xs font-semibold mb-2 flex items-center gap-1"><ClipboardList className="h-3.5 w-3.5 text-emerald-500" />نتائج الواجبات</h4>
+                    <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar">
+                      {detail.homeworkResults && detail.homeworkResults.length > 0 ? (
+                      detail.homeworkResults.map((hr: any) => (
+                        <div key={hr.id} className="border rounded-lg p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-semibold truncate max-w-[250px]">{hr.homeworkTitle}</p>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className={`text-xs font-bold ${hr.score >= (hr.maxScore / 2) ? 'text-emerald-600' : 'text-red-500'}`}>{hr.score}/{hr.maxScore}</span>
+                              <span className="text-[9px] text-muted-foreground">{hr.submittedAt ? new Date(hr.submittedAt).toLocaleDateString('ar-EG') : ''}</span>
+                              <span onClick={function (e) { e.stopPropagation() }}>
+                                <RegradeButton kind="homework" resultId={hr.id} onDone={function () { if (selectedStudent && selectedStudent.id) loadDetail(selectedStudent.id) }} />
+                              </span>
+                              {hr.homeworkId && (
+                                <span onClick={function (e) { e.stopPropagation() }}>
+                                  <RegradeAllButton kind="homework" targetId={hr.homeworkId} onDone={function () { if (selectedStudent && selectedStudent.id) loadDetail(selectedStudent.id) }} />
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {/* All Questions Review (correct + wrong) */}
+                          {hr.allQuestions && hr.allQuestions.length > 0 ? (
+                            <div className="mt-1 space-y-1">
+                              <p className="text-[10px] font-semibold text-muted-foreground">جميع الأسئلة ({hr.allQuestions.length}):</p>
+                              {hr.allQuestions.map((aq: any, qi: number) => (
+                                <div key={qi} className="text-[10px] p-1.5 rounded border" dir="ltr">
+                                  <div className="flex items-start gap-1.5">
+                                    <span className={`shrink-0 font-bold px-1.5 py-0.5 rounded-full text-[9px] ${
+                                      aq.overridden
+                                        ? 'bg-purple-500/10 text-purple-600'
+                                        : aq.type === 'writing'
+                                          ? writingVerdictBadge(aq).cls
+                                          : aq.isCorrect
+                                            ? 'bg-emerald-500/10 text-emerald-600'
+                                            : 'bg-red-500/10 text-red-600'
+                                    }`}>
+                                      {aq.overridden
+                                        ? (aq.isCorrect ? 'صح (يدوي ✓)' : 'غلط (يدوي ✗)')
+                                        : aq.type === 'writing'
+                                          ? writingVerdictBadge(aq).text
+                                          : aq.isCorrect ? 'Correct' : 'Wrong'}
+                                    </span>
+                                    <span onClick={function (e) { e.stopPropagation() }} className="shrink-0">
+                                      <OverrideButton
+                                        kind="homework"
+                                        resultId={hr.id}
+                                        qIndex={typeof aq.origIdx === 'number' ? aq.origIdx : qi}
+                                        isCorrect={!!aq.isCorrect}
+                                        onDone={function () { if (selectedStudent && selectedStudent.id) loadDetail(selectedStudent.id) }}
+                                      />
+                                    </span>
+                                    <p className="font-medium flex-1" style={{ textAlign: 'left' }}>{qi + 1}. <FractionText text={aq.question} /></p>
+                                  </div>
+                                  {/* (2026-و40-w) جدول السؤال معبى بقيم الطالب + رسمته — عرض فقط */}
+                                  {(aq.table || aq.figure) && (
+                                    <div className="mt-1 pl-6">
+                                      {aq.table && <WorksheetTableReadonly table={aq.table} values={Array.isArray(aq.tableAnswers) ? aq.tableAnswers : parseTableValuesFromText(aq.studentAnswer || '', aq.table)} />}
+                                      {aq.figure && <WorksheetFigure figure={aq.figure} />}
+                                    </div>
+                                  )}
+                                  <div className="mt-1 pl-6 space-y-0.5">
+                                    {aq.type === 'writing' ? (
+                                      <>
+                                        <p className="text-[9px] font-semibold text-muted-foreground">إجابة الطالب:</p>
+                                        <p className="text-foreground whitespace-pre-wrap break-words" dir="auto"><FractionText text={aq.studentAnswer || '(فارغ)'} /></p>
+                                        {/* Image preview - click to enlarge - show ALL images */}
+                                        {extractAllImagePaths(aq.studentAnswer).length > 0 && onViewImage && (
+                                          <div className="mt-1 flex flex-wrap gap-2">
+                                            {extractAllImagePaths(aq.studentAnswer).map(function(imgPath, imgIdx) {
+                                              return (
+                                                <button
+                                                  key={imgIdx}
+                                                  type="button"
+                                                  onClick={function() { onViewImage(imgPath) }}
+                                                  className="group relative block rounded-md border border-amber-200 dark:border-amber-900/40 overflow-hidden hover:border-amber-500 transition-colors cursor-pointer"
+                                                >
+                                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                  <img
+                                                    src={imgPath}
+                                                    alt={'Student answer image ' + (imgIdx + 1) + ' - click to enlarge'}
+                                                    className="w-[300px] h-[250px] object-contain bg-white"
+                                                    onError={function(e) { var t = e.currentTarget as HTMLImageElement; if (t.parentElement) t.parentElement.style.display = 'none' }}
+                                                  />
+                                                  <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[9px] px-1.5 py-0.5 rounded">🔍 صورة {imgIdx + 1} - اعرض</span>
+                                                </button>
+                                              )
+                                            })}
+                                          </div>
+                                        )}
+                                        {/* (و60-هـ) حكم الـ AI الموحد: مؤشر قراءة + ملاحظات للنصي والصورة */}
+                                        <AiWritingVerdictBlock aq={aq} />
+                                        {aq.correctAnswer && (
+                                          <p className="text-emerald-600 whitespace-pre-wrap break-words" dir="auto">الإجابة الصحيحة: <FractionText text={aq.correctAnswer} /></p>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <>
+                                        <p className="text-red-600">Student answer: <span dir="ltr"><FractionText text={aq.studentAnswer} /></span></p>
+                                        <p className="text-emerald-600">Correct answer: <span dir="ltr"><FractionText text={aq.correctAnswer} /></span></p>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <>
+                              {hr.wrongQuestions && hr.wrongQuestions.length > 0 && (
+                                <div className="mt-1 space-y-1">
+                                  <p className="text-[10px] font-semibold text-red-600">الأسئلة الخاطئة ({hr.wrongQuestions.length}):</p>
+                                  {hr.wrongQuestions.map((wq: any, wi: number) => (
+                                    <div key={wi} className="flex items-start gap-2 text-[10px] p-1.5 rounded bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/40">
+                                      <span className="shrink-0 font-bold text-red-500">{wi + 1}.</span>
+                                      <div className="min-w-0">
+                                        <p className="font-medium" dir="ltr" style={{ textAlign: 'left' }}><FractionText text={wq.question} /></p>
+                                        <p className="text-red-600 mt-0.5">إجابة الطالب: <span dir="ltr">{wq.studentAnswer}</span></p>
+                                        <p className="text-emerald-600">الإجابة الصحيحة: <span dir="ltr">{wq.correctAnswer}</span></p>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {hr.writingAnswers && hr.writingAnswers.length > 0 && (
+                                <div className="mt-2 space-y-1">
+                                  <p className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                                    <FileText className="h-3 w-3" />
+                                    إجابات مقالية ({hr.writingAnswers.length}) - التصحيح بالذكاء الاصطناعي:
+                                  </p>
+                                  {hr.writingAnswers.map((wa: any, wi: number) => (
+                                    <div key={wi} className="text-[10px] p-2 rounded bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/40 space-y-1">
+                                      <p className="font-semibold text-amber-700 dark:text-amber-300">سؤال {wi + 1}: <span className="font-normal" dir="ltr" style={{ textAlign: 'left' }}><FractionText text={wa.question} /></span></p>
+                                      <div className="mt-1 p-1.5 rounded bg-background/50 border border-border/30">
+                                        <p className="text-[9px] font-semibold text-muted-foreground mb-0.5">إجابة الطالب:</p>
+                                        <p className="text-foreground whitespace-pre-wrap break-words" dir="auto"><FractionText text={wa.answer || '(فارغ)'} /></p>
+                                      </div>
+                                      {wa.modelAnswer && (
+                                        <div className="mt-1 p-1.5 rounded bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-900/30">
+                                          <p className="text-[9px] font-semibold text-emerald-700 dark:text-emerald-400 mb-0.5">الإجابة النموذجية (للمقارنة):</p>
+                                          <p className="text-emerald-900 dark:text-emerald-200 whitespace-pre-wrap break-words" dir="auto"><FractionText text={wa.modelAnswer} /></p>
+                                        </div>
+                                      )}
+                                      {wa.acceptedAnswers && wa.acceptedAnswers.length > 0 && (
+                                        <p className="text-[9px] text-muted-foreground">إجابات مقبولة: <FractionText text={wa.acceptedAnswers.join('، ')} /></p>
+                                      )}
+                                      {/* (2026-و16) الحكم الحقيقي بدل «بانتظار التصحيح» الثابت اللي
+                                          كان بيبان دايمًا — البادج بيظهر بس لو التصحيح فعلاً لسه
+                                          شغال في الخلفية، وغير كده الدرجة النهائية صح/غلط.
+                                          التعديل اليدوي (تعليم صح/غلط) شغال زي ما هو من OverrideButton */}
+                                      {wa.needsGrading ? (
+                                        <p className="text-[9px] text-amber-600 dark:text-amber-400 mt-1">الدرجة: {wa.points} نقطة - بتصحح بالذكاء الاصطناعي…</p>
+                                      ) : (
+                                        /* (2026-و29) درجة جزئية (صورة غير مقروءة/محاولة) → كهرماني «جزئي»
+                                           بدل أحمر «غلط» — رسالة أصدق للمستر */
+                                        <p className={'text-[9px] mt-1 ' + (wa.isCorrect ? 'text-emerald-600 dark:text-emerald-400' : (String(wa.aiFeedback || '') === 'لم يجب الطالب' ? 'text-muted-foreground' : ((Number(wa.awardedPoints || wa.aiAwardedPoints || 0) > 0) ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400')))}>
+                                          الدرجة: {Number(wa.awardedPoints || wa.aiAwardedPoints || 0)}/{wa.points} - {wa.isCorrect ? 'صح' : ((Number(wa.awardedPoints || wa.aiAwardedPoints || 0) > 0) ? 'جزئي — راجعها' : 'غلط')}
+                                          {wa.aiFeedback ? ' — ' + wa.aiFeedback : ''}
+                                        </p>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      ))
+                      ) : (
+                        <p className="text-center text-muted-foreground py-4 text-xs">لا توجد نتائج واجبات لهذا الطالب</p>
+                      )}
+                    </div>
+                  </div>
+              </div>
+            ) : (
+              <p className="text-center text-muted-foreground py-6 text-sm">لم يتم تحميل البيانات</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* (و65) دايلوجات التقارير الجاهزة للطباعة — تقرير الطالب + التقرير الشامل للصف */}
+      <StudentReportDialog student={reportFor} onOpenChange={(v) => { if (!v) setReportFor(null) }} />
+      <ClassReportDialog grade={grade} open={classReportOpen} onOpenChange={setClassReportOpen} />
+    </div>
+  )
+}
+
+/* ========== CONTENT MANAGER (for Homework & Announcements) ========== */
+interface CMProps<T extends { id: string; grade: string; createdAt: string }> {
+  title: string; apiPath: string; itemName: string
+  fields: Record<string, { label: string; type: 'text' | 'textarea'; placeholder?: string }>
+  renderTitle: (item: T) => string; renderSubtitle: (item: T) => string
+  supportFileUpload?: boolean; fileCategory?: string; acceptedTypes?: string
+  supportAnswerKey?: boolean; supportThumbnail?: boolean; supportMCQ?: boolean
+  onRefresh: () => void
+}
+
+function ContentManager<T extends { id: string; grade: string; createdAt: string }>({ title, apiPath, itemName, fields, renderTitle, renderSubtitle, supportFileUpload, fileCategory, acceptedTypes, supportAnswerKey, supportThumbnail, supportMCQ, onRefresh }: CMProps<T>) {
+  const [items, setItems] = useState<T[]>([])
+  const gradesList = useGradesList()
+  /* (25-ب1) إثبات الأدمن: GET يشوف المجدول + PATCH موعد الواجب */
+  const currentAdminId = useAppStore(function (s) { return s.currentAdmin?.id || '' })
+  const [loading, setLoading] = useState(true)
+  const [editTarget, setEditTarget] = useState<any>(null)
+  const [showForm, setShowForm] = useState(false)
+  const [formGrade, setFormGrade] = useState('')
+  const [formValues, setFormValues] = useState<Record<string, string>>({})
+  const [mcqQuestions, setMcqQuestions] = useState<Array<{ question: string; options: string[]; correct: number }>>([])
+  const [formFile, setFormFile] = useState<File | null>(null)
+  const [formFilePath, setFormFilePath] = useState('')
+  const [formFileUrl, setFormFileUrl] = useState('')
+  const [answerKeyFile, setAnswerKeyFile] = useState<File | null>(null)
+  const [answerKeyPath, setAnswerKeyPath] = useState('')
+  const [answerKeyUrl, setAnswerKeyUrl] = useState('')
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null)
+  const [thumbnailPath, setThumbnailPath] = useState('')
+  const [thumbnailUrl, setThumbnailUrl] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadMsg, setUploadMsg] = useState('')
+  const [aiExtracting, setAiExtracting] = useState(false)
+  /* نماذج الامتحان العشوائية (طلب المستر): استخراج أكتر من ملف لنفس الامتحان،
+     كل نموذج مفصول لوحده — والطالب بيشوف نموذج واحد بس بيتحدد عشوائيًا
+     ثابت لحسابه على السيرفر (في /api/exams لما الطلب يكون بستUDENTId) */
+  const [examModels, setExamModels] = useState<Array<{ name: string; filePath: string; fileType: string; questions: any[] }>>([])
+  /* (2026-و) طلب المستر: التوزيع مش إجباري يكون عشوائي — عشوائي 🎲 أو نموذج واحد ثابت للكل 📌 */
+  const [modelMode, setModelMode] = useState<'random' | 'fixed'>('random')
+  const [fixedModelName, setFixedModelName] = useState('')
+  const [modelExtracting, setModelExtracting] = useState(false)
+  const isExamManager = apiPath === '/api/exams'
+  const isHomeworkManager = apiPath === '/api/homework'
+  const [filterGrade, setFilterGrade] = useState('')
+  /* (25-ب1) جدولة ظهور الواجب: حقل الإضافة + محرر الموعد في القايمة */
+  const [formScheduledAt, setFormScheduledAt] = useState('')
+  const [schedEditId, setSchedEditId] = useState<string | null>(null)
+  const [schedEditVal, setSchedEditVal] = useState('')
+  const [schedSaving, setSchedSaving] = useState(false)
+  /* (2026-و26) استهداف الطلاب للواجب — زي الفيديوهات بالظبط */
+  const [targetEditId, setTargetEditId] = useState<string | null>(null)
+  /* (2026-و29) منتقي المجموعات للواجبات */
+  const [groupEditId, setGroupEditId] = useState<string | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const answerKeyRef = useRef<HTMLInputElement>(null)
+  const thumbnailRef = useRef<HTMLInputElement>(null)
+
+  const loadItems = async (showLoader = true) => {
+    if (showLoader) setLoading(true)
+    try {
+      const params = new URLSearchParams({ pageSize: '100' })
+      if (filterGrade) params.set('grade', filterGrade)
+      /* (25-ب1) إثبات الأدمن (adminId + isAdmin على السيرفر) — عشان اللوحة
+         تشوف العناصر المجدولة كمان (الطالب ميشوفهاش لحد الموعد) */
+      if ((isHomeworkManager || isExamManager) && currentAdminId) params.set('adminId', currentAdminId)
+      const res = await fetch(`${apiPath}?${params}`)
+      if (!res.ok) {
+        try { const errData = await res.json(); toast.error('خطأ في تحميل: ' + (errData.error || ''), { description: apiPath, duration: 8000 }) } catch { toast.error('خطأ في السيرفر', { description: apiPath, duration: 8000 }) }
+      } else {
+        const data = await res.json()
+        setItems(data[itemName] || [])
+      }
+    } catch (err: any) { toast.error('خطأ في تحميل البيانات: ' + (err.message || ''), { description: apiPath, duration: 6000 }) }
+    setLoading(false)
+  }
+
+  useEffect(() => { loadItems() }, [apiPath, itemName, filterGrade])
+
+  const handleFileUpload = async (localPath: { val: string }, localType: { val: string }): Promise<boolean> => {
+    // URL fallback: if URL is provided, use it directly instead of uploading
+    if (formFileUrl.trim()) {
+      localPath.val = formFileUrl.trim()
+      localType.val = ''
+      setFormFilePath(localPath.val)
+      return true
+    }
+    if (!formFile || !fileCategory) return true
+    setUploading(true)
+    setUploadMsg('جاري رفع نموذج الأسئلة...')
+    try {
+      const data = await chunkedUpload(formFile, fileCategory, undefined, (msg) => setUploadMsg(msg))
+      localPath.val = data.filePath
+      localType.val = data.fileType
+      setFormFilePath(data.filePath)
+      return true
+    } catch (err: any) {
+      toast.error(err.message || 'خطأ في رفع الملف')
+      return false
+    } finally {
+      setUploading(false)
+      setUploadMsg('')
+    }
+  }
+
+  const handleAnswerKeyUpload = async (localPath: { val: string }, localType: { val: string }): Promise<boolean> => {
+    // URL fallback
+    if (answerKeyUrl.trim()) {
+      localPath.val = answerKeyUrl.trim()
+      localType.val = ''
+      setAnswerKeyPath(localPath.val)
+      return true
+    }
+    if (!answerKeyFile || !fileCategory) return true
+    setUploading(true)
+    setUploadMsg('جاري رفع نموذج الإجابة...')
+    try {
+      const data = await chunkedUpload(answerKeyFile, fileCategory, undefined, (msg) => setUploadMsg(msg))
+      localPath.val = data.filePath
+      localType.val = data.fileType
+      setAnswerKeyPath(data.filePath)
+      return true
+    } catch (err: any) {
+      toast.error(err.message || 'خطأ في رفع نموذج الإجابة')
+      return false
+    } finally {
+      setUploading(false)
+      setUploadMsg('')
+    }
+  }
+
+  const handleThumbnailUpload = async (localPath: { val: string }): Promise<boolean> => {
+    // URL fallback
+    if (thumbnailUrl.trim()) {
+      localPath.val = thumbnailUrl.trim()
+      setThumbnailPath(localPath.val)
+      return true
+    }
+    if (!thumbnailFile || !fileCategory) return true
+    setUploading(true)
+    setUploadMsg('جاري رفع الصورة المصغرة...')
+    try {
+      const data = await chunkedUpload(thumbnailFile, fileCategory, undefined, (msg) => setUploadMsg(msg))
+      localPath.val = data.filePath
+      setThumbnailPath(data.filePath)
+      return true
+    } catch (err: any) {
+      toast.error(err.message || 'خطأ في رفع الصورة المصغرة')
+      return false
+    } finally {
+      setUploading(false)
+      setUploadMsg('')
+    }
+  }
+
+  const handleAIExtract = async () => {
+    if (aiExtracting) return
+    setAiExtracting(true)
+    setUploadMsg('جاري استخراج الأسئلة بالذكاء الاصطناعي...')
+    try {
+      var fd = new FormData()
+      if (formFile) { fd.append('file', formFile) }
+      else if (formFileUrl.trim()) { fd.append('fileUrl', formFileUrl.trim()) }
+      else { toast.error('ارفع ملف الأسئلة أولاً أو حط رابط'); setAiExtracting(false); setUploadMsg(''); return }
+      // Send answer key file if available
+      fd.append('type', 'exam')
+      fd.append('grade', formGrade)
+      var ctrl = new AbortController()
+      var tmr = setTimeout(function() { ctrl.abort() }, 180000)
+      var res = await fetch('/api/ai-extract', { method: 'POST', body: fd, signal: ctrl.signal })
+      clearTimeout(tmr)
+      var data = await res.json()
+      if (res.ok && data.extracted && data.extracted.questions && data.extracted.questions.length > 0) {
+        // Preserve question type (mcq/writing) and all fields
+        var extracted = data.extracted.questions.map(function(q: any) {
+          if (isWritingQuestion(q)) {
+            return { type: 'writing', question: q.question || '', options: [], correct: -1, points: q.points || 5, modelAnswer: q.modelAnswer || '', acceptedAnswers: q.acceptedAnswers || [] }
+          }
+          return { type: 'mcq', question: q.question || '', options: (q.options || ['','','','']).slice(0, 4), correct: q.correct || 0, points: q.points || 1, modelAnswer: q.modelAnswer || '' }
+        })
+        setMcqQuestions(extracted)
+        var stats = data.extracted.stats || {}
+        var msg = 'تم استخراج ' + extracted.length + ' سؤال بنجاح!'
+        if (stats.mcq || stats.writing) { msg += ' (' + (stats.mcq || 0) + ' اختيارات، ' + (stats.writing || 0) + ' مقالي)' }
+        toast.success(msg)
+      } else { toast.error(data.error || 'لم يتم استخراج أسئلة — تأكد من وجود GEMINI_API_KEY في الإعدادات') }
+    } catch (err: any) {
+      if (err && err.name === 'AbortError') { toast.error('انتهت مهلة الاستخراج - حاول مرة أخرى') }
+      else { toast.error('خطأ: ' + (err.message || '')) }
+    }
+    setAiExtracting(false)
+    setUploadMsg('')
+  }
+
+  /* استخراج نموذج جديد للامتحان (نماذج عشوائية — طلب المستر):
+     نفس ملف الأسئلة المختار + نموذج الإجابة → رفع الملف + استخراج أسئلته
+     → بيتضاف كنموذج مستقل (مفصول عن الباقي) وبعدين بنفضي الملف عشان
+     المستر يختار ملف النموذج اللي بعده */
+  const handleAIExtractModel = async () => {
+    if (modelExtracting) return
+    if (!formFile && !formFileUrl.trim()) { toast.error('ارفع ملف النموذج الأول أو حط رابط'); return }
+    setModelExtracting(true)
+    var savedName = ''
+    try {
+      var path = ''
+      var type = ''
+      if (formFile && fileCategory) {
+        setUploading(true)
+        setUploadMsg('جاري رفع ملف النموذج...')
+        var up = await chunkedUpload(formFile, fileCategory, undefined, function (m: string) { setUploadMsg(m) })
+        path = up.filePath
+        type = up.fileType
+        setUploading(false)
+      } else if (formFileUrl.trim()) {
+        path = formFileUrl.trim()
+      }
+      setUploadMsg('جاري استخراج أسئلة النموذج بالذكاء الاصطناعي...')
+      var fd = new FormData()
+      if (formFile) { fd.append('file', formFile) }
+      else if (formFileUrl.trim()) { fd.append('fileUrl', formFileUrl.trim()) }
+      fd.append('type', 'exam')
+      fd.append('grade', formGrade)
+      var ctrl = new AbortController()
+      var tmr = setTimeout(function () { ctrl.abort() }, 180000)
+      var res = await fetch('/api/ai-extract', { method: 'POST', body: fd, signal: ctrl.signal })
+      clearTimeout(tmr)
+      var data = await res.json()
+      if (res.ok && data.extracted && data.extracted.questions && data.extracted.questions.length > 0) {
+        var extracted = data.extracted.questions.map(function (q: any) {
+          if (isWritingQuestion(q)) {
+            return { type: 'writing', question: q.question || '', options: [], correct: -1, points: q.points || 5, modelAnswer: q.modelAnswer || '', acceptedAnswers: q.acceptedAnswers || [] }
+          }
+          return { type: 'mcq', question: q.question || '', options: (q.options || ['','','','']).slice(0, 4), correct: q.correct || 0, points: q.points || 1, modelAnswer: q.modelAnswer || '' }
+        })
+        setExamModels(function (prev) {
+          var letters = ['أ', 'ب', 'ج', 'د', 'هـ', 'و', 'ز', 'ح']
+          var nm = 'النموذج ' + (letters[prev.length] || String(prev.length + 1))
+          savedName = nm
+          return prev.concat([{ name: nm, filePath: path, fileType: type, questions: extracted }])
+        })
+        /* نفضي الملف عشان النموذج اللي بعده يكون ملف مختلف */
+        setFormFile(null); setFormFileUrl(''); setFormFilePath('')
+        if (fileRef.current) fileRef.current.value = ''
+      } else { toast.error(data.error || 'لم يتم استخراج أسئلة — تأكد من وجود GEMINI_API_KEY في الإعدادات') }
+    } catch (err: any) {
+      if (err && err.name === 'AbortError') { toast.error('انتهت مهلة الاستخراج - حاول مرة أخرى') }
+      else { toast.error('خطأ: ' + (err.message || '')) }
+    }
+    setUploading(false)
+    setModelExtracting(false)
+    setUploadMsg('')
+    if (savedName) toast.success('تم إضافة ' + savedName + ' — كل طالب هيشوف نموذج واحد بس عشوائي')
+  }
+
+  const handleSubmit = async () => {
+    const titleVal = formValues['title']
+    if (!titleVal?.trim()) { toast.error('أدخل العنوان'); return }
+    if (!formGrade) { toast.error('اختر الصف'); return }
+    setSubmitting(true)
+    try {
+      // Use local refs to avoid React state batching issues
+      const filePathRef = { val: formFilePath || '' }
+      const fileTypeRef = { val: formFile?.type || '' }
+      const answerKeyPathRef = { val: answerKeyPath || '' }
+      const answerKeyTypeRef = { val: '' }
+      const thumbnailPathRef = { val: thumbnailPath || '' }
+
+      // Upload question paper
+      if (supportFileUpload && !filePathRef.val && (formFile || formFileUrl.trim())) {
+        const ok = await handleFileUpload(filePathRef, fileTypeRef)
+        if (!ok) { setSubmitting(false); return }
+      }
+      // Upload answer key
+      if (supportAnswerKey && !answerKeyPathRef.val && (answerKeyFile || answerKeyUrl.trim())) {
+        const ok = await handleAnswerKeyUpload(answerKeyPathRef, answerKeyTypeRef)
+        if (!ok) { setSubmitting(false); return }
+      }
+      // Upload thumbnail
+      if (supportThumbnail && !thumbnailPathRef.val && (thumbnailFile || thumbnailUrl.trim())) {
+        const ok = await handleThumbnailUpload(thumbnailPathRef)
+        if (!ok) { setSubmitting(false); return }
+      }
+      const body: Record<string, string> = { ...formValues, grade: formGrade }
+      if (filePathRef.val) { body.filePath = filePathRef.val; body.fileType = fileTypeRef.val }
+      if (answerKeyPathRef.val) { body.answerKeyPath = answerKeyPathRef.val; body.answerKeyType = answerKeyTypeRef.val }
+      if (thumbnailPathRef.val) { body.thumbnail = thumbnailPathRef.val }
+      if (supportMCQ && mcqQuestions.length > 0) { body.questions = JSON.stringify(mcqQuestions) }
+      /* (25-ب1) موعد ظهور الواجب للطلاب (اختياري — فاضي = يظهر فورًا) */
+      if (isHomeworkManager && formScheduledAt.trim()) {
+        try { body.scheduledAt = new Date(formScheduledAt).toISOString() } catch (e) {}
+      }
+      // نماذج الامتحان — مع طريقة التوزيع (عشوائي أو نموذج واحد ثابت للكل)
+      if (isExamManager && examModels.length > 0) {
+        body.models = JSON.stringify(examModels)
+        body.modelMode = modelMode
+        if (modelMode === 'fixed') { body.fixedModel = fixedModelName || examModels[0].name }
+      }
+      const res = await fetch(apiPath, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      if (res.ok) {
+        toast.success('تم الإضافة بنجاح'); setShowForm(false); setFormValues({}); setFormGrade(''); setFormFile(null); setFormFilePath(''); setFormFileUrl(''); setAnswerKeyFile(null); setAnswerKeyPath(''); setAnswerKeyUrl(''); setThumbnailFile(null); setThumbnailPath(''); setThumbnailUrl(''); setMcqQuestions([]); setExamModels([]); setFormScheduledAt(''); loadItems(false); onRefresh()
+      } else { try { const d = await res.json(); toast.error(d.error || 'خطأ', { duration: 8000 }) } catch { toast.error('خطأ في السيرفر - حاول تاني', { duration: 8000 }) } }
+    } catch (err: any) { toast.error('خطأ في الاتصال: ' + (err.message || ''), { duration: 8000 }) }
+    setSubmitting(false)
+  }
+
+  const handleDelete = async (id: string) => {
+    try { await fetch(`${apiPath}/${id}`, { method: 'DELETE' }); toast.success('تم الحذف'); loadItems(false); onRefresh() } catch { toast.error('خطأ') }
+  }
+
+  /* (25-ب1) PATCH موعد ظهور الواجب — تحقق الأدمن على السيرفر
+     (scheduledAt = null → إلغاء الجدولة والظهور فورًا) */
+  const patchHwSchedule = async function (id: string, scheduledAt: string | null, okMsg: string) {
+    if (!currentAdminId) { toast.error('مفيش جلسة أدمن — سجل دخول تاني', { duration: 8000 }); return }
+    setSchedSaving(true)
+    try {
+      var res = await fetch(`${apiPath}/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminId: currentAdminId, scheduledAt }),
+      })
+      if (res.ok) {
+        toast.success(okMsg)
+        setSchedEditId(null); setSchedEditVal('')
+        loadItems(false); if (onRefresh) onRefresh()
+      } else {
+        var d: any = {}
+        try { d = await res.json() } catch (e) {}
+        toast.error(d.error || 'خطأ في الحفظ', { duration: 8000 })
+      }
+    } catch { toast.error('خطأ في الاتصال', { duration: 8000 }) }
+    setSchedSaving(false)
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <CardTitle className="text-lg">{title}</CardTitle>
+          <div className="flex gap-2 items-center flex-wrap">
+            <select value={filterGrade} onChange={(e) => setFilterGrade(e.target.value)} className="h-9 rounded-md border border-input bg-transparent px-3 text-sm">
+              <option value="">كل الصفوف</option>
+              {gradesList.map((g) => <option key={g.ar} value={g.ar}>{(g.emoji ? g.emoji + ' ' : '') + g.ar}</option>)}
+            </select>
+            <Button size="sm" onClick={() => { setShowForm(!showForm); if (!showForm) { setExamModels([]); setModelMode('random'); setFixedModelName('') } }}><Plus className="h-4 w-4 ml-1" />إضافة</Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {showForm && (
+          <div className="p-4 rounded-lg border bg-muted/30 space-y-3">
+            <h4 className="font-semibold text-sm">إضافة جديد</h4>
+            <div className="space-y-1.5">
+              <Label className="text-xs">الصف الدراسي</Label>
+              <select value={formGrade} onChange={(e) => setFormGrade(e.target.value)} className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm">
+                <option value="">اختر الصف</option>{gradesList.map((g) => <option key={g.ar} value={g.ar}>{(g.emoji ? g.emoji + ' ' : '') + g.ar}</option>)}
+              </select>
+            </div>
+            {Object.entries(fields).map(([key, field]) => (
+              <div key={key} className="space-y-1.5">
+                <Label className="text-xs">{field.label}</Label>
+                {field.type === 'textarea' ? (
+                  <Textarea placeholder={field.placeholder} value={formValues[key] || ''} onChange={(e) => setFormValues({ ...formValues, [key]: e.target.value })} rows={4} />
+                ) : (
+                  <Input placeholder={field.placeholder} value={formValues[key] || ''} onChange={(e) => setFormValues({ ...formValues, [key]: e.target.value })} dir={key === 'url' ? 'ltr' : 'rtl'} />
+                )}
+              </div>
+            ))}
+            {/* (25-ب1) جدولة ظهور الواجب — قبل الموعد الطالب مش شايف الواجب خالص */}
+            {isHomeworkManager && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">موعد ظهور الواجب للطلاب (اختياري — فاضي = يظهر فورًا)</Label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Input type="datetime-local" value={formScheduledAt} onChange={(e) => setFormScheduledAt(e.target.value)} placeholder="يظهر فورًا" className="h-9 text-sm max-w-[240px]" />
+                  {formScheduledAt && (
+                    <Button type="button" variant="ghost" size="sm" className="h-8 text-[11px] text-destructive" onClick={() => setFormScheduledAt('')}>إلغاء الموعد</Button>
+                  )}
+                </div>
+              </div>
+            )}
+            {supportFileUpload && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">نموذج الأسئلة (رفع ملف أو رابط)</Label>
+                <div className="flex items-center gap-2">
+                  <input ref={fileRef} type="file" accept={acceptedTypes} className="hidden" onChange={(e) => { setFormFile(e.target.files?.[0] || null); setFormFilePath(''); setFormFileUrl('') }} />
+                  <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4 ml-1" />{formFile ? formFile.name : 'رفع ملف'}</Button>
+                  {formFile && <span className="text-xs text-muted-foreground">{(formFile.size / 1024 / 1024).toFixed(1)} MB</span>}
+                  {uploading && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-muted-foreground shrink-0">أو رابط:</span>
+                  <Input placeholder="https://..." value={formFileUrl} onChange={(e) => { setFormFileUrl(e.target.value); if (e.target.value.trim()) { setFormFile(null); setFormFilePath('') } }} dir="ltr" className="h-8 text-xs" />
+                </div>
+              </div>
+            )}
+            {supportAnswerKey && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">نموذج الإجابة (رفع ملف أو رابط)</Label>
+                <div className="flex items-center gap-2">
+                  <input ref={answerKeyRef} type="file" accept={acceptedTypes} className="hidden" onChange={(e) => { setAnswerKeyFile(e.target.files?.[0] || null); setAnswerKeyPath(''); setAnswerKeyUrl('') }} />
+                  <Button type="button" variant="outline" size="sm" onClick={() => answerKeyRef.current?.click()}><FileDown className="h-4 w-4 ml-1" />{answerKeyFile ? answerKeyFile.name : 'رفع ملف'}</Button>
+                  {answerKeyFile && <span className="text-xs text-muted-foreground">{(answerKeyFile.size / 1024 / 1024).toFixed(1)} MB</span>}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-muted-foreground shrink-0">أو رابط:</span>
+                  <Input placeholder="https://..." value={answerKeyUrl} onChange={(e) => { setAnswerKeyUrl(e.target.value); if (e.target.value.trim()) { setAnswerKeyFile(null); setAnswerKeyPath('') } }} dir="ltr" className="h-8 text-xs" />
+                </div>
+              </div>
+            )}
+            {supportThumbnail && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">صورة مصغرة (اختياري - رفع أو رابط)</Label>
+                <div className="flex items-center gap-3">
+                  <input ref={thumbnailRef} type="file" accept="image/*" className="hidden" onChange={(e) => { setThumbnailFile(e.target.files?.[0] || null); setThumbnailPath(''); setThumbnailUrl('') }} />
+                  <Button type="button" variant="outline" size="sm" onClick={() => thumbnailRef.current?.click()}><PictureInPicture2 className="h-4 w-4 ml-1" />{thumbnailFile ? thumbnailFile.name : 'رفع صورة'}</Button>
+                  {thumbnailFile && <span className="text-xs text-muted-foreground">{(thumbnailFile.size / 1024).toFixed(0)} KB</span>}
+                  {thumbnailPath && <div className="w-12 h-8 rounded border overflow-hidden relative"><Image src={thumbnailPath} alt="thumb" fill className="object-cover" sizes="48px" unoptimized /></div>}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-muted-foreground shrink-0">أو رابط:</span>
+                  <Input placeholder="https://..." value={thumbnailUrl} onChange={(e) => { setThumbnailUrl(e.target.value); if (e.target.value.trim()) { setThumbnailFile(null); setThumbnailPath('') } }} dir="ltr" className="h-8 text-xs" />
+                </div>
+              </div>
+            )}
+            {supportMCQ && (
+              <div className="space-y-3 p-3 rounded-lg border border-primary/30 bg-primary/5">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-semibold text-primary">أسئلة اختيار من متعدد (اختياري)</Label>
+                  <div className="flex gap-1">
+                    <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={function() {
+                      setMcqQuestions([...mcqQuestions, { question: '', options: ['', '', '', ''], correct: 0 }])
+                    }}><Plus className="h-3 w-3 ml-1" />إضافة سؤال</Button>
+                    <Button type="button" size="sm" variant="outline" className="h-7 text-xs border-purple-500/50 text-purple-600 hover:bg-purple-500/10" onClick={handleAIExtract} disabled={aiExtracting || (!formFile && !formFileUrl.trim())}>
+                      {aiExtracting ? <Loader2 className="h-3 w-3 ml-1 animate-spin" /> : <Sparkles className="h-3 w-3 ml-1" />}
+                      استخراج بالذكاء الاصطناعي
+                    </Button>
+                  </div>
+                </div>
+                {mcqQuestions.length === 0 && <p className="text-[11px] text-muted-foreground text-center py-2">اضغط "إضافة سؤال" لإضافة أسئلة متعددة</p>}
+                {mcqQuestions.map(function(q, qi) {
+                  return (
+                    <div key={qi} className="space-y-2 p-3 rounded-lg border bg-background">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium">سؤال {qi + 1}</span>
+                        <Button type="button" size="sm" variant="ghost" className="h-6 w-6 p-0 text-destructive" onClick={function() { setMcqQuestions(mcqQuestions.filter(function(_, i) { return i !== qi })) }}><X className="h-3 w-3" /></Button>
+                      </div>
+                      <Input placeholder="اكتب السؤال هنا..." value={q.question} onChange={function(e) { var updated = [...mcqQuestions]; updated[qi] = { ...updated[qi], question: e.target.value }; setMcqQuestions(updated) }} className="text-sm" />
+                      {/* المعاينة الحية — زي ما الطالب هيشوف بالظبط (كسور وأسوس مُنسّقة) */}
+                      {q.question.trim() && (
+                        <div className="rounded-md border bg-muted/30 p-2">
+                          <p className="text-[9px] font-bold text-muted-foreground mb-1">👁️ المعاينة (زي ما الطالب هيشوفها):</p>
+                          <p className="text-sm" dir="ltr" style={{ textAlign: 'left' }}><FractionText text={q.question} /></p>
+                          {q.options.some(function(o) { return o.trim() }) && (
+                            <div className="mt-1.5 space-y-0.5">
+                              {q.options.map(function(o, oi2) { return o.trim() ? (
+                                <p key={oi2} className={'text-xs ' + (q.correct === oi2 ? 'text-emerald-600 font-bold' : 'text-foreground/80')} dir="ltr" style={{ textAlign: 'left' }}>
+                                  {String.fromCharCode(65 + oi2)}. <FractionText text={o} /> {q.correct === oi2 ? '✓' : ''}
+                                </p>
+                              ) : null })}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      <div className="grid grid-cols-2 gap-2">
+                        {q.options.map(function(opt, oi) {
+                          return (
+                            <div key={oi} className="flex items-center gap-1.5">
+                              <input type="radio" name={"q" + qi} checked={q.correct === oi} onChange={function() { var updated = [...mcqQuestions]; updated[qi] = { ...updated[qi], correct: oi }; setMcqQuestions(updated) }} className="accent-primary" />
+                              <Input placeholder={"اختيار " + (oi + 1)} value={opt} onChange={function(e) { var updated = [...mcqQuestions]; var newOpts = [...updated[qi].options]; newOpts[oi] = e.target.value; updated[qi] = { ...updated[qi], options: newOpts }; setMcqQuestions(updated) }} className="h-8 text-xs" />
+                            </div>
+                          )
+                        })}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">اختر الإجابة الصحيحة بجانب الاختيار</p>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            {/* ===== النماذج العشوائية للامتحان (طلب المستر) =====
+                استخراج أكتر من ملف لنفس الامتحان — كل نموذج مفصول لوحده،
+                والطالب بيشوف نموذج واحد بس بيتحدد عشوائيًا ثابت لحسابه */}
+            {isExamManager && supportMCQ && (
+              <div className="space-y-3 p-3 rounded-lg border border-dashed border-purple-400/50 bg-purple-500/5">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <Label className="text-sm font-semibold text-purple-600 dark:text-purple-400">نماذج عشوائية للامتحان</Label>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">ارفع ملف النموذج واعمل استخراج — كل نموذج بيتضاف مفصول لوحده، والطالب هيشوف نموذج واحد بس عشوائي (مرة أ ومرة ب)</p>
+                  </div>
+                  <Button type="button" size="sm" variant="outline" className="h-7 text-xs border-purple-500/50 text-purple-600 hover:bg-purple-500/10 shrink-0" onClick={handleAIExtractModel} disabled={modelExtracting || uploading || (!formFile && !formFileUrl.trim())}>
+                    {modelExtracting ? <Loader2 className="h-3 w-3 ml-1 animate-spin" /> : <Sparkles className="h-3 w-3 ml-1" />}
+                    استخراج نموذج جديد
+                  </Button>
+                </div>
+                {examModels.length === 0 ? (
+                  <p className="text-[11px] text-muted-foreground text-center py-1.5">مفيش نماذج لسه — لو ضفت نموذجين أو أكتر تقدر تختار العشوائية أو نموذج واحد ثابت</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {examModels.map(function(m, mi) {
+                      return (
+                        <div key={mi} className="flex items-center justify-between gap-2 p-2 rounded-lg border bg-background">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Badge className="bg-purple-500 text-white text-[10px] shrink-0">{m.name}</Badge>
+                            <span className="text-[11px] text-muted-foreground truncate">{m.questions.length} سؤال {m.filePath ? '• الملف مرفوع ✓' : ''}</span>
+                          </div>
+                          <Button type="button" size="sm" variant="ghost" className="h-6 w-6 p-0 text-destructive shrink-0" onClick={function() { setExamModels(examModels.filter(function(_, i) { return i !== mi })); if (fixedModelName === m.name) setFixedModelName('') }}><X className="h-3 w-3" /></Button>
+                        </div>
+                      )
+                    })}
+                    {/* (2026-و) طريقة التوزيع: عشوائي أو نموذج واحد ثابت للكل */}
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <span className="text-[11px] font-semibold shrink-0">طريقة التوزيع:</span>
+                      <select value={modelMode} onChange={function(e) { setModelMode(e.target.value as 'random' | 'fixed'); if (e.target.value === 'random') setFixedModelName('') }} className="h-7 rounded-md border border-input bg-transparent px-2 text-[11px]">
+                        <option value="random">🎲 عشوائي — كل طالب نموذج مختلف</option>
+                        <option value="fixed">📌 نموذج واحد ثابت للكل</option>
+                      </select>
+                      {modelMode === 'fixed' && (
+                        <select value={fixedModelName} onChange={function(e) { setFixedModelName(e.target.value) }} className="h-7 rounded-md border border-purple-500/50 bg-transparent px-2 text-[11px] text-purple-600 dark:text-purple-400">
+                          <option value="">اختر النموذج الثابت…</option>
+                          {examModels.map(function(m) { return <option key={m.name} value={m.name}>{m.name}</option> })}
+                        </select>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">
+                      {modelMode === 'fixed'
+                        ? '📌 كل الطلاب هيشوفوا ' + (fixedModelName || examModels[0].name) + ' بس (نموذج واحد ثابت للكل)'
+                        : '✅ الامتحان هيبقى عشوائي: ' + examModels.length + ' نماذج — كل طالب هياخد واحد بس منهم'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+            {uploadMsg && <p className="text-xs text-primary animate-pulse">{uploadMsg}</p>}
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleSubmit} disabled={submitting || uploading}>{submitting || uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'حفظ'}</Button>
+              <Button size="sm" variant="outline" onClick={() => { setShowForm(false); setFormValues({}); setFormFile(null); setFormFilePath(''); setFormFileUrl(''); setAnswerKeyFile(null); setAnswerKeyPath(''); setAnswerKeyUrl(''); setThumbnailFile(null); setThumbnailPath(''); setThumbnailUrl(''); setMcqQuestions([]); setExamModels([]); setModelMode('random'); setFixedModelName(''); setFormScheduledAt(''); setUploadMsg('') }}>إلغاء</Button>
+            </div>
+          </div>
+        )}
+        {loading ? <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div> : items.length === 0 ? (
+          <p className="text-center text-muted-foreground py-10 text-sm">لا توجد عناصر</p>
+        ) : (
+          <div className="space-y-3 max-h-[500px] overflow-y-auto custom-scrollbar">
+            {items.map((item: any) => (
+              <div key={item.id} className="p-3 rounded-lg border bg-card space-y-2">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                <div className="space-y-1 min-w-0 flex-1">
+                  <p className="font-semibold text-sm">{renderTitle(item)}</p>
+                  <p className="text-xs text-muted-foreground truncate max-w-md">{renderSubtitle(item)}</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant="secondary" className="text-[10px]">{item.grade}</Badge>
+                    {/* (25-ب1) بادج «مجدول» — الواجب مخفي عن الطلاب لحد الموعد */}
+                    {isHomeworkManager && isScheduledFuture((item as any).scheduledAt) && (
+                      <Badge className="text-[10px] bg-blue-500 text-white" title={'يظهر ' + formatEgyptian((item as any).scheduledAt)}>مجدول — يظهر {formatEgyptian((item as any).scheduledAt)}</Badge>
+                    )}
+                    {/* (2026-و26) بادج الاستهداف — الواجب موجه لطلاب محددين */}
+                    {isHomeworkManager && parseTargetStudentIds((item as any).targetStudentIds).length > 0 && (
+                      <Badge className="text-[10px] bg-teal-600 text-white" title={'موجه لـ ' + parseTargetStudentIds((item as any).targetStudentIds).length + ' طالب بس'}>👥 موجه لـ {parseTargetStudentIds((item as any).targetStudentIds).length} طالب</Badge>
+                    )}
+                    {(item as any).thumbnail && <Badge variant="outline" className="text-[10px] border-purple-500/40 text-purple-600">صورة</Badge>}
+                    {item.filePath && <Badge variant="outline" className="text-[10px] border-primary/40 text-primary">أسئلة</Badge>}
+                    {item.answerKeyPath && <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-600">إجابة</Badge>}
+                    {(item as any).questions && <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-600">أسئلة</Badge>}
+                    {(item as any).models && ((item as any).modelMode === 'fixed'
+                      ? <Badge className="text-[10px] bg-amber-500 text-white">📌 نموذج ثابت</Badge>
+                      : <Badge className="text-[10px] bg-purple-500 text-white">نماذج عشوائية</Badge>)}
+                    <span className="text-[10px] text-muted-foreground">{new Date(item.createdAt).toLocaleDateString('ar-EG')}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {supportMCQ && (
+                    <EditQuestionsButton onClick={function () { setEditTarget(item) }} label="" />
+                  )}
+                  {/* (25-ب1) تعديل/إلغاء موعد ظهور الواجب */}
+                  {isHomeworkManager && (
+                    <Button size="icon" variant="ghost"
+                      className={'h-8 w-8 shrink-0 ' + (isScheduledFuture((item as any).scheduledAt) ? 'text-blue-600' : 'text-muted-foreground')}
+                      title="موعد ظهور الواجب للطلاب"
+                      onClick={function () {
+                        if (schedEditId === item.id) { setSchedEditId(null); setSchedEditVal('') }
+                        else { setSchedEditId(item.id); setSchedEditVal(toLocalInputValue((item as any).scheduledAt)) }
+                      }}>
+                      📅
+                    </Button>
+                  )}
+                  {/* (2026-و26) زرار استهداف الطلاب — مين يشوف الواجب (زي الفيديوهات) */}
+                  {isHomeworkManager && (
+                    <Button size="icon" variant="ghost"
+                      className={'h-8 w-8 shrink-0 ' + (parseTargetStudentIds((item as any).targetStudentIds).length > 0 ? 'text-teal-600' : 'text-muted-foreground')}
+                      title="تحديد الطلاب اللي يشوفوا الواجب ده"
+                      onClick={function () { setTargetEditId(targetEditId === item.id ? null : item.id) }}>
+                      👥
+                    </Button>
+                  )}
+                  {/* (2026-و29) زرار استهداف المجموعات للواجب — نفس النمط */}
+                  {isHomeworkManager && (
+                    <Button size="icon" variant="ghost"
+                      className={'h-8 w-8 shrink-0 ' + (parseTargetStudentIds((item as any).targetGroupIds).length > 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-muted-foreground')}
+                      title="تحديد المجموعات اللي تشوف الواجب ده"
+                      onClick={function () { setGroupEditId(groupEditId === item.id ? null : item.id) }}>
+                      🧑‍🤝‍🧑
+                    </Button>
+                  )}
+                  <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0" onClick={() => handleDelete(item.id)}><Trash2 className="h-4 w-4" /></Button>
+                </div>
+                </div>
+                {/* (2026-و26) منتقي الطلاب المستهدفين للواجب */}
+                {isHomeworkManager && targetEditId === item.id && (
+                  <StudentTargetPicker
+                    open={true}
+                    onOpenChange={function (o) { if (!o) setTargetEditId(null) }}
+                    apiPath="/api/homework"
+                    itemId={item.id}
+                    initialIds={parseTargetStudentIds((item as any).targetStudentIds)}
+                    itemTitle={renderTitle(item)}
+                    adminId={currentAdminId}
+                    onSaved={function () { loadItems(false); if (onRefresh) onRefresh() }}
+                  />
+                )}
+                {/* (2026-و29) منتقي المجموعات المستهدفة للواجب */}
+                {isHomeworkManager && groupEditId === item.id && (
+                  <GroupTargetPicker
+                    open={true}
+                    onOpenChange={function (o) { if (!o) setGroupEditId(null) }}
+                    apiPath="/api/homework"
+                    itemId={item.id}
+                    initialIds={parseTargetStudentIds((item as any).targetGroupIds)}
+                    itemTitle={renderTitle(item)}
+                    adminId={currentAdminId}
+                    onSaved={function () { loadItems(false); if (onRefresh) onRefresh() }}
+                  />
+                )}
+                {/* (25-ب1) محرر الموعد المضغوط */}
+                {isHomeworkManager && schedEditId === item.id && (
+                  <div className="flex items-center gap-1.5 flex-wrap p-2 rounded-lg border border-dashed border-blue-500/40 bg-blue-500/5">
+                    <span className="text-[10px] font-medium shrink-0">موعد الظهور:</span>
+                    <Input type="datetime-local" value={schedEditVal} onChange={function (e) { setSchedEditVal(e.target.value) }}
+                      placeholder="يظهر فورًا" className="h-7 text-[11px] max-w-[220px]" />
+                    <Button type="button" variant="outline" size="sm" className="h-7 text-[10px] px-2"
+                      disabled={schedSaving || !schedEditVal}
+                      onClick={function () { patchHwSchedule(item.id, schedEditVal ? new Date(schedEditVal).toISOString() : null, 'تم تحديث موعد ظهور الواجب') }}>
+                      حفظ الموعد
+                    </Button>
+                    {isScheduledFuture((item as any).scheduledAt) && (
+                      <Button type="button" variant="ghost" size="sm" className="h-7 text-[10px] px-2 text-destructive"
+                        disabled={schedSaving}
+                        onClick={function () { patchHwSchedule(item.id, null, 'تم إلغاء الجدولة — الواجب ظاهر للطلاب فورًا') }}>
+                        إلغاء الجدولة
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        {supportMCQ && (
+          <QuestionsEditorDialog
+            open={!!editTarget}
+            onOpenChange={function (o) { if (!o) setEditTarget(null) }}
+            title={editTarget ? (renderTitle(editTarget) || '') : ''}
+            apiPath={apiPath}
+            itemId={editTarget ? editTarget.id : ''}
+            initialQuestionsRaw={editTarget ? (editTarget as any).questions : null}
+            onSaved={function () { loadItems(false); if (onRefresh) onRefresh() }}
+          />
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+/* ========== AI EXTRACTION PANEL ========== */
+function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; adminId?: string }) {
+  const gradesList = useGradesList()
+  const [step, setStep] = useState<1 | 2 | 3>(1)
+  const [extractType, setExtractType] = useState<'exam' | 'homework'>('exam')
+  const [grade, setGrade] = useState('')
+  const [title, setTitle] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [fileUrl, setFileUrl] = useState('')
+  /* (و48) ملف الإجابات الاختياري اتشال بطلب المستر: «شيل لي إن أنا أقدر أعمل
+     استخراج من ملف إجابات اختياري، شيله» — الاستخراج من ملف واحد بس،
+     والإجابات الناقصة بتتملأ بالحل الذكي (extract-or-solve) زي ما هي */
+  const [extracting, setExtracting] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [extractedQuestions, setExtractedQuestions] = useState<Array<any>>([])
+  const [statusMsg, setStatusMsg] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
+  // YouTube state
+  const [youtubeUrl, setYoutubeUrl] = useState('')
+  const [numQuestions, setNumQuestions] = useState(10)
+  const [inputMode, setInputMode] = useState<'file' | 'youtube' | 'book'>('file')
+  /* (2026-و40) وضع الكتاب — استخراج من صفحات محددة في كتاب كبير (طلب المستر:
+     بفتح كتاب كبير، أحدد صفحات، يجيب كل الأسئلة أو أهم N سؤال بالترتيب) */
+  const [bookFile, setBookFile] = useState<File | null>(null)
+  const [bookNumPages, setBookNumPages] = useState(0)
+  const [bookFrom, setBookFrom] = useState(1)
+  const [bookTo, setBookTo] = useState(1)
+  const [bookMode, setBookMode] = useState<'all' | 'top'>('all')
+  const [bookCount, setBookCount] = useState(10)
+  const [bookName, setBookName] = useState('')
+  const [bookPdfLoading, setBookPdfLoading] = useState(false)
+  /* (و45) وضع الكتاب بلينك: «أو ضع رابط PDF» — بيتحمل من خلال /api/books/proxy */
+  const [bookUrl, setBookUrl] = useState('')
+  const [bookLinkLoading, setBookLinkLoading] = useState(false)
+  const bookDocRef = useRef<any>(null)
+  const bookFileRef = useRef<HTMLInputElement>(null)
+  /* (25-ب1) إعدادات الامتحان قبل الحفظ: إظهار الإجابات + المؤقت + موعد الظهور */
+  const [examShowResult, setExamShowResult] = useState(false)
+  const [examTimeLimit, setExamTimeLimit] = useState('')
+  const [examScheduledAt, setExamScheduledAt] = useState('')
+  /* (2026-و40-w) أكتر من ملف ورا بعض: زرار «أضف ملف تاني» في شاشة المراجعة
+     يرجّع لخطوة اختيار المصدر — والأسئلة الجديدة بتتنضاف تحت الحالية
+     (ممنوع الاستبدال) مع srcName «الملف الثاني/الثالث/…» على الدفعة الجديدة */
+  const [appendingFile, setAppendingFile] = useState(false)
+  const [fileBatchCount, setFileBatchCount] = useState(0)
+  /* (2026-و44) الكتب المحفوظة في وضع الكتاب — طلب المستر: «الكتاب المضاف باللينك
+     يبقى ثابت في كل مرة — علامة/سهم، لو دوست عليه تظهر صفحات الكتاب» */
+  const [savedBooks, setSavedBooks] = useState<any[]>([])
+  const [savedBooksLoading, setSavedBooksLoading] = useState(false)
+  const [showSavedBooks, setShowSavedBooks] = useState(false)
+  /* (و48) مصدر القص الأخير — بنحتفظ بيه عشان زرار «قص الرسمة تاني» في
+     شاشة المراجعة يقدر يعيد المحاولة لأي رسمة فشل قصّها لحظة الاستخراج */
+  const lastCropSourceRef = useRef<{ file?: File | null; doc?: any | null }>({})
+  /* (و50) ملف المصدر متخزن على السيرفر (Media) — خط الإنقاذ: أي رسمة ناقصة
+     بتتقص من السيرفر مباشرة من غير أي اعتماد على متصفح المستر */
+  const sourceMediaRef = useRef<string>('')
+  /* (و51) إصلاح شامل للبيانات القديمة: أسئلة اتحفظت قبل إصلاح القص فيها
+     bbox من غير url — فالطالب كان شايف «في صورة» من غير صورة فعلية.
+     الزرار بيلف على كل الواجبات/الامتحانات (وكل نموذج) بيقص من الملف
+     الأصلي المتخزن في Media ويكتب الأسئلة المصلحة في الداتابيز */
+  const [backfillBusy, setBackfillBusy] = useState(false)
+  var runBackfill = async function () {
+    if (backfillBusy) return
+    if (!adminId) { toast.error('مفيش جلسة أدمن — سجل دخول تاني', { duration: 8000 }); return }
+    setBackfillBusy(true)
+    try {
+      var res = await fetch('/api/backfill-figures', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminId: adminId }),
+      })
+      var d = await res.json()
+      if (!res.ok) { toast.error(d.error || 'فشل الإصلاح — جرب تاني', { duration: 8000 }); return }
+      if (d.cropped > 0) {
+        toast.success('اتصلحت ' + d.cropped + ' رسمة في ' + d.fixed + ' سجل (اتفحص ' + d.scanned + ') ✓ — الصور هتظهر للطلاب دلوقتي', { duration: 10000 })
+      } else if (d.withMissing === 0) {
+        toast.success('كل الأسئلة سليمة — مفيش رسمة ناقصة في أي واجب أو امتحان ✓', { duration: 8000 })
+      } else {
+        toast.warning('فيه ' + d.failed + ' رسمة محتاجة ملفاتها الأصلية مش متخزنة — ابعتها يدوي من محرر الأسئلة', { duration: 10000 })
+      }
+      if (d.remaining > 0) toast.info('فيه ' + d.remaining + ' رسمة لسه — دوس الإصلاح تاني عشان يكمل', { duration: 10000 })
+      onRefresh()
+    } catch (e) {
+      toast.error('فشل الإصلاح — جرب تاني', { duration: 8000 })
+    }
+    setBackfillBusy(false)
+  }
+  const [retryingCrop, setRetryingCrop] = useState<boolean>(false)
+  /* (و52) محرر القص اليدوي — الهدف المفتوح دلوقتي (سؤال أو اختيار) */
+  const [cropEdit, setCropEdit] = useState<FigureCropTarget | null>(null)
+  /* (2026-و55) محرر الجدول في شاشة المراجعة — رقم السؤال اللي جدوله مفتوح للتعديل */
+  const [tableEditQi, setTableEditQi] = useState<number>(-1)
+
+  /* (و52) تطبيق نتيجة محرر القص اليدوي — الرسمة الجديدة تتكتب في السؤال فورًا */
+  var applyFigureCrop = function (t: FigureCropTarget, url: string, bbox: { x: number; y: number; w: number; h: number }, page: number) {
+    setExtractedQuestions(function (prev) {
+      return prev.map(function (q: any, i: number) {
+        if (i !== t.qi || !q) return q
+        if (t.kind === 'q') {
+          return Object.assign({}, q, { figure: Object.assign({}, q.figure || {}, { url: url, bbox: bbox, page: page }) })
+        }
+        var ofs = Array.isArray(q.optionFigures) ? q.optionFigures.slice() : []
+        while (ofs.length <= t.oi) ofs.push(null)
+        ofs[t.oi] = Object.assign({}, ofs[t.oi] || {}, { url: url, bbox: bbox, page: page })
+        return Object.assign({}, q, { optionFigures: ofs })
+      })
+    })
+    setCropEdit(null)
+    toast.success('الرسمة اتقصّت من الصفحة الأصلية واتحفظت ✓ — هتوصل للطالب بالشكل ده بالظبط')
+  }
+
+  var resetAll = function() {
+    setStep(1); setExtractType('exam'); setGrade(''); setTitle('')
+    sourceMediaRef.current = ''
+    setFile(null); setFileUrl('')
+    setExtractedQuestions([]); setStatusMsg('')
+    lastCropSourceRef.current = {}
+    setYoutubeUrl(''); setNumQuestions(10); setInputMode('file')
+    setExamShowResult(false); setExamTimeLimit(''); setExamScheduledAt('')
+    /* (2026-و40) تصفير وضع الكتاب */
+    setBookFile(null); setBookNumPages(0); setBookFrom(1); setBookTo(1)
+    setBookMode('all'); setBookCount(10); setBookName(''); bookDocRef.current = null
+    /* (2026-و40-w) تصفير وضع أكتر من ملف */
+    setAppendingFile(false); setFileBatchCount(0)
+  }
+
+  /* (2026-و40-w) تسمية الملفات بالترتيب: الأول/الثاني/الثالث… */
+  var fileOrdinalLabel = function (n: number): string {
+    var ordinals = ['', 'الملف الأول', 'الملف الثاني', 'الملف الثالث', 'الملف الرابع', 'الملف الخامس', 'الملف السادس', 'الملف السابع', 'الملف الثامن', 'الملف التاسع', 'الملف العاشر', 'الملف الحادي عشر', 'الملف الثاني عشر']
+    return (n >= 1 && n < ordinals.length) ? ordinals[n] : ('الملف ' + n)
+  }
+
+  /* (2026-و40-w) نقطة نهاية الاستخراج المشتركة (الملف/يوتيوب/الكتاب):
+     1) قص رسومات الأسئلة (figure.bbox من غير url) من مصدر الصفحات + رفعها
+        مع توست «جهز الرسومات X من Y…» — قبل شاشة المراجعة عشان url
+        يتخزن مع الحفظ من غير خطوة إضافية
+     2) لو بنضيف ملف تاني → دمج تحت الحالية (ممنوع الاستبدال) + srcName ترتيبي
+     3) لو أول ملف → استبدال عادي من غير srcName (سؤال بمصدر واحد بيتعرض «صفحة N» بس) */
+  var finishExtraction = async function (newQs: any[], cropSource: { file?: File | null; doc?: any | null }) {
+    try {
+      /* (و44) قص رسومات السؤال أوتوماتيك — (و45) رسومات الاختيارات اتشالت من العدّاد
+         والإلزام بالكامل بطلب المستر: مش مطلوب رفع صورة للسؤال ولا للختيار —
+         القص أوتوماتيك بس لما ينفع، ومن غير أي تنبيه أو منع */
+      /* (و48) عدّاد القص بيشمل رسمة السؤال **ورسومات الاختيارات** — ده كان السبب
+         الرئيسي لـ«اختيارات الرسومات مش بتظهر ولا للأدمن ولا للطالب»:
+         السؤال اللي اختياراته صور من غير رسمة سؤال كان العدّاد مش بيشوفه،
+         فالقص مش بيحصل أصلًا وبتفضل bbox من غير url (placeholder بس).
+         (و45 زي ما هو: القص أوتوماتيك وصامت — من غير إلزام أو تنبيه) */
+      var needCrop = 0
+      newQs.forEach(function (q: any) {
+        if (!q) return
+        if (q.figure && q.figure.bbox && !q.figure.url) needCrop++
+        if (Array.isArray(q.optionFigures)) {
+          q.optionFigures.forEach(function (of: any) {
+            if (of && of.bbox && !of.url) needCrop++
+          })
+        }
+      })
+      lastCropSourceRef.current = {
+        file: (cropSource && cropSource.file) || null,
+        doc: (cropSource && cropSource.doc) || null,
+      }
+      if (needCrop > 0) {
+        setStatusMsg('جهز الرسومات 0 من ' + needCrop + '…')
+        await ensureFigureUrls(newQs, cropSource || {}, function (done: number, total: number) {
+          setStatusMsg('جهز الرسومات ' + done + ' من ' + total + '…')
+        })
+        /* (و50) لو لسه ناقص بعد محاولة المتصفح → السيرفر يقص من الملف الأصلي
+           المتخزن (sourceMediaId) — صامت وسريع — ده اللي يضمن إن الصور تظهر
+           حتى لو pdf.js أو الرفع فشل في المتصفح */
+        var stillMissing = 0
+        try {
+          newQs.forEach(function (q: any) {
+            if (!q) return
+            if (q.figure && q.figure.bbox && !q.figure.url) stillMissing++
+            if (Array.isArray(q.optionFigures)) q.optionFigures.forEach(function (of: any) { if (of && of.bbox && !of.url) stillMissing++ })
+          })
+        } catch (eC) { stillMissing = 0 }
+        if (stillMissing > 0 && sourceMediaRef.current) {
+          try {
+            var rResc = await fetch('/api/crop-figures', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sourceMediaId: sourceMediaRef.current, questions: newQs }),
+            })
+            var dResc = await rResc.json()
+            if (rResc.ok && dResc.success && Array.isArray(dResc.questions)) {
+              newQs = dResc.questions
+              if (dResc.figuresCrop && dResc.figuresCrop.cropped > 0) {
+                toast.success('السيرفر جهز ' + dResc.figuresCrop.cropped + ' رسمة من الملف الأصلي ✓')
+              }
+            }
+          } catch (eResc) { /* صامت — البلاكس هتفضل ظاهرة وزرار 📐 موجود */ }
+        }
+        setStatusMsg('')
+      }
+    } catch (eCrop: any) {
+      /* فشل القص مش بيوقف الاستخراج — bbox هيفضل والواجهة تعرض placeholder */
+      setStatusMsg('')
+    }
+    if (appendingFile) {
+      var batchName = fileOrdinalLabel(Math.max(1, fileBatchCount + 1))
+      var tagged = newQs.map(function (q: any) { return Object.assign({}, q, { srcName: batchName }) })
+      var existing = extractedQuestions.map(function (q: any) {
+        if (q && q.srcName && String(q.srcName).trim()) return q
+        return Object.assign({}, q, { srcName: fileOrdinalLabel(1) })
+      })
+      setExtractedQuestions(existing.concat(tagged))
+      setFileBatchCount(fileBatchCount + 1)
+      setAppendingFile(false)
+      toast.success('تمت إضافة ' + tagged.length + ' سؤال من ' + batchName + ' — نزلوا تحت الأسئلة الحالية')
+    } else {
+      setExtractedQuestions(newQs)
+      setFileBatchCount(1)
+    }
+    setStep(3)
+  }
+
+  /* (2026-و40-w) زرار «أضف ملف تاني»: يرجّع لخطوة اختيار المصدر بنفس الأوضاع
+     مع الحفاظ على الأسئلة المستخرجة زي ما هي */
+  var startAppendFile = function () {
+    setAppendingFile(true)
+    setFile(null); setFileUrl(''); sourceMediaRef.current = ''
+    setBookFile(null); setBookNumPages(0); setBookFrom(1); setBookTo(1); bookDocRef.current = null
+    setStatusMsg('اختار الملف التاني وابعت استخراج — أسئلته هتتنزّل تحت الحالية (' + extractedQuestions.length + ' سؤال)')
+    setStep(2)
+  }
+
+  var canProceedStep1 = extractType && grade.trim() && title.trim()
+  var canExtractFile = file || fileUrl.trim()
+  var canExtractYoutube = youtubeUrl.trim().length > 5
+  /* (2026-و40) جاهزية وضع الكتاب: ملف مفتوح + نطاق صالح (≤30 صفحة) */
+  var bookPagesSelected = bookNumPages > 0 ? (bookTo - bookFrom + 1) : 0
+  var canExtractBook = !!bookFile && bookNumPages > 0 && bookFrom >= 1 && bookTo >= bookFrom && bookTo <= bookNumPages && bookPagesSelected <= 30
+  var canExtract = inputMode === 'youtube' ? canExtractYoutube : inputMode === 'book' ? canExtractBook : canExtractFile
+
+  var handleExtract = async function() {
+    if (!canExtract || extracting) return
+    setExtracting(true)
+    setStatusMsg('جاري استخراج الأسئلة بالذكاء الاصطناعي... قد يستغرق ذلك دقيقة')
+    try {
+      if (inputMode === 'youtube') {
+        // YouTube extraction
+        var ctrl = new AbortController()
+        var tmr = setTimeout(function() { ctrl.abort() }, 180000)
+        var res = await fetch('/api/ai-extract-youtube', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ youtubeUrl: youtubeUrl.trim(), numQuestions: numQuestions, type: extractType, grade: grade }),
+          signal: ctrl.signal
+        })
+        clearTimeout(tmr)
+        var data = await res.json()
+        if (res.ok && data.extracted && data.extracted.questions && data.extracted.questions.length > 0) {
+          if (data.extracted.title && !title) { setTitle(data.extracted.title) }
+          setStatusMsg('')
+          /* (2026-و40-w) قص الرسومات + دمج أكتر من ملف عبر النقطة المشتركة */
+          await finishExtraction(data.extracted.questions, {})
+          toast.success('تم استخراج ' + data.extracted.questions.length + ' سؤال من يوتيوب بنجاح!')
+        } else {
+          toast.error(data.error || 'لم يتم استخراج أسئلة من الفيديو')
+          setStatusMsg('')
+        }
+      } else {
+        // File/image extraction (supports 1 or 2 files: questions + optional answer key)
+        /* (و43) PDF كبير (>3.5MB) في وضع الملف → نفس مسار وضع «كتاب»: قراءة
+           الصفحات على المتصفح (pdf.js) ورفعها JSON للـ /api/ai-extract-pages —
+           من غير FormData (حد Vercel 4.5MB كان بيفشل «أضف ملف تاني» على
+           الملفات الكبيرة وكان بطيء جدًا). الصغير والصور بيفضلوا على المسار
+           الخام زي ما هو (مطابقة ملف الإجابات شغالة هناك) */
+        var isBigPdf = !!file && (file.type === 'application/pdf' || /\.pdf$/i.test(String(file.name || ''))) && file.size > 3.5 * 1024 * 1024
+        if (isBigPdf && file) {
+          var openedF = await openPdf(file)
+          var docF = openedF.doc
+          var totalPagesF = Math.min(openedF.numPages || 0, 60)
+          var collectedF: any[] = []
+          var seenKeysF: any = {}
+          var chunksF = Math.ceil(totalPagesF / 5)
+          for (var cf = 0; cf < chunksF; cf++) {
+            var cFromF = 1 + cf * 5
+            var cToF = Math.min(totalPagesF, cFromF + 4)
+            setStatusMsg('بيقرأ صفحات الملف ' + cFromF + '–' + cToF + '… (' + (cf + 1) + '/' + chunksF + ')')
+            var pagesF: any[] = []
+            for (var pf = cFromF; pf <= cToF; pf++) {
+              /* (و52) 1700/0.85 بدل 1400/0.72 — دي نفس الصور اللي السيرفر بيقص منها الرسمات،
+                 الجودة الواطية كانت سبب «الرسومات جودتها وحشة» في الملفات الكبيرة */
+              var imgF = await renderPageToJpeg(docF, pf, 1700, 0.85)
+              pagesF.push({ n: pf, image: imgF })
+            }
+            var chunkDataF: any = null
+            for (var attemptF = 0; attemptF < 2 && !chunkDataF; attemptF++) {
+              try {
+                var ctrlF = new AbortController()
+                var tmrF = setTimeout(function() { ctrlF.abort() }, 180000)
+                var resF = await fetch('/api/ai-extract-pages', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ pages: pagesF, mode: 'all', bookTitle: title }),
+                  signal: ctrlF.signal,
+                })
+                clearTimeout(tmrF)
+                var dataF = await resF.json()
+                if (resF.ok && dataF.extracted) chunkDataF = dataF.extracted
+              } catch (eF: any) {
+                if (eF && eF.name === 'AbortError') throw eF
+              }
+              if (!chunkDataF && attemptF === 0) await new Promise(function (r) { setTimeout(r, 1200) })
+            }
+            if (!chunkDataF) continue
+            var qsF = chunkDataF.questions || []
+            for (var qfi = 0; qfi < qsF.length; qfi++) {
+              var keyF = bookQuestionKey(qsF[qfi])
+              if (keyF && seenKeysF[keyF]) continue
+              if (keyF) seenKeysF[keyF] = true
+              collectedF.push(qsF[qfi])
+            }
+          }
+          if (collectedF.length === 0) {
+            toast.error('مقدرتش أستخرج أسئلة من الملف — جرب ملف تاني أو استخدم وضع «كتاب — صفحات محددة»')
+            setStatusMsg('')
+            try { docF.destroy() } catch (eDxF) {}
+            setExtracting(false)
+            return
+          }
+          if (!title.trim() && !appendingFile) setTitle(String(file.name || '').replace(/\.pdf$/i, '') || 'ملف PDF')
+          setStatusMsg('')
+          /* (و43) قص الرسومات من مستند الملف المفتوح + دمج أكتر من ملف عبر النقطة المشتركة */
+          await finishExtraction(collectedF, { doc: docF, file: file })
+          var okMsgF = (appendingFile ? 'تمت إضافة ' : 'تم استخراج ') + collectedF.length + (appendingFile ? ' سؤال من الملف الجديد!' : ' سؤال من الملف!')
+          toast.success(okMsgF)
+          try { docF.destroy() } catch (eDxF2) {}
+          setExtracting(false)
+          return
+        }
+        var fd = new FormData()
+        if (file) { fd.append('file', file) }
+        else if (fileUrl.trim()) { fd.append('fileUrl', fileUrl.trim()) }
+        fd.append('type', extractType)
+        fd.append('grade', grade)
+        var ctrl2 = new AbortController()
+        var tmr2 = setTimeout(function() { ctrl2.abort() }, 180000)
+        var res2 = await fetch('/api/ai-extract', { method: 'POST', body: fd, signal: ctrl2.signal })
+        clearTimeout(tmr2)
+        var data2 = await res2.json()
+        if (res2.ok && data2.extracted && data2.extracted.questions && data2.extracted.questions.length > 0) {
+          setStatusMsg('')
+          /* (2026-و40-w) قص الرسومات من ملف المصدر + دمج أكتر من ملف عبر النقطة المشتركة
+             (و48) الاستخراج من لينك: بيجيب الملف الأصلي عن طريق بروكسي المنصة
+             (/api/books/proxy — بتحل CORS) عشان قص الرسمات يشتغل زي الملف
+             المرفوع بالظبط — من غيرها كان القص بيتخطى خالص في وضع اللينك */
+          var cropFile: File | null = file || null
+          if (!cropFile && fileUrl.trim()) {
+            try {
+              var resLink = await fetch('/api/books/proxy?url=' + encodeURIComponent(fileUrl.trim()), { cache: 'no-store' })
+              if (resLink.ok) {
+                var blobLink = await resLink.blob()
+                var isPdfLink = (blobLink.type || '').includes('pdf') || /\.pdf(\?|$)/i.test(fileUrl.trim())
+                cropFile = new File([blobLink], 'source-' + Date.now() + (isPdfLink ? '.pdf' : '.jpg'), { type: isPdfLink ? 'application/pdf' : (blobLink.type || 'image/jpeg') })
+              }
+            } catch (eLink) { /* من غير مصدر القص بيتخطى — نفس سلوك الفشل الصامت */ }
+          }
+          /* (و50) خط الإنقاذ: ملف المصدر متخزن على السيرفر — أي رسمة ناقصة
+             بتتقص من عند السيرفر مباشرة لاحقًا (المراجعة/الحفظ) */
+          sourceMediaRef.current = String((data2.extracted && data2.extracted.sourceMediaId) || '')
+          await finishExtraction(data2.extracted.questions, { file: cropFile })
+          var stats = data2.extracted.stats || {}
+          var msg = 'تم استخراج ' + data2.extracted.questions.length + ' سؤال بنجاح!'
+          if (stats.mcq || stats.writing) {
+            msg += ' (' + (stats.mcq || 0) + ' اختيارات، ' + (stats.writing || 0) + ' مقالية)'
+          }
+          toast.success(msg)
+          /* (و50) لو القص السيرفري فشل في رسومات — رسالة صريحة فورًا، ممنوع الصمت */
+          var fc = data2.extracted.figuresCrop
+          if (fc && (fc.failed > 0 || fc.error)) {
+            toast.warning('استخراج تم، لكن ' + (fc.failed > 0 ? fc.failed : 'بعض') + ' رسمة ماقصّتهاش من الملف — دوس «📐 الرسمة مش ظاهرة؟ دوس هنا» جنب السؤال وبتتقص فورًا', { duration: 8000 })
+          }
+        } else {
+          toast.error(data2.error || 'لم يتم استخراج أسئلة')
+          setStatusMsg('')
+        }
+      }
+    } catch (err: any) {
+      if (err && err.name === 'AbortError') { toast.error('انتهت مهلة الاستخراج - حاول مرة أخرى') }
+      else { toast.error('خطأ: ' + (err.message || '')) }
+      setStatusMsg('')
+    }
+    setExtracting(false)
+  }
+
+  var updateQuestion = function(qi: number, field: string, value: any) {
+    var updated = extractedQuestions.map(function(q, i) {
+      if (i !== qi) return q
+      if (field === 'question') return Object.assign({}, q, { question: value })
+      if (field === 'correct') return Object.assign({}, q, { correct: value })
+      if (field === 'points') return Object.assign({}, q, { points: value })
+      if (field === 'modelAnswer') return Object.assign({}, q, { modelAnswer: value })
+      if (field === 'acceptedAnswers') return Object.assign({}, q, { acceptedAnswers: value })
+      /* (و43) دعم حقل figure — رفع صورة الرسمة يدويًا من شاشة المراجعة */
+      if (field === 'figure') return Object.assign({}, q, { figure: value })
+      /* (2026-و55) محرر الجدول من شاشة المراجعة — عدّل/امسح/اكتب خلايا وعناوين */
+      if (field === 'table') return Object.assign({}, q, { table: value })
+      if (field.startsWith('option_')) {
+        var oi = parseInt(field.split('_')[1])
+        var newOpts = [...(q.options || [])]; newOpts[oi] = value
+        return Object.assign({}, q, { options: newOpts })
+      }
+      return q
+    })
+    setExtractedQuestions(updated)
+  }
+
+  /* (و43) رفع صورة رسمة السؤال يدويًا — chunkedUpload → /api/files/<id>
+     وq.figure = { url } (من غير bbox — WorksheetFigure بيعرض url على طول) */
+  var uploadQuestionFigure = async function (qi: number, f: File | null) {
+    if (!f) return
+    try {
+      var up = await chunkedUpload(f, 'exam-figures')
+      if (up && up.filePath && /^\/api\/files\//.test(up.filePath)) {
+        updateQuestion(qi, 'figure', { url: up.filePath })
+        toast.success('الرسمة اتضافت للسؤال — هتظهر للطالب زي الملف')
+      } else {
+        toast.error('فشل رفع الرسمة — جرب تاني')
+      }
+    } catch (e) {
+      toast.error('فشل رفع الرسمة — جرب تاني')
+    }
+  }
+
+  /* (و43) رفع صورة لاختيار MCQ — optionFigures[i] = { url } بمحاذاة options */
+  var uploadOptionFigure = async function (qi: number, oi: number, f: File | null) {
+    if (!f) return
+    try {
+      var up = await chunkedUpload(f, 'exam-figures')
+      if (up && up.filePath && /^\/api\/files\//.test(up.filePath)) {
+        setExtractedQuestions(function (prev) {
+          return prev.map(function (q: any, i: number) {
+            if (i !== qi) return q
+            var optCount = Array.isArray(q.options) ? q.options.length : 0
+            var ofs = Array.isArray(q.optionFigures) ? q.optionFigures.slice() : []
+            while (ofs.length < optCount) ofs.push(null)
+            ofs[oi] = { url: up.filePath }
+            return Object.assign({}, q, { optionFigures: ofs })
+          })
+        })
+        toast.success('صورة الاختيار اتضافت — هتظهر للطالب جنب الاختيار')
+      } else {
+        toast.error('فشل رفع صورة الاختيار — جرب تاني')
+      }
+    } catch (e) {
+      toast.error('فشل رفع صورة الاختيار — جرب تاني')
+    }
+  }
+
+  /* (و43) إزالة صورة اختيار */
+  var removeOptionFigure = function (qi: number, oi: number) {
+    setExtractedQuestions(function (prev) {
+      return prev.map(function (q: any, i: number) {
+        if (i !== qi) return q
+        var ofs = Array.isArray(q.optionFigures) ? q.optionFigures.slice() : []
+        ofs[oi] = null
+        return Object.assign({}, q, { optionFigures: ofs })
+      })
+    })
+  }
+
+  var deleteQuestion = function(qi: number) { setExtractedQuestions(extractedQuestions.filter(function(_, i) { return i !== qi })) }
+  var addQuestion = function() { setExtractedQuestions([...extractedQuestions, { type: 'mcq', question: '', options: ['لا يوجد','لا يوجد','لا يوجد','لا يوجد'], correct: 0, points: 1 }]) }
+  var addWritingQuestion = function() { setExtractedQuestions([...extractedQuestions, { type: 'writing', question: '', options: [], correct: -1, points: 5, modelAnswer: '', acceptedAnswers: [] }]) }
+
+  /* ============================================================
+   * (و48) إعادة محاولة قص الرسمات لسؤال واحد — شبكة أمان بطلب المستر:
+   *   «أكد لي إن الصور تظهر» — لو القص فشل لحظة الاستخراج (نت نت/مصدر مش متاح)
+   *   المستر يدوس زرار واحد والرسمة تتقص من المصدر الأصلي وترفع وتظهر
+   *   للأدمن والطالب على طول — والمصدر محفوظ في lastCropSourceRef.
+   * ============================================================ */
+  var retryCropQuestion = async function (qi: number) {
+    var target = extractedQuestions[qi]
+    if (!target) return
+    if (retryingCrop) return
+    var src = lastCropSourceRef.current || {}
+    var needs = !!(target.figure && target.figure.bbox && !target.figure.url) ||
+      (Array.isArray(target.optionFigures) && target.optionFigures.some(function (of: any) { return of && of.bbox && !of.url }))
+    if (!needs) { toast.info('السؤال ده رسماته ظاهرة بالفعل'); return }
+    setRetryingCrop(true)
+    setStatusMsg('بيجهز رسمات السؤال ' + (qi + 1) + '…')
+    /* (و50) الأولوية للسيرفر: الملف الأصلي متخزن عنده — القص يحصل عنده
+       حتى لو متصفح المستر كله بايظ — وبيقص **كل** الرسمات الناقصة دفعة واحدة */
+    var serverFixed = false
+    if (sourceMediaRef.current) {
+      try {
+        var rRes2 = await fetch('/api/crop-figures', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sourceMediaId: sourceMediaRef.current, questions: extractedQuestions }),
+        })
+        var dRes2 = await rRes2.json()
+        if (rRes2.ok && dRes2.success && Array.isArray(dRes2.questions)) {
+          setExtractedQuestions(dRes2.questions)
+          var croppedN = dRes2.figuresCrop && dRes2.figuresCrop.cropped ? dRes2.figuresCrop.cropped : 0
+          if (croppedN > 0) {
+            serverFixed = true
+            toast.success('السيرفر قصّ ' + croppedN + ' رسمة من الملف الأصلي ✓ — هتظهر في المراجعة وللطالب')
+          }
+        }
+      } catch (eSrv) { /* نكمل لمسار المتصفح */ }
+    }
+    if (serverFixed) { setStatusMsg(''); setRetryingCrop(false); return }
+    if (!src.file && !src.doc) { toast.error('مفيش مصدر للقص — الرسمة دي من استخراج قديم. ارفعها يدوي بزرار 📷 أو استخرج تاني'); setStatusMsg(''); setRetryingCrop(false); return }
+    var clone: any
+    try { clone = JSON.parse(JSON.stringify(target)) } catch (e) { clone = Object.assign({}, target) }
+    try { await ensureFigureUrls([clone], src) } catch (e) {}
+    setExtractedQuestions(function (prev) {
+      return prev.map(function (q: any, i: number) { return i === qi ? clone : q })
+    })
+    setStatusMsg('')
+    setRetryingCrop(false)
+    var gotNew = !!(clone.figure && clone.figure.url) ||
+      (Array.isArray(clone.optionFigures) && clone.optionFigures.some(function (of: any) { return of && of.url }))
+    if (gotNew) toast.success('الرسمة اتقصت واترفعت ✓ — هتظهر في المراجعة وللطالب')
+    else toast.error('مقدرتش أقص الرسمة من الملف الأصلي — ارفعها يدوي بزرار 📷')
+  }
+
+  var handleSave = async function() {
+    if (extractedQuestions.length === 0) { toast.error('لا يوجد اسئلة للحفظ'); return }
+    /* (استخراج أدق 2026-و10) ممنوع حفظ سؤال اختيارات من غير إجابة محددة —
+       ده كان بيتحول لإجابة عشوائية (A) عند الطالب. المستر بيثبتها بإيده الأول */
+    var unfixed = extractedQuestions.filter(function(q: any) {
+      var isMcq = q.type !== 'writing' && q.type !== 'essay' && Array.isArray(q.options) && q.options.length > 0
+      return isMcq && (q.correct === -1 || q.correct === undefined || q.correct === null)
+    })
+    if (unfixed.length > 0) {
+      toast.error('فيه ' + unfixed.length + ' سؤال اختيارات من غير إجابة محددة — حدد الإجابة الصحيحة (دوس على الحرف A/B/C/D) لكل واحد فيهم الأول')
+      return
+    }
+    setSaving(true); setStatusMsg('جاري الحفظ في قاعدة البيانات...')
+    try {
+      /* (و50) إنقاذ أخير قبل الحفظ: أي رسمة ناقصة بتتقص من السيرفر أوتوماتيك —
+         الحفظ عمره ما يتحفظ برسمات ناقصة والمصدر موجود */
+      var qsForSave = extractedQuestions
+      /* (و53) القص من المتصفح الأول — من الملف الأصلي المفتوح بجودته الكاملة
+         (نفس جودة المحرر اليدوي) — والسيرفر إنقاذ للّي فات بس */
+      try {
+        var needClientCrop = false
+        extractedQuestions.forEach(function (q: any) {
+          if (!q) return
+          if (q.figure && q.figure.bbox && !q.figure.url) needClientCrop = true
+          if (Array.isArray(q.optionFigures)) q.optionFigures.forEach(function (of: any) { if (of && of.bbox && !of.url) needClientCrop = true })
+        })
+        var lcs = lastCropSourceRef.current || {}
+        if (needClientCrop && (lcs.file || lcs.doc)) {
+          setStatusMsg('بيجهز الرسمات بجودة عالية قبل الحفظ…')
+          await ensureFigureUrls(extractedQuestions, { file: lcs.file || null, doc: lcs.doc || null })
+        }
+      } catch (ePre53) { /* الإنقاذ السيرفري بعد كده يغطي الناقص */ }
+      if (sourceMediaRef.current) {
+        var missingN = 0
+        extractedQuestions.forEach(function (q: any) {
+          if (!q) return
+          if (q.figure && q.figure.bbox && !q.figure.url) missingN++
+          if (Array.isArray(q.optionFigures)) q.optionFigures.forEach(function (of: any) { if (of && of.bbox && !of.url) missingN++ })
+        })
+        if (missingN > 0) {
+          setStatusMsg('بيجهز ' + missingN + ' رسمة من الملف الأصلي قبل الحفظ…')
+          try {
+            var rRes3 = await fetch('/api/crop-figures', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sourceMediaId: sourceMediaRef.current, questions: extractedQuestions }),
+            })
+            var dRes3 = await rRes3.json()
+            if (rRes3.ok && dRes3.success && Array.isArray(dRes3.questions)) {
+              qsForSave = dRes3.questions
+              setExtractedQuestions(dRes3.questions)
+              if (dRes3.figuresCrop && dRes3.figuresCrop.cropped > 0) {
+                toast.success('السيرفر جهز ' + dRes3.figuresCrop.cropped + ' رسمة قبل الحفظ ✓')
+              }
+            }
+          } catch (eRes3) { /* الحفظ يكمل زي ما هو */ }
+        }
+      }
+      var fd = new FormData()
+      fd.append('type', extractType); fd.append('grade', grade); fd.append('title', title)
+      fd.append('questions', JSON.stringify(qsForSave))
+      /* (و51) تخزين المصدر مع السجل نفسه — الـ backfill الشامل بيبقى يقدر
+         يرجع يقص أي رسمة ناقصة من الملف الأصلي في أي وقت بعد كده
+         (النوع الحقيقي بيتجاب من Media على السيرفر) */
+      if (sourceMediaRef.current) {
+        fd.append('filePath', '/api/files/' + sourceMediaRef.current)
+      }
+      /* (25-ب1) إعدادات الامتحان: إظهار الإجابات + المؤقت + موعد الظهور
+         (بتخزن من /api/ai/extract-and-save وبتتعدل لاحقًا من تاب الامتحانات) */
+      if (extractType === 'exam') {
+        fd.append('showResult', examShowResult ? 'true' : 'false')
+        fd.append('timeLimitMin', examTimeLimit.trim() === '' ? '0' : String(Math.max(0, Number(examTimeLimit) || 0)))
+      }
+      if (examScheduledAt.trim()) {
+        try { fd.append('scheduledAt', new Date(examScheduledAt).toISOString()) } catch (e) {}
+      }
+      var res = await fetch('/api/ai/extract-and-save', { method: 'POST', body: fd })
+      var data = await res.json()
+      if (res.ok && data.success) { toast.success(data.message || 'تم الحفظ بنجاح!'); onRefresh(); resetAll() }
+      else { toast.error(data.error || 'خطا في الحفظ') }
+    } catch (err: any) { toast.error('خطا في الاتصال: ' + (err.message || '')) }
+    setSaving(false); setStatusMsg('')
+  }
+
+  var getYtId = function(url: string) {
+    var m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/|v\/))([\w-]{11})/)
+    return m ? m[1] : null
+  }
+
+  /* ===== (2026-و40) وضع الكتاب ===== */
+  var handleBookFile = async function(f: File | null) {
+    setBookFile(f); bookDocRef.current = null; setBookNumPages(0); setBookFrom(1); setBookTo(1)
+    if (!f) return
+    setBookPdfLoading(true)
+    try {
+      var opened = await openPdf(f)
+      bookDocRef.current = opened.doc
+      setBookNumPages(opened.numPages)
+      toast.success('اتفتح الكتاب — عدد الصفحات: ' + opened.numPages)
+    } catch (e: any) {
+      toast.error('مقدرتش أفتح ملف الـ PDF: ' + (e.message || ''))
+    }
+    setBookPdfLoading(false)
+  }
+
+  /* (و45 بطلب المستر) وضع الكتاب بلينك: «أو ضع رابط PDF» — التحميل بيتم من
+     خلال /api/books/proxy (نفس بروكسي الكتب: حماية SSRF + سقف 250MB + حل CORS)
+     والملف بيتحول File وبيفتح في نفس pipeline وضع الكتاب بالظبط (openPdf).
+     الملف المحلي لو موجود بياخد الأسبقية — واللينك مكتوب في bookUrl زي ما هو. */
+  var openBookFromLink = async function () {
+    var link = bookUrl.trim()
+    if (!link || bookLinkLoading) return
+    if (!/^https?:\/\//i.test(link)) { toast.error('الرابط لازم يبدأ بـ http أو https'); return }
+    if (bookFile) { toast.error('فيه ملف محلي مختار — الملف بياخد الأسبقية. امسحه الأول لو عايز تفتح الرابط'); return }
+    setBookLinkLoading(true)
+    try {
+      var res = await fetch('/api/books/proxy?url=' + encodeURIComponent(link), { cache: 'no-store' })
+      if (!res.ok) {
+        var je: any = null
+        try { je = await res.json() } catch (e) {}
+        throw new Error((je && je.error) || 'مقدرتش أجيب الملف من الرابط (كود ' + res.status + ') — اتأكد إن الرابط شغال ومباشر')
+      }
+      var blob = await res.blob()
+      if (blob.size === 0) throw new Error('الملف اللي جاي من الرابط فاضي — اتأكد إن الرابط بيوصل للملف مباشرة')
+      var file = new File([blob], 'book-' + Date.now() + '.pdf', { type: 'application/pdf' })
+      setBookFile(file); bookDocRef.current = null; setBookNumPages(0); setBookFrom(1); setBookTo(1)
+      var opened = await openPdf(file)
+      bookDocRef.current = opened.doc
+      setBookNumPages(opened.numPages)
+      setBookName(''); setTitle(function (t: string) { return t || 'كتاب من رابط' })
+      setBookFrom(1); setBookTo(Math.min(opened.numPages, 30))
+      toast.success('اتفتح الكتاب من الرابط — عدد الصفحات: ' + opened.numPages + ' — حدد الصفحات واضغط استخراج')
+    } catch (e: any) {
+      toast.error('الرابط ما اتنفذش: ' + (e && e.message ? e.message : 'حصلت مشكلة'))
+    }
+    setBookLinkLoading(false)
+  }
+
+  /* (2026-و44) قايمة الكتب المحفوظة (من تاب الكتب والملازم — ملف أو لينك خارجي)
+     اللينك الخارجي بيمر من /api/books/proxy (pdf.js مش بيوصل للينكات بسبب CORS) */
+  var loadSavedBooks = async function () {
+    setSavedBooksLoading(true)
+    try {
+      var r = await fetch('/api/books', { cache: 'no-store' })
+      var j = await r.json()
+      setSavedBooks(j.books || [])
+    } catch (e) { /* صامت */ }
+    setSavedBooksLoading(false)
+  }
+  var openSavedBook = async function (b: any) {
+    if (bookPdfLoading) return
+    setBookPdfLoading(true)
+    try {
+      var blob: Blob | null = null
+      if (b.sourceUrl) {
+        var res = await fetch('/api/books/proxy?url=' + encodeURIComponent(b.sourceUrl), { cache: 'no-store' })
+        if (!res.ok) {
+          var je: any = null
+          try { je = await res.json() } catch (e) {}
+          throw new Error((je && je.error) || 'مقدرتش أجيب الكتاب من اللينك — اتأكد إن اللينك شغال')
+        }
+        blob = await res.blob()
+      } else if (b.filePath) {
+        var res2 = await fetch(b.filePath, { cache: 'no-store' })
+        if (!res2.ok) throw new Error('مقدرتش أجيب ملف الكتاب')
+        blob = await res2.blob()
+      } else {
+        throw new Error('الكتاب ده من غير ملف ولا لينك')
+      }
+      var file = new File([blob], (b.title || 'book') + '.pdf', { type: 'application/pdf' })
+      setBookFile(file)
+      setBookName(b.title || '')
+      var opened = await openPdf(file)
+      bookDocRef.current = opened.doc
+      setBookNumPages(opened.numPages)
+      setBookFrom(1)
+      setBookTo(Math.min(opened.numPages, 30))
+      toast.success('اتفتح «' + (b.title || 'الكتاب') + '» — ' + opened.numPages + ' صفحة — حدد الصفحات واضغط استخراج من الصفحات')
+      setShowSavedBooks(false)
+    } catch (e: any) {
+      toast.error(e && e.message ? e.message : 'حصلت مشكلة في فتح الكتاب')
+    }
+    setBookPdfLoading(false)
+  }
+
+  /* مفتاح منع التكرار: نص السؤال مطبّع (فراغات/ترقيم/طول 120) */
+  var bookQuestionKey = function(q: any) {
+    return String((q && (q.question || q.q)) || '').toLowerCase().replace(/\s+/g, ' ').replace(/[^\u0600-\u06FFa-z0-9]/g, '').substring(0, 120)
+  }
+
+  var handleExtractBook = async function() {
+    if (!canExtractBook || extracting) return
+    var doc = bookDocRef.current
+    if (!doc) { toast.error('افتح ملف الكتاب الأول'); return }
+    var from = bookFrom, to = bookTo
+    var total = to - from + 1
+    var CHUNK = 5
+    var chunks = Math.ceil(total / CHUNK)
+    setExtracting(true)
+    try {
+      var collected: any[] = []
+      var seenKeys: any = {}
+      var skippedChunks = 0
+      for (var c = 0; c < chunks; c++) {
+        var cFrom = from + c * CHUNK
+        var cTo = Math.min(to, cFrom + CHUNK - 1)
+        setStatusMsg('جاري قراءة الصفحات ' + cFrom + '–' + cTo + '… (' + (c + 1) + '/' + chunks + ')')
+        var pages: any[] = []
+        for (var pn = cFrom; pn <= cTo; pn++) {
+          /* (و52) 1700/0.85 — نفس الصور مصدر للقص السيرفري */
+          var img = await renderPageToJpeg(doc, pn, 1700, 0.85)
+          pages.push({ n: pn, image: img })
+        }
+        var extractedChunk: any = null
+        for (var attempt = 0; attempt < 2 && !extractedChunk; attempt++) {
+          try {
+            var ctrlB = new AbortController()
+            var tmrB = setTimeout(function() { ctrlB.abort() }, 180000)
+            var resB = await fetch('/api/ai-extract-pages', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ pages: pages, mode: 'all', bookTitle: bookName.trim() }),
+              signal: ctrlB.signal,
+            })
+            clearTimeout(tmrB)
+            var dataB = await resB.json()
+            if (resB.ok && dataB.extracted) extractedChunk = dataB.extracted
+          } catch (eB: any) {
+            if (eB && eB.name === 'AbortError') throw eB
+          }
+          if (!extractedChunk && attempt === 0) await new Promise(function (r) { setTimeout(r, 1200) })
+        }
+        if (!extractedChunk) { skippedChunks++; continue }
+        var qs = extractedChunk.questions || []
+        for (var qi = 0; qi < qs.length; qi++) {
+          var key = bookQuestionKey(qs[qi])
+          if (key && seenKeys[key]) continue
+          if (key) seenKeys[key] = true
+          collected.push(qs[qi])
+        }
+      }
+      /* أهم N سؤال: اختيار عابر للدفعات — نداء نص-only واحد على نفس المسار */
+      if (bookMode === 'top' && collected.length > bookCount) {
+        setStatusMsg('جاري اختيار أهم ' + bookCount + ' سؤال…')
+        var picked: any[] | null = null
+        try {
+          var ctrlS = new AbortController()
+          var tmrS = setTimeout(function() { ctrlS.abort() }, 180000)
+          var resS = await fetch('/api/ai-extract-pages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ selectTop: { questions: collected, count: bookCount } }),
+            signal: ctrlS.signal,
+          })
+          clearTimeout(tmrS)
+          var dataS = await resS.json()
+          if (resS.ok && dataS.extracted && Array.isArray(dataS.extracted.questions) && dataS.extracted.questions.length > 0) picked = dataS.extracted.questions
+        } catch (eS: any) {
+          if (eS && eS.name === 'AbortError') throw eS
+        }
+        collected = picked || collected.slice(0, bookCount)
+      }
+      if (collected.length === 0) {
+        toast.error('مقدرتش أستخرج أسئلة من الصفحات دي — جرب نطاق تاني أو تأكد إن الصفحات فيها أسئلة مطبوعة واضحة')
+        setStatusMsg('')
+        setExtracting(false)
+        return
+      }
+      if (!title.trim() && !appendingFile) setTitle(bookName.trim() || ('كتاب — صفحات ' + from + '–' + to))
+      setStatusMsg('')
+      /* (2026-و40-w) قص الرسومات من مستند الكتاب المفتوح + دمج أكتر من ملف */
+      await finishExtraction(collected, { doc: doc, file: bookFile })
+      var okMsg = (appendingFile ? 'تمت إضافة ' : 'تم استخراج ') + collected.length + (appendingFile ? ' سؤال من الملف الجديد!' : ' سؤال من صفحات الكتاب!')
+      if (skippedChunks > 0) okMsg += ' (فشلت ' + skippedChunks + ' دفعة صفحات — جرب نطاقها تاني)'
+      toast.success(okMsg)
+    } catch (err: any) {
+      if (err && err.name === 'AbortError') { toast.error('انتهت مهلة الاستخراج - حاول مرة أخرى') }
+      else { toast.error('خطأ: ' + (err.message || '')) }
+      setStatusMsg('')
+    }
+    setExtracting(false)
+  }
+
+  var renderStep1 = function() {
+    return (
+      <div className="space-y-4">
+        <div className="text-center py-4">
+          <Sparkles className="h-10 w-10 text-purple-500 mx-auto mb-3" />
+          <h3 className="text-lg font-bold">استخراج الذكاء الاصطناعي</h3>
+          <p className="text-sm text-muted-foreground mt-1">ارفع ملف او استخرج من فيديو يوتيوب واحفظ الاسئلة مباشرة</p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <button type="button" onClick={function() { setExtractType('exam') }} className={"p-4 rounded-xl border-2 text-center transition-all " + (extractType === 'exam' ? 'border-primary bg-primary/5 shadow-md' : 'border-muted hover:border-primary/30')}>
+            <FileText className={"h-8 w-8 mx-auto mb-2 " + (extractType === 'exam' ? 'text-primary' : 'text-muted-foreground')} />
+            <p className={"font-bold text-sm " + (extractType === 'exam' ? 'text-primary' : '')}>امتحان</p>
+            <p className="text-[10px] text-muted-foreground mt-1">Exam</p>
+          </button>
+          <button type="button" onClick={function() { setExtractType('homework') }} className={"p-4 rounded-xl border-2 text-center transition-all " + (extractType === 'homework' ? 'border-primary bg-primary/5 shadow-md' : 'border-muted hover:border-primary/30')}>
+            <ClipboardList className={"h-8 w-8 mx-auto mb-2 " + (extractType === 'homework' ? 'text-primary' : 'text-muted-foreground')} />
+            <p className={"font-bold text-sm " + (extractType === 'homework' ? 'text-primary' : '')}>واجب</p>
+            <p className="text-[10px] text-muted-foreground mt-1">Homework</p>
+          </button>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium">الصف الدراسي *</Label>
+          <select value={grade} onChange={function(e) { setGrade(e.target.value) }} className="w-full h-10 rounded-lg border border-input bg-transparent px-3 text-sm">
+            <option value="">اختر الصف</option>
+            {GRADES.map(function(g) { return <option key={g} value={g}>{g}</option> })}
+          </select>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium">العنوان *</Label>
+          <Input value={title} onChange={function(e) { setTitle(e.target.value) }} placeholder={extractType === 'exam' ? 'مثال: امتحان الباب الاول' : 'مثال: واجب الكسور الاسبوعي'} />
+        </div>
+        <Button className="w-full" onClick={function() { if (canProceedStep1) setStep(2) }} disabled={!canProceedStep1}>التالي - اختيار المصدر</Button>
+      </div>
+    )
+  }
+
+  var renderStep2 = function() {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 mb-2">
+          <button type="button" onClick={function() { setStep(1) }} className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1"><X className="h-4 w-4" /> رجوع</button>
+          <div className="flex items-center gap-2 flex-1">
+            <Badge variant="outline" className={"text-xs " + (extractType === 'exam' ? 'border-blue-500/50 text-blue-600' : 'border-emerald-500/50 text-emerald-600')}>{extractType === 'exam' ? 'امتحان' : 'واجب'}</Badge>
+            <span className="text-sm font-medium truncate">{title}</span>
+            <Badge variant="secondary" className="text-xs">{grade}</Badge>
+          </div>
+        </div>
+        {/* (2026-و40-w) بانر وضع الإضافة: بنستخرج من ملف تاني والأسئلة هتتنضاف تحت الحالية */}
+        {appendingFile && (
+          <div className="p-2.5 rounded-lg border border-dashed border-primary/40 bg-primary/5 text-[11px] font-semibold text-primary">
+            ➕ بنضيف ملف تاني — الأسئلة الحالية ({extractedQuestions.length}) محفوظة، والجديدة هتتنزّل تحتها في آخر القايمة
+          </div>
+        )}
+        <div className="flex gap-2 p-1 rounded-lg bg-muted">
+          <button type="button" onClick={function() { setInputMode('file') }} className={"flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition-all " + (inputMode === 'file' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground')}>
+            <Upload className="h-4 w-4" /> رفع ملف
+          </button>
+          <button type="button" onClick={function() { setInputMode('youtube') }} className={"flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition-all " + (inputMode === 'youtube' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground')}>
+            <PlayCircle className="h-4 w-4" /> يوتيوب
+          </button>
+          {/* (2026-و40) وضع الكتاب — صفحات محددة من كتاب كبير */}
+          <button type="button" onClick={function() { setInputMode('book') }} className={"flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition-all " + (inputMode === 'book' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground')}>
+            <BookOpen className="h-4 w-4" /> كتاب
+          </button>
+        </div>
+
+        {/* (و51) إصلاح شامل — أسئلة قديمة اتحفظت ورسماتها ناقصة عند الطلاب */}
+        <button
+          type="button"
+          onClick={runBackfill}
+          disabled={backfillBusy}
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs font-medium hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors disabled:opacity-60"
+        >
+          {backfillBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wrench className="h-4 w-4" />}
+          {backfillBusy ? 'جاري فحص وإصلاح رسمات كل الأسئلة...' : '🛠 رسمة مش ظاهرة عند الطالب؟ دوس هنا — إصلاح شامل لكل الأسئلة القديمة'}
+        </button>
+
+        {inputMode === 'file' ? (
+          <div className="space-y-4">
+            {/* Questions file */}
+            <div className="p-4 rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 space-y-3">
+              <div className="text-center">
+                <Upload className="h-8 w-8 text-primary mx-auto mb-2" />
+                <p className="text-sm font-medium">ارفع ملف الأسئلة أو صورة</p>
+                <p className="text-[10px] text-muted-foreground">PDF, صورة, أو أي ملف يحتوي على الأسئلة</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,image/*" className="hidden" onChange={function(e) { setFile(e.target.files?.[0] || null); setFileUrl('') }} />
+                <Button type="button" variant="outline" onClick={function() { fileRef.current?.click() }} className="flex-1"><Upload className="h-4 w-4 ml-2" />{file ? file.name : 'اختر ملف الأسئلة من الجهاز'}</Button>
+              </div>
+              {file && <p className="text-xs text-muted-foreground text-center">{(file.size / 1024 / 1024).toFixed(1)} MB</p>}
+              <div className="flex items-center gap-3"><div className="flex-grow h-px bg-border" /><span className="text-[11px] text-muted-foreground">أو</span><div className="flex-grow h-px bg-border" /></div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">أو لصق رابط ملف الأسئلة</Label>
+                <Input placeholder="https://example.com/exam.pdf" value={fileUrl} onChange={function(e) { setFileUrl(e.target.value); if (e.target.value.trim()) { setFile(null) } }} dir="ltr" />
+              </div>
+            </div>
+
+            {/* (و48) ملف الإجابات الاختياري اتشال بطلب المستر — الاستخراج من ملف الأسئلة بس */}
+          </div>
+        ) : inputMode === 'youtube' ? (
+          <div className="p-4 rounded-xl border-2 border-dashed border-red-300 bg-red-50 dark:bg-red-950/20 space-y-3">
+            <div className="text-center">
+              <PlayCircle className="h-8 w-8 text-red-500 mx-auto mb-2" />
+              <p className="text-sm font-medium">استخراج من فيديو يوتيوب</p>
+              <p className="text-[10px] text-muted-foreground">الصق رابط فيديو يوتيوب وسيتم استخراج الاسئلة منه</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">رابط يوتيوب *</Label>
+              <Input placeholder="https://youtube.com/watch?v=..." value={youtubeUrl} onChange={function(e) { setYoutubeUrl(e.target.value) }} dir="ltr" />
+            </div>
+            {getYtId(youtubeUrl) && (
+              <div className="relative w-full aspect-video rounded-lg overflow-hidden border">
+                <Image src={'https://img.youtube.com/vi/' + getYtId(youtubeUrl) + '/mqdefault.jpg'} alt="YouTube thumbnail" fill className="object-cover" sizes="400px" unoptimized />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                  <PlayCircle className="h-12 w-12 text-white/80" />
+                </div>
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label className="text-xs">عدد الاسئلة المطلوبة</Label>
+              <div className="flex items-center gap-3">
+                <input type="range" min={3} max={30} value={numQuestions} onChange={function(e) { setNumQuestions(parseInt(e.target.value)) }} className="flex-1" />
+                <span className="text-sm font-bold text-primary w-8 text-center">{numQuestions}</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* ===== (2026-و40) وضع الكتاب — صفحات محددة من كتاب PDF كبير ===== */
+          <div className="p-4 rounded-xl border-2 border-dashed border-sky-400/40 bg-sky-50 dark:bg-sky-950/20 space-y-3">
+            <div className="text-center">
+              <BookOpen className="h-8 w-8 text-sky-500 mx-auto mb-2" />
+              <p className="text-sm font-medium">📚 كتاب — صفحات محددة</p>
+              <p className="text-[10px] text-muted-foreground">افتح كتاب PDF كبير وحدد الصفحات — المنصة تقراها صفحة صفحة وتستخرج الأسئلة بترتيب الكتاب</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <input ref={bookFileRef} type="file" accept=".pdf" className="hidden" onChange={function(e) { handleBookFile(e.target.files?.[0] || null) }} />
+              <Button type="button" variant="outline" onClick={function() { bookFileRef.current?.click() }} className="flex-1 border-sky-400/40 text-sky-700 dark:text-sky-400">
+                {bookPdfLoading ? <Loader2 className="h-4 w-4 ml-2 animate-spin" /> : <BookOpen className="h-4 w-4 ml-2" />}
+                {bookFile ? bookFile.name : 'اختر ملف الكتاب (PDF)'}
+              </Button>
+            </div>
+            {/* (و45 بطلب المستر) الاستخراج بملف أو لينك — في وضع الكتاب كمان:
+               لو الكتاب على لينك (Drive أو أي موقع) حط اللينك وهيتحمل من خلال
+               بروكسي المنصة (بيحل CORS) ويفتح زي الملف بالظبط — الملف لو متحط
+               بياخد الأسبقية. الملف الصغير الأسرع، واللينك أحسن للكتب الكبيرة */}
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-3"><div className="flex-grow h-px bg-sky-200" /><span className="text-[11px] text-muted-foreground">أو ضع رابط PDF</span><div className="flex-grow h-px bg-sky-200" /></div>
+              <div className="flex items-center gap-2">
+                <Input placeholder="https://drive.google.com/… أو https://example.com/book.pdf" value={bookUrl} onChange={function(e) { setBookUrl(e.target.value) }} dir="ltr" className="flex-1" />
+                <Button type="button" variant="outline" onClick={openBookFromLink} disabled={bookLinkLoading || !bookUrl.trim()} className="border-sky-400/40 text-sky-700 dark:text-sky-400 shrink-0">
+                  {bookLinkLoading ? <Loader2 className="h-4 w-4 ml-2 animate-spin" /> : <LinkIcon className="h-4 w-4 ml-2" />}
+                  افتح الرابط
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground">لو حطيت ملف ورابط، الملف هو اللي هيفتح. اللينك بيتحمل عن طريق المنصة (حماية + بلا مشاكل CORS) — مستحسن للكتب الكبيرة على Drive</p>
+            </div>
+            {/* (2026-و44) الكتب المحفوظة — سهم يفتح قايمة الكتب المضافة من تاب
+               «الكتب والملازم» (ملف أو لينك) — دوست على الكتاب يفتح وتحدد صفحاته */}
+            <div className="space-y-1.5">
+              <button type="button" onClick={function () { var next = !showSavedBooks; setShowSavedBooks(next); if (next && savedBooks.length === 0 && !savedBooksLoading) loadSavedBooks() }} className="w-full flex items-center justify-between rounded-md border border-sky-300/60 bg-white/70 dark:bg-transparent px-3 py-2 text-sm font-bold text-sky-700 dark:text-sky-300 hover:bg-sky-100/60 dark:hover:bg-sky-900/30 transition-colors cursor-pointer">
+                <span>📚 الكتب المحفوظة {savedBooks.length > 0 ? '(' + savedBooks.length + ')' : ''} — دوس على الكتاب يفتح على طول</span>
+                <ChevronDown className={'h-4 w-4 transition-transform' + (showSavedBooks ? ' rotate-180' : '')} />
+              </button>
+              {showSavedBooks && (
+                <div className="max-h-60 overflow-y-auto custom-scrollbar rounded-md border border-border">
+                  {savedBooksLoading ? (
+                    <div className="flex items-center justify-center py-4"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
+                  ) : savedBooks.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-4 px-3">مفيش كتب محفوظة — ضيف الكتب من تاب «الكتب والملازم» بالملف أو باللينك وهتلاقيها هنا ثابتة</p>
+                  ) : savedBooks.map(function (b: any) {
+                    var srcLabel = b.sourceUrl ? '🔗 لينك خارجي' : (b.filePath ? '📄 ملف محفوظ' : '')
+                    return (
+                      <button key={b.id} type="button" onClick={function () { openSavedBook(b) }} className="w-full text-right px-3 py-2 border-b border-border/50 last:border-0 hover:bg-muted/60 transition-colors cursor-pointer">
+                        <p className="text-xs font-bold truncate">📕 {b.title}</p>
+                        <p className="text-[10px] text-muted-foreground">{srcLabel}{b.grade ? ' — ' + b.grade : ''}</p>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+            {bookFile && <p className="text-xs text-muted-foreground text-center">{(bookFile.size / 1024 / 1024).toFixed(1)} MB</p>}
+            {bookNumPages > 0 && <p className="text-xs text-center font-medium text-sky-600 dark:text-sky-400">عدد صفحات الكتاب: {bookNumPages}</p>}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">من صفحة</Label>
+                <Input type="number" min={1} max={bookNumPages || undefined} value={bookFrom} onChange={function(e) { var v = parseInt(e.target.value) || 1; setBookFrom(v); if (bookTo < v) setBookTo(v) }} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">إلى صفحة</Label>
+                <Input type="number" min={1} max={bookNumPages || undefined} value={bookTo} onChange={function(e) { setBookTo(parseInt(e.target.value) || 1) }} />
+              </div>
+            </div>
+            {bookNumPages > 0 && (bookFrom < 1 || bookTo > bookNumPages || bookTo < bookFrom) && (
+              <p className="text-[11px] text-red-500">النطاق غير صحيح — الصفحات من 1 إلى {bookNumPages}</p>
+            )}
+            {bookPagesSelected > 30 && (
+              <p className="text-[11px] text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 p-2 rounded-md">اخترت {bookPagesSelected} صفحة — دي كتير. اشتغل على مراحل (مثلاً 1–30 وبعدين 31–60) عشان الذاكرة والوقت.</p>
+            )}
+            <div className="flex gap-2 flex-wrap">
+              <label className={"flex items-center gap-1.5 text-sm cursor-pointer p-2 rounded-md border " + (bookMode === 'all' ? 'border-primary bg-primary/5' : 'border-border')}>
+                <input type="radio" name="bookMode" checked={bookMode === 'all'} onChange={function() { setBookMode('all') }} />
+                كل الأسئلة في الصفحات
+              </label>
+              <label className={"flex items-center gap-1.5 text-sm cursor-pointer p-2 rounded-md border " + (bookMode === 'top' ? 'border-primary bg-primary/5' : 'border-border')}>
+                <input type="radio" name="bookMode" checked={bookMode === 'top'} onChange={function() { setBookMode('top') }} />
+                أهم
+                <Input type="number" min={1} max={100} value={bookCount} onClick={function(e) { e.stopPropagation() }} onChange={function(e) { setBookCount(Math.max(1, parseInt(e.target.value) || 10)) }} className="h-7 w-16 text-xs" />
+                سؤال
+              </label>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">اسم الكتاب (اختياري — بيتخزن كعنوان)</Label>
+              <Input placeholder="مثال: كتاب الشرح — الفصل الأول" value={bookName} onChange={function(e) { setBookName(e.target.value) }} />
+            </div>
+          </div>
+        )}
+        {statusMsg && <div className="flex items-center gap-2 p-3 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400"><Loader2 className="h-4 w-4 animate-spin" /><p className="text-sm">{statusMsg}</p></div>}
+        <Button className="w-full" size="lg" onClick={function() { if (inputMode === 'book') handleExtractBook(); else handleExtract() }} disabled={!canExtract || extracting}>
+          {extracting ? <Loader2 className="h-5 w-5 ml-2 animate-spin" /> : inputMode === 'book' ? <BookOpen className="h-5 w-5 ml-2" /> : <Sparkles className="h-5 w-5 ml-2" />}
+          {extracting ? 'جاري الاستخراج...' : (inputMode === 'book' ? 'استخراج من الصفحات' : (inputMode === 'youtube' ? 'استخراج من يوتيوب' : 'استخراج الاسئلة'))}
+        </Button>
+      </div>
+    )
+  }
+
+  var renderStep3 = function() {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={function() { setStep(2) }} className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1"><X className="h-4 w-4" /> رجوع</button>
+            <Badge variant="outline" className={"text-xs " + (extractType === 'exam' ? 'border-blue-500/50 text-blue-600' : 'border-emerald-500/50 text-emerald-600')}>{extractType === 'exam' ? 'امتحان' : 'واجب'}</Badge>
+            <span className="text-sm font-medium truncate">{title}</span>
+            <Badge variant="secondary" className="text-xs">{grade}</Badge>
+            {inputMode === 'youtube' && <Badge variant="outline" className="text-xs border-red-300 text-red-600"><PlayCircle className="h-3 w-3 ml-1" />يوتيوب</Badge>}
+          </div>
+          <Badge className="bg-purple-500/10 text-purple-600 dark:text-purple-400 border-0">{extractedQuestions.length} سؤال</Badge>
+          {/* (و50) بصمة الإصدار — المستر والأدمن يشوفوا فورًا إن الكود الجديد (القص السيرفري المضمون) هو الشغال */}
+          <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-0" title="نسخة القص السيرفري المضمون — الصور بتتحفظ من السيرفر حتى لو المتصفح فشل">و50 ✓</Badge>
+        </div>
+        <p className="text-xs text-muted-foreground">راجع الأسئلة المستخرجة وعدلها قبل الحفظ. اختر الإجابة الصحيحة بجانب كل اختيار للـ MCQ، أو راجع الإجابة النموذجية للأسئلة المقالية.</p>
+        {/* (2026-و40-w) زرار بارز في أعلى المراجعة: استخراج من ملف تاني — الأسئلة الجديدة بتتنضاف تحت الحالية (ممنوع الاستبدال) */}
+        {extractedQuestions.length > 0 && (
+          <button
+            type="button"
+            onClick={startAppendFile}
+            className="w-full flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-dashed border-primary/50 bg-primary/5 text-primary font-bold text-sm hover:bg-primary/10 transition-colors"
+          >
+            ➕ أضف ملف تاني — أسئلته هتتنزّل تحت الحالية
+          </button>
+        )}
+        {statusMsg && <div className="flex items-center gap-2 p-3 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400"><Loader2 className="h-4 w-4 animate-spin" /><p className="text-sm">{statusMsg}</p></div>}
+        {/* (و49) بانر صريح لو أي رسمة فضلت من غير صورة — ممنوع الفشل الصامت:
+           المستر كان بيقول «بيقول في صورة بس مش شايفها» من غير ما يعرف يعمل إيه */}
+        {function () {
+          var missingFigs = 0
+          extractedQuestions.forEach(function (q: any) {
+            if (!q) return
+            if (q.figure && q.figure.bbox && !q.figure.url) missingFigs++
+            if (Array.isArray(q.optionFigures)) q.optionFigures.forEach(function (of: any) { if (of && of.bbox && !of.url) missingFigs++ })
+          })
+          if (missingFigs === 0) return null
+          return (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-400/40 text-amber-700 dark:text-amber-400">
+              <span className="text-base leading-none mt-0.5">📐</span>
+              <div className="text-xs space-y-1">
+                <p className="font-bold">{missingFigs} رسمة لسه مظهرتش — دوس «📐 الرسمة مش ظاهرة؟ دوس هنا» جنب السؤال وإتقص تاني من الملف الأصلي فورًا، أو «✂️ عدّل القص» وحددها بإيدك.</p>
+                <p className="opacity-80">لو فضلت ظاهرة بعد المحاولة، ارفع الصورة يدوي بـ 📷 جنب كل اختيار أو السؤال — الصور بتنحفظ وتوصل للطلاب طبيعي.</p>
+              </div>
+            </div>
+          )
+        }()}
+        <div className="space-y-3 max-h-[500px] overflow-y-auto custom-scrollbar">
+          {extractedQuestions.map(function(q, qi) {
+            var qType = isWritingQuestion(q) ? 'writing' : 'mcq' /* (و45) اختيارات صور = اختياري */
+            /* (2026-و40-w) فاصل خفيف بين مجموعات الملفات (srcName بيتبدل) */
+            var prevSrc = qi > 0 ? String(extractedQuestions[qi - 1].srcName || '') : ''
+            var curSrc = String(q.srcName || '')
+            var showFileDivider = qi > 0 && prevSrc !== curSrc
+            var hasTablePreview = !!(q.table && Array.isArray(q.table.rows) && q.table.rows.length > 0)
+            /* (و43) معاينة الرسمة: bbox مقصوص آليًا أو url مرفوع يدويًا */
+            var hasFigurePreview = !!(q.figure && (q.figure.bbox || q.figure.url))
+            /* (و48) بادج الرسمة يشمل رسومات الاختيارات + هل في رسمات لسه من غير قص */
+            var hasOptFigures = Array.isArray(q.optionFigures) && q.optionFigures.some(function (of: any) { return of && (of.url || of.bbox) })
+            var hasMissingCrop = !!(q.figure && q.figure.bbox && !q.figure.url) || (Array.isArray(q.optionFigures) && q.optionFigures.some(function (of: any) { return of && of.bbox && !of.url }))
+            return (
+              <Fragment key={qi}>
+                {showFileDivider && (
+                  <div className="flex items-center gap-2 pt-1">
+                    <span className="h-px flex-1 bg-primary/20" />
+                    <span className="text-[10px] font-bold text-primary/70">{curSrc || ('الملف ' + (fileBatchCount))}</span>
+                    <span className="h-px flex-1 bg-primary/20" />
+                  </div>
+                )}
+            <div className="p-3 rounded-lg border bg-card space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-bold text-primary">سؤال {qi + 1}</span>
+                  <Badge variant="outline" className={"text-[9px] " + (qType === 'mcq' ? 'border-blue-500/40 text-blue-600' : 'border-amber-500/40 text-amber-600')}>{qType === 'mcq' ? 'اختيارات' : 'مقالي'}</Badge>
+                  <span className="text-[10px] text-muted-foreground">{q.points || 1} نقطة</span>
+                  {/* (2026-و40-w) بادج ورقة العمل: فيها جدول / فيها رسمة + صفحة المصدر */}
+                  {hasTablePreview && <Badge variant="outline" className="text-[9px] border-sky-500/40 text-sky-600">📋 فيها جدول</Badge>}
+                  {(hasFigurePreview || hasOptFigures) && <Badge variant="outline" className="text-[9px] border-violet-500/40 text-violet-600">📐 فيها رسمة</Badge>}
+                  {hasMissingCrop && (
+                    <button type="button" onClick={function() { retryCropQuestion(qi) }} disabled={retryingCrop} className="text-[9px] font-bold text-violet-600 dark:text-violet-400 border border-violet-400/50 rounded-full px-2 py-0.5 hover:bg-violet-500/10 disabled:opacity-50">
+                      {retryingCrop ? 'بيجهز…' : '📐 الرسمة مش ظاهرة؟ دوس هنا'}
+                    </button>
+                  )}
+                  {typeof q.sourcePage === 'number' && q.sourcePage > 0 && (
+                    <Badge variant="outline" className="text-[9px] border-amber-500/40 text-amber-600">صفحة {q.sourcePage}{curSrc ? ' — ' + curSrc : ''}</Badge>
+                  )}
+                    {/* (استخراج أدق 2026-و10) تحذير صريح للأسئلة اللي الـ AI ماقدرش
+                       يقرا إجابتها من ورقة الإجابات بثقة — ممنوع تخرج عشوائية */}
+                    {qType === 'mcq' && (q.needsReview || q.correct === -1 || q.correct === undefined) && (
+                      <Badge variant="outline" className="text-[9px] border-red-500/50 bg-red-500/10 text-red-600">⚠ مش متأكد من الإجابة — ثبّتها بإيدك</Badge>
+                    )}
+                    {q.keyQuote && (
+                      <Badge variant="outline" className="text-[9px] border-emerald-500/40 text-emerald-600" title="النص المقروء حرفياً من ورقة الإجابات">📄 من المفتاح: {String(q.keyQuote).slice(0, 24)}</Badge>
+                    )}
+                  </div>
+                  <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive" onClick={function() { deleteQuestion(qi) }}><Trash2 className="h-3 w-3" /></Button>
+                </div>
+                <Input value={q.question || ''} onChange={function(e) { updateQuestion(qi, 'question', e.target.value) }} placeholder="نص السؤال..." className="text-sm" />
+                {hasMathMarkup(q.question || '') && (
+                  <div className="p-2 rounded-md bg-primary/5 border border-primary/20">
+                    <p className="text-[9px] font-semibold text-muted-foreground mb-1">👁 معاينة عرض الطالب:</p>
+                    <p className="text-sm text-foreground" dir="ltr" style={{ textAlign: 'left' }}><FractionText text={q.question || ''} /></p>
+                  </div>
+                )}
+
+                {/* (2026-و40-w) معاينة الجدول (الخانات المظللة الطالب يكتبها) + الرسمة المقصوصة
+                    (2026-و55) + محرر الجدول: المستر يعدل العناوين والخلايا ويمسح ويكتب */}
+                {hasTablePreview && (
+                  <div className="p-2 rounded-md bg-sky-500/5 border border-sky-500/20">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <p className="text-[9px] font-semibold text-muted-foreground">📋 الجدول — الخانات المظللة الطالب يكتبها:</p>
+                      <button type="button" onClick={function() { setTableEditQi(function(prev: number) { return prev === qi ? -1 : qi }) }} className="text-[9px] font-bold text-sky-600 dark:text-sky-400 hover:underline">
+                        {tableEditQi === qi ? '▴ إقفال المحرر' : '✏️ عدّل الجدول'}
+                      </button>
+                    </div>
+                    {tableEditQi === qi ? (
+                      <WorksheetTableEditor table={q.table} onChange={function(t: any) { updateQuestion(qi, 'table', t) }} />
+                    ) : (
+                      <WorksheetTableReadonly table={q.table} />
+                    )}
+                  </div>
+                )}
+                {hasFigurePreview && (
+                  <div className="p-2 rounded-md bg-violet-500/5 border border-violet-500/20">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[9px] font-semibold text-muted-foreground mb-1">📐 رسمة السؤال:</p>
+                      <div className="flex items-center gap-2">
+                        {/* (و52) محرر قص يدوي — أي قص أوتوماتيك طلع ناقص/متلخبط يتظبط بإيد المستر في ثواني */}
+                        <button type="button" onClick={function() { setCropEdit({ qi: qi, kind: 'q', oi: -1, page: parseInt(String((q.figure && q.figure.page) || q.sourcePage || 1), 10) || 1, bbox: (q.figure && q.figure.bbox) || null }) }} className="text-[9px] font-bold text-violet-600 dark:text-violet-400 hover:underline">✂️ عدّل القص</button>
+                        {/* (و43) إزالة الرسمة المرفوعة يدويًا */}
+                        {q.figure && q.figure.url && (
+                          <button type="button" onClick={function() { updateQuestion(qi, 'figure', null) }} className="mb-1 text-[9px] text-destructive hover:underline">✕ إزالة</button>
+                        )}
+                      </div>
+                    </div>
+                    <WorksheetFigure figure={q.figure} />
+                  </div>
+                )}
+
+                {/* (و45 بطلب المستر) تحذير «السؤال ده محتاج رسم» اتلغى خالص —
+                   كان بينبّه غلط على أسئلة مش محتاجة رسمة. القص أوتوماتيك شغال،
+                   وزرار 📷 لرفع رسمة السؤال يدويًا لسه موجود اختياريًا تحت. */}
+                {!q.figure && (
+                  <label className="inline-flex items-center gap-1 mt-1 cursor-pointer text-[11px] text-muted-foreground hover:text-foreground transition-colors">
+                    📷 رفع رسمة للسؤال (اختياري)
+                    <input type="file" accept="image/*" hidden onChange={function(e) { var f = e.target.files && e.target.files[0]; e.target.value = ''; uploadQuestionFigure(qi, f) }} />
+                  </label>
+                )}
+
+                {qType === 'mcq' ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(q.options || []).map(function(opt, oi) {
+                        /* (و43) صورة الاختيار المرفوعة (optionFigures[i] = { url })
+                           (و45 بطلب المستر) مفيش أي تنبيه أو إلزام لصور الاختيارات —
+                           زرار 📷 بقى أداة اختيارية بس: مفيش كهرماني ولا نبض ولا تحذير */
+                        var ofImg = q.optionFigures && q.optionFigures[oi]
+                        return (
+                          <div key={oi} className="space-y-1">
+                            <div className="flex items-center gap-1.5">
+                              <button type="button" className={"w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] transition-colors " + (q.correct === oi ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/30 hover:border-primary/50')} onClick={function() { updateQuestion(qi, 'correct', oi) }}>{String.fromCharCode(65 + oi)}</button>
+                              <Input value={opt} onChange={function(e) { updateQuestion(qi, 'option_' + oi, e.target.value) }} placeholder={"اختيار " + (oi + 1)} className="h-8 text-xs" />
+                              {/* (و43) زرار رفع صورة للاختيار — أداة اختيارية بالكامل (و45) */}
+                              <label title="رفع صورة للاختيار (اختياري)"
+                                className="shrink-0 h-8 px-1.5 inline-flex items-center justify-center rounded-md border border-border text-[11px] cursor-pointer transition-colors hover:bg-muted">
+                                📷
+                                <input type="file" accept="image/*" hidden onChange={function(e) { var f = e.target.files && e.target.files[0]; e.target.value = ''; uploadOptionFigure(qi, oi, f) }} />
+                              </label>
+                              {/* (و52) ✂️ تعديل قص رسمة الاختيار — لما القص الأوتوماتيك يطلع ناقص أو متلخبط */}
+                              {ofImg && (ofImg.url || ofImg.bbox) && (
+                                <button type="button" title="تعديل قص رسمة الاختيار"
+                                  onClick={function() { setCropEdit({ qi: qi, kind: 'of', oi: oi, page: parseInt(String(ofImg.page || q.sourcePage || 1), 10) || 1, bbox: ofImg.bbox || null }) }}
+                                  className="shrink-0 h-8 px-1.5 inline-flex items-center justify-center rounded-md border border-violet-400/50 text-[11px] transition-colors hover:bg-violet-500/10">✂️</button>
+                              )}
+                            </div>
+                            {ofImg && ofImg.url && (
+                              <span className="relative inline-flex pr-6">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={ofImg.url} alt="صورة الاختيار" className="h-10 rounded border border-border bg-white object-contain" />
+                                <button type="button" title="إزالة صورة الاختيار" onClick={function() { removeOptionFigure(qi, oi) }} className="absolute top-0 right-0 h-4 w-4 rounded-full bg-destructive text-white text-[9px] leading-none flex items-center justify-center">✕</button>
+                              </span>
+                            )}
+                            {/* (و48) رسمة اختيار من غير قص: placeholder واضح بدل ما تختفي —
+                               المستر كان بيقول «بيقول لي إن في صورة بس مش أوصل للصورة»
+                               — كده شايف إن في رسمة + زرار القص فوق يجيبه */}
+                            {ofImg && ofImg.bbox && !ofImg.url && (
+                              <div className="flex items-center justify-center rounded-md border-2 border-dashed border-violet-300 dark:border-violet-700 bg-violet-50/60 dark:bg-violet-950/20 text-violet-500 dark:text-violet-400 text-[10px] font-semibold px-2 py-1.5 text-center">
+                                📐 رسمة الاختيار {String.fromCharCode(65 + oi)} — صفحة {parseInt(String((ofImg.page) || q.sourcePage || 1), 10) || 1}
+                              </div>
+                            )}
+                            {hasMathMarkup(opt || '') && (
+                              <p className="text-xs text-foreground pr-6" dir="ltr" style={{ textAlign: 'left' }}><FractionText text={opt || ''} /></p>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                    {q.modelAnswer && (
+                      <div className="mt-1 p-2 rounded-md bg-muted/40 border border-border/30">
+                        <p className="text-[10px] font-semibold text-muted-foreground mb-0.5">الإجابة النموذجية:</p>
+                        <p className="text-xs text-foreground whitespace-pre-wrap" dir="auto"><FractionText text={q.modelAnswer} /></p>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-[10px] text-muted-foreground">النقاط</Label>
+                        <Input type="number" min={1} value={q.points || 5} onChange={function(e) { updateQuestion(qi, 'points', parseInt(e.target.value) || 5) }} className="h-8 text-xs" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] text-muted-foreground">الإجابات المقبولة (مفصولة بفاصلة)</Label>
+                        <Input value={(q.acceptedAnswers || []).join('، ')} onChange={function(e) { updateQuestion(qi, 'acceptedAnswers', e.target.value.split('،').map(function(s: string) { return s.trim() }).filter(Boolean)) }} placeholder="مثال: 5, x=5, x = 5" className="h-8 text-xs" dir="ltr" />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">الإجابة النموذجية (خطوة بخطوة)</Label>
+                      <MathKeyboard
+                        value={q.modelAnswer || ''}
+                        onChange={function(val: string) { updateQuestion(qi, 'modelAnswer', val) }}
+                        placeholder="Write the full solution step by step..."
+                        rows={3}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+              </Fragment>
+            )
+          })}
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={addQuestion}><Plus className="h-4 w-4 ml-1" />إضافة سؤال اختيارات</Button>
+          <Button variant="outline" size="sm" onClick={addWritingQuestion} className="border-amber-500/50 text-amber-600 hover:bg-amber-500/10"><Plus className="h-4 w-4 ml-1" />إضافة سؤال مقالي</Button>
+        </div>
+        {/* ===== (25-ب1) إعدادات الامتحان قبل الحفظ — طلبات المستر:
+             سوتش إظهار الإجابات (افتراضي مطفأ) + المؤقت بالدقائق + موعد الظهور ===== */}
+        {extractType === 'exam' && (
+          <div className="space-y-3 p-3 rounded-lg border border-dashed border-emerald-400/50 bg-emerald-500/5">
+            <div>
+              <Label className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">إعدادات الامتحان</Label>
+              <p className="text-[10px] text-muted-foreground mt-0.5">تقدر تعدلها في أي وقت لاحقًا من تاب «الامتحانات»</p>
+            </div>
+            <div className="flex items-center justify-between gap-3 p-2 rounded-lg border bg-background">
+              <div className="min-w-0">
+                <p className="text-xs font-medium">إظهار الإجابات للطالب بعد التسليم</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {examShowResult
+                    ? 'الطالب هيشوف نتيجة الاختياري والأخطاء فور التسليم'
+                    : 'الطالب هيشوف «انتظر النتيجة من المستر» فقط (افتراضي)'}
+                </p>
+              </div>
+              <Switch checked={examShowResult} onCheckedChange={function (v) { setExamShowResult(v) }} />
+            </div>
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">مدة الامتحان بالدقائق (اختياري)</Label>
+                <Input type="number" min={1} value={examTimeLimit}
+                  onChange={function (e) { setExamTimeLimit(e.target.value) }}
+                  placeholder="بلا وقت" className="w-36 h-8 text-xs" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">موعد ظهور الامتحان للطلاب (اختياري)</Label>
+                <Input type="datetime-local" value={examScheduledAt}
+                  onChange={function (e) { setExamScheduledAt(e.target.value) }}
+                  placeholder="يظهر فورًا" className="h-8 text-xs" />
+              </div>
+              {examScheduledAt && (
+                <Button type="button" variant="ghost" size="sm" className="h-8 text-[11px] text-destructive"
+                  onClick={function () { setExamScheduledAt('') }}>إلغاء الموعد (يظهر فورًا)</Button>
+              )}
+            </div>
+          </div>
+        )}
+        <div className="flex gap-2 pt-2">
+          <Button className="flex-1" onClick={handleSave} disabled={saving || extractedQuestions.length === 0}>
+            {saving ? <Loader2 className="h-4 w-4 ml-1 animate-spin" /> : <Save className="h-4 w-4 ml-1" />}
+            {saving ? 'جاري الحفظ...' : 'حفظ في قاعدة البيانات'}
+          </Button>
+          <Button variant="outline" onClick={resetAll}>الغاء</Button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg flex items-center gap-2"><Sparkles className="h-5 w-5 text-purple-500" />استخراج الذكاء الاصطناعي | AI Extraction</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center justify-center gap-2 mb-6">
+          {[1, 2, 3].map(function(s) {
+            var isActive = step === s
+            var isDone = step > s
+            return (
+              <div key={s} className="flex items-center gap-2">
+                <div className={"w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors " + (isDone ? 'bg-emerald-500 text-white' : isActive ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}>{isDone ? <Check className="h-4 w-4" /> : s}</div>
+                {s < 3 && <div className={"w-12 h-0.5 " + (isDone ? 'bg-emerald-500' : 'bg-muted')} />}
+              </div>
+            )
+          })}
+        </div>
+        <div className="flex justify-center gap-6 mb-4 text-[10px] text-muted-foreground">
+          <span className={step >= 1 ? 'text-primary font-medium' : ''}>النوع والبيانات</span>
+          <span className={step >= 2 ? 'text-primary font-medium' : ''}>اختيار المصدر</span>
+          <span className={step >= 3 ? 'text-primary font-medium' : ''}>مراجعة وحفظ</span>
+        </div>
+        {step === 1 && renderStep1()}
+        {step === 2 && renderStep2()}
+        {step === 3 && renderStep3()}
+        {/* (و52) محرر قص الرسمات اليدوي — يشتغل من مصدر القص الأخير أو الملف المخزن على السيرفر */}
+        {cropEdit && (
+          <FigureCropEditor
+            target={cropEdit}
+            source={{ file: (lastCropSourceRef.current && lastCropSourceRef.current.file) || null, doc: (lastCropSourceRef.current && lastCropSourceRef.current.doc) || null }}
+            sourceMediaId={sourceMediaRef.current || ''}
+            onSaved={function (url, bbox, page) { applyFigureCrop(cropEdit, url, bbox, page) }}
+            onClose={function () { setCropEdit(null) }}
+          />
+        )}
+      </CardContent>
+    </Card>
+  )
+}

@@ -1,0 +1,369 @@
+import { create } from 'zustand'
+
+export type AppView =
+  | 'landing'
+  | 'auth-login'
+  | 'auth-register'
+  | 'student-pending'
+  | 'student-portal'
+  | 'admin-dashboard'
+  | 'student-payment'
+  | 'parent-login'
+  | 'parent-register'
+  | 'parent-portal'
+
+/* (2026-و37) حساب ولي الأمر — جلسة مستقلة عن الطالب (mg_parent في localStorage)
+   الوالد بيتربط بحساب ابنه بـ studentId وبيشوف متابعة نتايجه من غير ما يسجل دخول بجهاز ابنه */
+export interface ParentStudentInfo {
+  id: string
+  name: string
+  grade: string
+  status: string
+  isPaidAccess?: boolean
+}
+
+export interface ParentInfo {
+  id: string
+  name: string
+  phone: string
+  studentId: string
+  student?: ParentStudentInfo | null
+}
+
+export interface Student {
+  id: string
+  name: string
+  phone: string
+  grade: string
+  status: string
+  isPaidAccess: boolean
+  parentName: string
+  parentPhone: string
+  loginCount: number
+  lastLogin: string | null
+  watchedVideoCount?: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ExamResult {
+  id: string
+  examId: string
+  studentId: string
+  /* 2026-و12 — النتيجة ممنوعة على الطالب (طلب المستر) — الـ API للطالب
+     مبيرجعش درجات خالص، فالحقول دي بقت اختيارية */
+  score?: number
+  maxScore?: number
+  submittedAt: string
+  student?: { name: string; phone: string; grade: string; status: string }
+}
+
+export interface GalleryImage {
+  id: string
+  title: string
+  filePath: string
+  type: string
+  videoUrl: string
+  thumbnail?: string // (و45) صورة مصغرة لعناصر الفيديو (أوتوماتيك من اليوتيوب)
+  sortOrder: number
+  createdAt: string
+}
+
+export interface Admin {
+  id: string
+  email: string
+  name: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Video {
+  id: string
+  title: string
+  url: string
+  filePath: string
+  fileType: string
+  thumbnail: string
+  grade: string
+  price: number
+  createdAt: string
+}
+
+export interface Homework {
+  id: string
+  title: string
+  content: string
+  filePath: string
+  fileType: string
+  thumbnail: string
+  grade: string
+  createdAt: string
+}
+
+export interface Exam {
+  id: string
+  title: string
+  content: string
+  filePath: string
+  fileType: string
+  thumbnail: string
+  grade: string
+  createdAt: string
+}
+
+export interface Announcement {
+  id: string
+  title: string
+  content: string
+  grade: string
+  createdAt: string
+}
+
+export interface Discussion {
+  id: string
+  studentId: string
+  studentName: string
+  grade: string
+  content: string
+  isAdminReply: boolean
+  createdAt: string
+}
+
+export interface StudentActivity {
+  id: string
+  studentId: string
+  action: string
+  details: string
+  createdAt: string
+  student?: { name: string; grade: string; phone: string; status: string }
+}
+
+export const GRADES = [
+  'الصف السادس الابتدائي',
+  'أولى إعدادي',
+  'تانية إعدادي',
+  'تالتة إعدادي',
+  'أولى بكالوريا',
+] as const
+
+export const GRADE_SHORT_NAMES: Record<string, string> = {
+  'الصف السادس الابتدائي': 'G6',
+  'أولى إعدادي': '1',
+  'تانية إعدادي': '2',
+  'تالتة إعدادي': '3',
+  'أولى بكالوريا': '1B',
+}
+
+export const GRADES_EN = [
+  { ar: 'الصف السادس الابتدائي', en: 'Grade 6', icon: 'G6' },
+  { ar: 'أولى إعدادي', en: 'Prep 1', icon: '1' },
+  { ar: 'تانية إعدادي', en: 'Prep 2', icon: '2' },
+  { ar: 'تالتة إعدادي', en: 'Prep 3', icon: '3' },
+  { ar: 'أولى بكالوريا', en: '1 Bac', icon: '1B' },
+] as const
+
+// ============================================================
+// (24-b) الصفوف الدراسية الديناميكية — طلب المستر:
+// «أقدر أضيف صف، أمسح صف، أخلي الاسم بالعربي وبالإنجليزي
+// والإيموجي بتاعه اللي هو يظهر فوق الصورة»
+// DEFAULT_GRADES = نفس الصفوف الحالية في GRADES و GRADES_EN
+// (متلمةسش القايمتين دول عشان التوافق الخلفي مع باقي الكود)
+// ============================================================
+export interface GradeItem {
+  ar: string
+  en: string
+  emoji: string
+  short: string
+}
+
+export const DEFAULT_GRADES: GradeItem[] = [
+  { ar: 'الصف السادس الابتدائي', en: 'Grade 6', emoji: '6️⃣', short: 'G6' },
+  { ar: 'أولى إعدادي', en: 'Prep 1', emoji: '1️⃣', short: '1' },
+  { ar: 'تانية إعدادي', en: 'Prep 2', emoji: '2️⃣', short: '2' },
+  { ar: 'تالتة إعدادي', en: 'Prep 3', emoji: '3️⃣', short: '3' },
+  { ar: 'أولى بكالوريا', en: '1 Bac', emoji: '🅱️', short: '1B' },
+]
+
+// بتفك JSON من siteConfig.grades_data (المفتاح اللي لوحة الأدمن بتكتب فيه)
+// ولو فاشل/فاضي بترجّع DEFAULT_GRADES — كل شاشات العرض بتقرأ من هنا
+export function gradesFromConfig(siteConfig: SiteConfig | null | undefined): GradeItem[] {
+  try {
+    var raw = siteConfig ? siteConfig.grades_data : null
+    if (typeof raw === 'string' && raw.trim() !== '') {
+      var parsed = JSON.parse(raw)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        var items: GradeItem[] = []
+        for (var i = 0; i < parsed.length; i++) {
+          var g: any = parsed[i] || {}
+          items.push({
+            ar: typeof g.ar === 'string' ? g.ar : '',
+            en: typeof g.en === 'string' ? g.en : '',
+            emoji: typeof g.emoji === 'string' ? g.emoji : '',
+            short: typeof g.short === 'string' ? g.short : (typeof g.en === 'string' && g.en ? g.en : (typeof g.ar === 'string' ? g.ar : '')),
+          })
+        }
+        // لو في صف واحد على الأقل ليه اسم عربي نرجع القايمة، غير كده فولباك
+        var hasAny = false
+        for (var j = 0; j < items.length; j++) {
+          if (items[j].ar.trim() !== '') { hasAny = true; break }
+        }
+        if (hasAny) return items
+      }
+    }
+  } catch (e) { /* فولباك تحت */ }
+  return DEFAULT_GRADES
+}
+
+export interface Stats {
+  totalStudents: number
+  pendingStudents: number
+  approvedStudents: number
+  totalVideos: number
+  totalHomework: number
+  totalExams: number
+  totalAnnouncements: number
+  totalDiscussions: number
+  grades: string[]
+  pendingPayments?: number
+}
+
+export interface SiteConfig {
+  [key: string]: string
+}
+
+export interface SocialLinks {
+  social_facebook: string
+  social_whatsapp_channel: string
+  social_instagram: string
+  social_youtube: string
+}
+
+interface AppState {
+  currentView: AppView
+  setView: (view: AppView) => void
+
+  currentStudent: Student | null
+  setCurrentStudent: (student: Student | null) => void
+  currentParent: ParentInfo | null
+  setCurrentParent: (parent: ParentInfo | null) => void
+  currentAdmin: Admin | null
+  setCurrentAdmin: (admin: Admin | null) => void
+  isAdminLoggedIn: boolean
+  setAdminLoggedIn: (v: boolean) => void
+
+  showStudentLogin: boolean
+  setShowStudentLogin: (v: boolean) => void
+  showStudentRegister: boolean
+  setShowStudentRegister: (v: boolean) => void
+  showAdminLogin: boolean
+  setShowAdminLogin: (v: boolean) => void
+
+  adminTab: string
+  setAdminTab: (tab: string) => void
+  studentTab: string
+  setStudentTab: (tab: string) => void
+
+  siteConfig: SiteConfig
+  setSiteConfig: (config: SiteConfig) => void
+  configLoaded: boolean
+  setConfigLoaded: (v: boolean) => void
+
+  socialLinks: SocialLinks
+  setSocialLinks: (links: SocialLinks) => void
+
+  stats: Stats | null
+  setStats: (stats: Stats | null) => void
+
+  galleryImages: GalleryImage[]
+  setGalleryImages: (images: GalleryImage[]) => void
+
+  pendingPaymentVideo: { id: string; title: string; price: number; grade: string } | null
+  setPendingPaymentVideo: (v: { id: string; title: string; price: number; grade: string } | null) => void
+
+  logout: () => void
+}
+
+export const useAppStore = create<AppState>((set) => ({
+  currentView: 'landing',
+  setView: (view) => set({ currentView: view }),
+
+  currentStudent: null,
+  // ربط الجلسة بين الصفحات: /videos/[id] وصفحة الدفع بيبوا على localStorage
+  // (mg_student) لأنهم routes منفصلة والـ store بيتصفّر مع كل تحميل صفحة.
+  // من غير الحفظ ده: صفحة الفيديو بتفتح من غير هوية الطالب → مفيش ووترمارك
+  // باسمه + التقدم مش بيتحفظ + الفيديوهات المدفوعة بتبان مقفولة (مش بيفتح).
+  setCurrentStudent: (student) => {
+    try {
+      if (typeof window !== 'undefined') {
+        if (student) localStorage.setItem('mg_student', JSON.stringify(student))
+        else localStorage.removeItem('mg_student')
+      }
+    } catch (e) {}
+    set({ currentStudent: student })
+  },
+  currentAdmin: null,
+  setCurrentAdmin: (admin) => set({ currentAdmin: admin }),
+  currentParent: null,
+  // (2026-و37) جلسة ولي الأمر زي جلسة الطالب بالظبط: localStorage حتى ترجع
+  // بعد الـ reload من غير تسجيل دخول من الأول (نفس علاج مشكلة الخروج)
+  setCurrentParent: (parent) => {
+    try {
+      if (typeof window !== 'undefined') {
+        if (parent) localStorage.setItem('mg_parent', JSON.stringify(parent))
+        else localStorage.removeItem('mg_parent')
+      }
+    } catch (e) {}
+    set({ currentParent: parent })
+  },
+  isAdminLoggedIn: false,
+  setAdminLoggedIn: (v) => set({ isAdminLoggedIn: v }),
+
+  showStudentLogin: false,
+  setShowStudentLogin: (v) => set({ showStudentLogin: v }),
+  showStudentRegister: false,
+  setShowStudentRegister: (v) => set({ showStudentRegister: v }),
+  showAdminLogin: false,
+  setShowAdminLogin: (v) => set({ showAdminLogin: v }),
+
+  adminTab: 'students',
+  setAdminTab: (tab) => set({ adminTab: tab }),
+  studentTab: 'videos',
+  setStudentTab: (tab) => set({ studentTab: tab }),
+
+  siteConfig: {},
+  setSiteConfig: (config) => set({ siteConfig: config }),
+  configLoaded: false,
+  setConfigLoaded: (v) => set({ configLoaded: v }),
+
+  socialLinks: {
+    social_facebook: '',
+    social_whatsapp_channel: '',
+    social_instagram: '',
+    social_youtube: '',
+  },
+  setSocialLinks: (links) => set({ socialLinks: links }),
+
+  stats: null,
+  setStats: (stats) => set({ stats }),
+
+  galleryImages: [],
+  setGalleryImages: (images) => set({ galleryImages: images }),
+
+  pendingPaymentVideo: null,
+  setPendingPaymentVideo: (v) => set({ pendingPaymentVideo: v }),
+
+  logout: () =>
+    set({
+      currentStudent: null,
+      currentParent: null,
+      currentAdmin: null,
+      isAdminLoggedIn: false,
+      currentView: 'landing',
+      adminTab: 'students',
+      studentTab: 'videos',
+      showStudentLogin: false,
+      showStudentRegister: false,
+      showAdminLogin: false,
+      pendingPaymentVideo: null,
+    }),
+}))
