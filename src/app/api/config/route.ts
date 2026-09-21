@@ -43,7 +43,7 @@ var DEFAULTS = {
      (عربي + إنجليزي زي باقي نصوص الهيرو) */
   hero_cta_text: 'اعمل حسابك',
   hero_cta_text_en: 'Create Account',
-  hero_subtitle: 'نبسّط لك الرياضيات ونجعلها سهلة وممتعة! Algebra, Geometry, Formulas, Cheat Sheets — واجبات أسبوعية، امتحانات منتظمة، ومتابعة مستمرة لتقدّمك الأكاديمي.',
+  hero_subtitle: 'يبقى معايا الماث مش حفظ قوانين وخطوات بس — هيتعلم إزاي يفكر ويرتب ويحل بثقة. هنثبت له إن الماث لغة منطقية سهلة وممتعة، وهيبقى دايمًا مستعد لأي امتحان.',
   hero_subtitle_en: 'We make math simple and fun! Algebra, Geometry, Formulas, Cheat Sheets — weekly homework, regular exams, and continuous tracking of your academic progress.',
   hero_stat1_value: '8+',
   hero_stat1_label: 'صفوف دراسية',
@@ -67,7 +67,7 @@ var DEFAULTS = {
   schedule_badge: 'جدول الحصص الأسبوعي',
   schedule_badge_en: 'Weekly Class Schedule',
   schedule_footer_note: 'جميع المواعيد بتوقيت القاهرة. لو عندك أي استفسار عن موعد حصتك تواصل معنا عبر واتساب.',
-  schedule_brand: 'The Scholar in Math',
+  schedule_brand: 'Zicola In Math',
   schedule_data: '',
 
   // === Instructor ===
@@ -135,8 +135,8 @@ var DEFAULTS = {
   guide_badge_en: 'Learning Guide',
   guide_title: 'كيف تستخدم المنصة؟',
   guide_title_en: 'How to Use the Platform',
-  guide_subtitle: 'ست خطوات بسيطة لتبدأ رحلتك التعليمية في The Scholar in Math',
-  guide_subtitle_en: 'Six simple steps to begin your learning journey with The Scholar in Math',
+  guide_subtitle: 'ست خطوات بسيطة لتبدأ رحلتك التعليمية في Zicola In Math',
+  guide_subtitle_en: 'Six simple steps to begin your learning journey with Zicola In Math',
   guide_card1_title: 'تسجيل حسابك',
   guide_card1_title_en: 'Register',
   guide_card1_desc: 'أنشئ حسابك في المنصة بسرعة وسهولة. اختر صفّك الدراسي وابدأ رحلتك التعليمية فوراً.',
@@ -178,8 +178,8 @@ var DEFAULTS = {
   whatsapp_number: '201000000000',
 
   // === Footer ===
-  footer_brand: 'The Scholar in Math',
-  footer_brand_en: 'The Scholar in Math',
+  footer_brand: 'Zicola In Math',
+  footer_brand_en: 'Zicola In Math',
   footer_copyright: 'جميع الحقوق محفوظة لـ أدهم حواش',
   footer_copyright_en: 'All rights reserved to Adham Hawash',
 
@@ -220,11 +220,11 @@ export async function GET() {
     // بصلحه نهائيًا في قاعدة البيانات
     var brandKeys = ['navbar_brand', 'footer_brand', 'footer_copyright', 'guide_subtitle', 'schedule_brand']
     for (var b = 0; b < brandKeys.length; b++) {
-      /* (و70) أي قيمة مخزنة قديمة (Zicola Math / Zicola in Math / Maths Genius)
-         بتتصحح فورًا على القراءة إلى The Scholar in Math — والترحيل في
-         ensure-schema بصلحها نهائيًا في قاعدة البيانات */
+      /* (و73) أي قيمة مخزنة قديمة (Zicola Math / Zicola in Math / Maths Genius
+         / The Scholar in Math) بتتصحح فورًا على القراءة إلى «Zicola In Math»
+         — الاسم اللي طلبه المستر صراحةً — والترحيل في ensure-schema بصلحها نهائيًا */
       if (typeof map[brandKeys[b]] === 'string' && (map[brandKeys[b]].indexOf('Zicola') !== -1 || map[brandKeys[b]].indexOf('Math Genius') !== -1 || map[brandKeys[b]].indexOf('Maths Genius') !== -1)) {
-        map[brandKeys[b]] = map[brandKeys[b]].split('Zicola in Math').join('The Scholar in Math').split('Zicola Math').join('The Scholar in Math').split('Maths Genius').join('The Scholar in Math').split('Math Genius').join('The Scholar in Math')
+        map[brandKeys[b]] = map[brandKeys[b]].split('Zicola in Math').join('Zicola In Math').split('Zicola Math').join('Zicola In Math').split('Maths Genius').join('Zicola In Math').split('Math Genius').join('Zicola In Math').split('The Scholar in Math').join('Zicola In Math')
       }
     }
     /* (و73) تصحيح البراند القديم (الاختصار الغلط M بدل Mr) → «Mr. Ahmed Shaban» —
@@ -237,6 +237,11 @@ export async function GET() {
       if (typeof mv === 'string' && mv.indexOf(LEGACY_MISTAKE_BRAND) !== -1) {
         map[mrBrandKeys[m]] = mv.split(LEGACY_MISTAKE_BRAND).join(LEGACY_MISTER_BRAND)
       }
+    }
+    /* (و73) وصف الهيرو القديم المخلوط بكلمات إنجليزية → النص العربي النضيف
+       (القيمة الجديدة في DEFAULTS) — على القراءة عشان الإنتاج يتصحح لوحده */
+    if (typeof map['hero_subtitle'] === 'string' && map['hero_subtitle'].indexOf('Algebra, Geometry, Formulas') !== -1) {
+      map['hero_subtitle'] = DEFAULTS.hero_subtitle
     }
     /* (و73) عنوان الهيرو الأول «مستر الماث» — أي قيمة Zicola قديمة بتترجم على القراءة */
     if (typeof map['hero_title_line1'] === 'string' && map['hero_title_line1'].indexOf('Zicola') !== -1) {
@@ -294,7 +299,7 @@ export async function GET() {
     }
     /* (و71) اسم النافيبار/الفوتر — نفس الحماية للإنتاج */
     if (typeof map['navbar_brand'] === 'string' && (map['navbar_brand'].indexOf('مهندس الماث') !== -1 || map['navbar_brand'].indexOf('مصطفى') !== -1 || map['navbar_brand'].indexOf('حسام') !== -1 || map['navbar_brand'].indexOf('Mostafa') !== -1 || map['navbar_brand'].indexOf('Hossam') !== -1 || map['navbar_brand'].indexOf('Math Engineer') !== -1)) {
-      map['navbar_brand'] = 'The Scholar in Math'
+      map['navbar_brand'] = 'Zicola In Math'
     }
     var cfgKeys = Object.keys(map)
     for (var k = 0; k < cfgKeys.length; k++) {
@@ -307,7 +312,7 @@ export async function GET() {
         v = map[cfgKeys[k]]
       }
       if (v.indexOf('Mr. Sherif ElSayed') !== -1 || v.indexOf('مستر شريف السيد') !== -1 || v.indexOf('نصائح مستر أحمد شعبان') !== -1 || v.indexOf('Mr. Wael El-Khadiry') !== -1 || v.indexOf('مستر أحمد شعبان') !== -1) {
-        map[cfgKeys[k]] = v.split('Mr. Sherif ElSayed').join('The Scholar in Math').split('مستر شريف السيد').join('مستر أحمد شعبان').split('نصائح مستر أحمد شعبان').join('نصائح مستر أحمد شعبان').split('Mr. Wael El-Khadiry').join('The Scholar in Math').split('مستر أحمد شعبان').join('مستر أحمد شعبان')
+        map[cfgKeys[k]] = v.split('Mr. Sherif ElSayed').join('Zicola In Math').split('مستر شريف السيد').join('مستر أحمد شعبان').split('نصائح مستر أحمد شعبان').join('نصائح مستر أحمد شعبان').split('Mr. Wael El-Khadiry').join('Zicola In Math').split('The Scholar in Math').join('Zicola In Math').split('مستر أحمد شعبان').join('مستر أحمد شعبان')
       }
     }
     /* (و72) الهوية الجديدة للنافبار: «Zicola In Math» + تهجئة الاسم Shaban —

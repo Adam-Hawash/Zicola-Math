@@ -329,9 +329,10 @@ export default function HeroSection() {
                 </div>
               )}
 
-              {/* √x الأزرق التقيل — فوق يسار الصورة (يمين المستر في التكوين) */}
+              {/* √x الأزرق التقيل — فوق يسار الصورة (يمين المستر في التكوين)
+                  (و73-B2) dir=ltr عشان الرمز ما ينقلبش «x√» في الوضع العربي */}
               <div aria-hidden="true" className="absolute -top-4 right-0 sm:-right-5 z-20 pointer-events-none select-none">
-                <span className="inline-block text-5xl sm:text-6xl font-extrabold text-[#3b82f6] drop-shadow-[0_6px_18px_rgba(37,99,235,0.45)]" style={{ transform: 'rotate(-8deg)' }}>
+                <span dir="ltr" className="inline-block text-5xl sm:text-6xl font-extrabold text-[#3b82f6] drop-shadow-[0_6px_18px_rgba(37,99,235,0.45)]" style={{ transform: 'rotate(-8deg)' }}>
                   √x
                 </span>
               </div>
