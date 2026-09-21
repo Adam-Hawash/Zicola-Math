@@ -2,9 +2,9 @@
 import { NextResponse } from 'next/server'
 import { db, safeWrite } from '@/lib/db'
 
-/* (و75) الإيميل الافتراضي للأدمن بقى الإيميل الإنجليزي —
+/* (و76) طلب المستر: معرّف اللوحة zicolainmath26 من غير @gmail.com —
    رقم الهاتف 44444444444 بيفضل مقبول في اللوجين كمان (login/route.ts) */
-var DEFAULT_EMAIL = 'zicolainmath26@gmail.com'
+var DEFAULT_EMAIL = 'zicolainmath26'
 var DEFAULT_PASSWORD = 'zicola2026#'
 var DEFAULT_NAME = 'The Scholar in Math'
 

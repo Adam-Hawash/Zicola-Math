@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { callGemini, callGeminiStream, hasGeminiKey } from '@/lib/gemini'
+import { callGemini, streamGemini, hasGeminiKey } from '@/lib/gemini'
 import ZAI from 'z-ai-web-dev-sdk'
 /* (2026-و33) منقّي الرموز المشترك — نفس المكتبة اللي بتنضّف ملاحظات المصحح */
 import { sanitizeMathText, ENGLISH_TERMS_RULE } from '@/lib/math-sanitize'
@@ -17,6 +17,14 @@ export const maxDuration = 60
  *
  * جديد: تاريخ المحادثة (history) — المساعد بقى فاكر الكلام اللي فات
  * فالطالب مش محتاج يعيد كل حاجة من الأول كل رسالة.
+ *
+ * (و77) سرعة الرد: طلبات النصوص بس بتبعت Gemini بالاستريمينغ الحقيقي
+ * (streamGemini + onDelta) — أول كلمة بتوصل للطالب لحظة ما الموديل
+ * يكتبها بدل ما نستنى الرد كله وبعدين نعيد تشغيله بحروف.
+ *
+ * (و77) الشكاوى: اتلغت الشكاوى التلقائية نهائيًا — الشكوى بتتسجل بس
+ * لما الطالب يكتبها بنفسه من تاب/صفحة الشكاوى (نظام الشكاوى اليدوي
+ * زي ما هو بدون أي تغيير). المساعد بقى بوجّه الطالب لتكتبها بنفسه.
  * ------------------------------------------------------------ */
 var MAX_IMAGES = 4
 var MAX_B64_LENGTH = 7000000 // ~5MB binary after base64
@@ -25,52 +33,9 @@ var MAX_HISTORY = 10 // آخر 10 رسائل (5 أدوار) بتبني سياق 
 /* (و45) حارس طول الرسالة — طلب الحزمة: مفيش رسالة أطول من 2000 حرف */
 var MAX_MESSAGE = 2000
 
-/* ============================================================
- * الشكاوى التلقائية — لو الطالب قال للمساعد إن فيه مشكلة، الشكوى
- * بتتسجل في قسم الشكاوي تلقائي وبتوصل للمستر.
- *  1) المصدر الأساسي: وسم [[شكوى: ...]] اللي المساعد بيكتبه في آخر رده.
- *  2) احتياطي: كلمات مشاكل قوية واضحة في رسالة الطالب نفسها.
- * ============================================================ */
-var COMPLAINT_MARKER_RE = /\[\[شكوى[:：]([\s\S]*?)\]\]/
-var HARD_ISSUE_RE = /(فيديو|الفيديو|الفيدو|الوتيو)[^\n]{0,30}(مش ?(بيفتح|شغال|راضي|باين|موجود|نازل)|ما ?بيفتح|مقفول)|مش ?شغال|مش ?راضي ?(ي?فتح)?|مش ?باين|مش ?نازل|مش ?موجود|الباسورد مش|كلمة السر مش|الحساب (اتقفل|مقفول|اتسرق)|اتسرق حسابي|عاوز ?كلم ?المستر|عايز ?كلم ?المستر|مطلوب ?المستر|شكوى/
-
-function extractComplaint(text: string): { clean: string; summary: string } {
-  var m = COMPLAINT_MARKER_RE.exec(text || '')
-  var clean = String(text || '').replace(COMPLAINT_MARKER_RE, '').replace(/\n{3,}/g, '\n\n').trim()
-  return { clean: clean, summary: m ? String(m[1] || '').trim().slice(0, 300) : '' }
-}
-
 /* (2026-و33) منقّي رموز الرياضيات اتنقل للمكتبة المشتركة src/lib/math-sanitize.ts
    (sanitizeMathText مستورد فوق) — بيتنفذ على رد الموديل قبل العرض
    فالطالب ما يشوفش غير رموز المنصة النضيفة: كسور رأسية وأُس وجُذور */
-
-async function logAutoComplaint(studentId: string, studentMessage: string, summary: string) {
-  try {
-    if (!summary) return
-    var name = '', phone = '', grade = ''
-    if (studentId) {
-      var rows = await db.$queryRawUnsafe('SELECT name, phone, grade FROM Student WHERE id = ? LIMIT 1', studentId)
-      if (rows && rows.length > 0) { name = String(rows[0].name || ''); phone = String(rows[0].phone || ''); grade = String(rows[0].grade || '') }
-    }
-    var id = 'cmp_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
-    try {
-      await db.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS Complaint (
-        id TEXT PRIMARY KEY, studentId TEXT DEFAULT '', studentName TEXT DEFAULT '', phone TEXT DEFAULT '',
-        grade TEXT DEFAULT '', message TEXT NOT NULL, summary TEXT DEFAULT '', source TEXT NOT NULL DEFAULT 'student',
-        status TEXT NOT NULL DEFAULT 'new', reply TEXT DEFAULT '', reviewedAt DATETIME,
-        createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`)
-    } catch (e) {}
-    await db.$executeRawUnsafe(
-      `INSERT INTO Complaint (id, studentId, studentName, phone, grade, message, summary, source, status, reply, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'ai', 'new', '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-      id, studentId, name, phone, grade,
-      String(studentMessage || '').slice(0, 4000), String(summary).slice(0, 300)
-    )
-    console.log('[AI Assistant] complaint auto-logged for', name || studentId, ':', summary)
-  } catch (e: any) {
-    console.error('[AI Assistant] logAutoComplaint failed:', String((e && e.message) || e))
-  }
-}
 
 function buildImageParts(images: string[]): any[] {
   var parts: any[] = []
@@ -156,11 +121,8 @@ function buildSystemPrompt(platformName: string, subjectLine: string, persona: s
     '- مش عارف يبدأ؟ تلميحة صغيرة واحدة 💡 بدون الإجابة النهائية واطلب منه يحاول تاني.',
     '- الصورة مش رياضيات؟ ساعده عادي وباختصار.',
     '',
-    '## قاعدة الشكاوى والمشاكل التقنية (مهمة جدًا):',
-    '- لو الطالب قال أو واضح إن فيه مشكلة في المنصة نفسها — فيديو مش بيفتح أو مش شغال، واجب/امتحان مش باين أو مش نازل، حساب مقفول أو باسورد مش شغال، مشكلة في المشتريات أو الفلوس، أو أي عطل تقني أو شكوى من حاجة — واسيه بجد في كلامك، وقل له إن شكواه اتسجلت للمستر هيشوفها بإذن الله.',
-    '- وبعدها في **آخر ردك** اكتب في سطر لوحده الوسم ده للنظام بالظبط (مرة واحدة بس ولو فيه مشكلة حقيقية بس):',
-    '[[شكوى: وصف قصير للمشكلة في أقل من 15 كلمة]]',
-    '- متكتبش الوسم ده أبدًا لو الطالب بس بيسأل سؤال دراسي عادي أو يستفسر — بس لو فيه مشكلة حقيقية اكتبه من غير تفريط.',
+    '## قاعدة الشكاوى والمشاكل التقنية (و77 — بدون تسجيل تلقائي):',
+    '- لو الطالب حكى لك عن مشكلة تقنية في المنصة (فيديو مش بيفتح، واجب أو امتحان مش باين، حساب مقفول، مشكلة في الفلوس أو المشتريات أو أي عطل) — تعاطف معاه ووجّهه بلطف إنه يكتب الشكوى بنفسه من تاب «الشكاوى» في بوابته أو صفحة الشكاوى عشان توصل للمستر فورًا. ممنوع تقول له إن الشكوى اتسجلت منك.',
   ].join('\n')
 }
 
@@ -233,6 +195,11 @@ export async function POST(request: Request) {
     // ---------- نجرب المحركات بالترتيب ونرجّع أول واحد ينجح ----------
     var timeoutMs = imageParts.length > 0 ? 50000 : 35000
 
+    /* (و77) حالة الاستريم الحقيقي لهذا الطلب — محرك streamGemini بيكتب
+       الدلتا هنا لحظة وصولها، والـSSE بيوصّلها للطالب فورًا.
+       (متغير محلي لكل طلب — مفيش تداخل بين الطلبات المتوازية) */
+    var live: { send: ((o: any) => void) | null; acc: string } = { send: null, acc: '' }
+
     // **النصوص: ZAI الأول (مفيش مفاتيح ورده قوية) → Gemini احتياطي**
     // **الصور: Gemini الأول (vision مثبت) → ZAI احتياطي**
     var engines: Array<() => Promise<{ ok: boolean; text: string; error?: string }>> = []
@@ -252,9 +219,20 @@ export async function POST(request: Request) {
       // **طلب المستر (2026-و7): Gemini 3.6 هو الأساسي في النصوص كمان —
       // المفتاح موجود في Vercel → Environment Variables (GEMINI_API_KEYS)
       // ولو المفتاح مش متظبط أو الحصة خلصت، ZAI بيفضل شبكة أمان**
+      // **(و77) استريمينغ حقيقي: onDelta بيوجّه كل قطعة للـSSE لحظة وصولها
+      // (live.send لسه null لو النداء legacy JSON — المُجمّع acc بس اللي بيشتغل)**
       if (hasGeminiKey()) {
         engines.push(function () {
-          return callGemini({ parts: [{ text: systemPrompt + '\n\nرسالة الطالب: ' + message }], generationConfig: { temperature: 0.3, maxOutputTokens: 4096 }, timeoutMs: timeoutMs, thinking: 'low' })
+          return streamGemini({
+            parts: [{ text: systemPrompt + '\n\nرسالة الطالب: ' + message }],
+            generationConfig: { temperature: 0.3, maxOutputTokens: 4096 },
+            timeoutMs: timeoutMs,
+            thinking: 'low',
+            onDelta: function (t: string) {
+              live.acc += t
+              if (live.send) live.send({ delta: t })
+            },
+          })
         })
       }
       engines.push(function () { return zaiChat(systemPrompt, history, message, timeoutMs) })
@@ -270,6 +248,8 @@ export async function POST(request: Request) {
             if (closed) return
             try { controller.enqueue(encoder.encode('data: ' + JSON.stringify(obj) + '\n\n')) } catch (e) {}
           }
+          /* (و77) وصل محرك الاستريم الحقيقي بقناة الإرسال قبل تشغيل المحركات */
+          live.send = send
           var result: any = null
           var lastErr = ''
           for (var ei = 0; ei < engines.length; ei++) {
@@ -283,27 +263,32 @@ export async function POST(request: Request) {
               console.error('[AI Assistant] engine ' + ei + ' threw:', lastErr)
             }
           }
+          /* (و77) هل الدلتا وصلت فعلًا للطالب لحظة بلحظة؟ (نصوص فقط + استريم حقيقي) */
+          var streamedLive = imageParts.length === 0 && live.acc.length > 0
           if (result) {
-            // تسجيل الشكوى التلقائية لو المساعد اكتشف مشكلة (وسم أو كلمات قوية)
-            var complaintInfo = extractComplaint(result.text)
-            result.text = sanitizeMathText(complaintInfo.clean)
-            var autoSummary = complaintInfo.summary || (HARD_ISSUE_RE.test(message) ? ('مشكلة من كلام الطالب: ' + message.slice(0, 120)) : '')
-            if (autoSummary) { try { await logAutoComplaint(String(context.studentId || ''), message, autoSummary) } catch (e) {} }
-
-            // بنبعت الرد كقطع صغيرة (typewriter) — نفس شكل الاستريمينج الحقيقي
-            var chars = Array.from(result.text)
-            var idx = 0
-            await new Promise<void>(function (resolve) {
-              var step = function () {
-                if (closed) { resolve(); return }
-                if (idx >= chars.length) { send({ done: true }); resolve(); return }
-                var chunk = chars.slice(idx, idx + 5).join('')
-                idx += 5
-                send({ delta: chunk })
-                setTimeout(step, 8)
-              }
-              step()
-            })
+            if (streamedLive) {
+              /* (و77) الاستريم الحقيقي — الرد وصل كامل للطالب قطعة قطعة بالفعل،
+                 فمفيش إعادة تشغيل typewriter ولا منقّي رجعي (البرومبت بيمنع
+                 $/الماركداون أصلًا) — خلاص وقفل */
+              send({ done: true })
+            } else {
+              result.text = sanitizeMathText(result.text)
+              // بنبعت الرد كقطع صغيرة (typewriter) — نفس شكل الاستريمينج الحقيقي
+              // (للاحتياطي ZAI أو أي محرك مخزّن — ولمسات الصور)
+              var chars = Array.from(result.text)
+              var idx = 0
+              await new Promise<void>(function (resolve) {
+                var step = function () {
+                  if (closed) { resolve(); return }
+                  if (idx >= chars.length) { send({ done: true }); resolve(); return }
+                  var chunk = chars.slice(idx, idx + 5).join('')
+                  idx += 5
+                  send({ delta: chunk })
+                  setTimeout(step, 8)
+                }
+                step()
+              })
+            }
           } else {
             var busyMsg = 'المساعد مشغول دلوقتي جداً، جرب تاني بعد شوية 🙏'
             if (lastErr.indexOf('429') >= 0) busyMsg = 'الحصة اليومية للمساعد الذكي خلصت، جرب بكرة أو بعدين بشوية 🙏'
@@ -327,10 +312,7 @@ export async function POST(request: Request) {
       try {
         var r2 = await engines[ei2]()
         if (r2 && r2.ok && r2.text) {
-          var ci = extractComplaint(r2.text)
-          r2.text = sanitizeMathText(ci.clean)
-          var autoSummary2 = ci.summary || (HARD_ISSUE_RE.test(message) ? ('مشكلة من كلام الطالب: ' + message.slice(0, 120)) : '')
-          if (autoSummary2) { try { await logAutoComplaint(String(context.studentId || ''), message, autoSummary2) } catch (e) {} }
+          r2.text = sanitizeMathText(r2.text)
           return NextResponse.json({ reply: r2.text })
         }
       } catch (e) {}

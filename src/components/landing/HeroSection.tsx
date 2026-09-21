@@ -114,36 +114,37 @@ export default function HeroSection() {
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0" aria-hidden="true">
         {/* (2-c) رموز خلفية باهتة — رموز وأماكن مختلفة تمامًا عن منصة Maths
             Genius (طلب المستر: «الرموز في الباك جراوند خليها في أماكن مختلفة
-            وأشكال مختلفة عن الـ جينيوس») — نفس المعاملة الباهتة */}
-        <div className="absolute text-[85px] font-bold text-white/[0.05] leading-none select-none" style={{ top: '16%', right: '24%' }}>×</div>
-        <div className="absolute text-[90px] font-bold text-[#8fb7ff]/[0.08] leading-none select-none" style={{ top: '34%', left: '10%' }}>+</div>
-        <div className="absolute text-[75px] font-bold text-white/[0.05] leading-none select-none" style={{ top: '7%', left: '52%' }}>=</div>
-        <div className="absolute text-[65px] font-bold text-[#8fb7ff]/[0.07] leading-none select-none" style={{ top: '58%', right: '36%' }}>%</div>
-        <div dir="ltr" className="absolute text-[55px] font-bold text-white/[0.05] leading-none select-none" style={{ top: '86%', right: '10%' }}>f(x)</div>
-        <div className="absolute text-[70px] font-bold text-[#8fb7ff]/[0.08] leading-none select-none" style={{ top: '70%', left: '28%' }}>∠</div>
-        <div className="absolute text-[60px] font-bold text-white/[0.05] leading-none select-none" style={{ top: '45%', right: '58%' }}>½</div>
-        <div dir="ltr" className="absolute text-[45px] font-bold text-[#8fb7ff]/[0.07] leading-none select-none" style={{ top: '92%', left: '45%' }}>90°</div>
+            وأشكال مختلفة عن الـ جينيوس») — (و77) الشفافيات اتضاعفت بالضعف
+            («الرموز ما تقترهاش قوي») 0.05→0.025 و0.07→0.035 و0.08→0.04 */}
+        <div className="absolute text-[85px] font-bold text-white/[0.025] leading-none select-none" style={{ top: '16%', right: '24%' }}>×</div>
+        <div className="absolute text-[90px] font-bold text-[#8fb7ff]/[0.04] leading-none select-none" style={{ top: '34%', left: '10%' }}>+</div>
+        <div className="absolute text-[75px] font-bold text-white/[0.025] leading-none select-none" style={{ top: '7%', left: '52%' }}>=</div>
+        <div className="absolute text-[65px] font-bold text-[#8fb7ff]/[0.035] leading-none select-none" style={{ top: '58%', right: '36%' }}>%</div>
+        <div dir="ltr" className="absolute text-[55px] font-bold text-white/[0.025] leading-none select-none" style={{ top: '86%', right: '10%' }}>f(x)</div>
+        <div className="absolute text-[70px] font-bold text-[#8fb7ff]/[0.04] leading-none select-none" style={{ top: '70%', left: '28%' }}>∠</div>
+        <div className="absolute text-[60px] font-bold text-white/[0.025] leading-none select-none" style={{ top: '45%', right: '58%' }}>½</div>
+        <div dir="ltr" className="absolute text-[45px] font-bold text-[#8fb7ff]/[0.035] leading-none select-none" style={{ top: '92%', left: '45%' }}>90°</div>
 
         {/* (2-c) أشكال هندسية جديدة كلها: معيّن/شبه منحرف/متوازي أضلاع/مكعب
             أيزومتري/نجمة رباعية/علامة زائد — في أماكن مختلفة عن مثلث/دائرة/
-            مربع/خماسي/سداسي جينيوس — نفس ستايل الستروك الباهت */}
-        <svg className="absolute text-white/[0.07]" style={{ top: '22%', left: '38%', width: '52px', height: '52px' }} viewBox="0 0 50 50" fill="none" stroke="currentColor" strokeWidth="2">
+            مربع/خماسي/سداسي جينيوس — (و77) نفس ستايل الستروك بس أنعم بالنص */}
+        <svg className="absolute text-white/[0.035]" style={{ top: '22%', left: '38%', width: '52px', height: '52px' }} viewBox="0 0 50 50" fill="none" stroke="currentColor" strokeWidth="2">
           <polygon points="25,5 45,25 25,45 5,25" />
         </svg>
-        <svg className="absolute text-[#8fb7ff]/[0.08]" style={{ top: '48%', right: '6%', width: '55px', height: '55px' }} viewBox="0 0 50 50" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg className="absolute text-[#8fb7ff]/[0.04]" style={{ top: '48%', right: '6%', width: '55px', height: '55px' }} viewBox="0 0 50 50" fill="none" stroke="currentColor" strokeWidth="2">
           <polygon points="14,8 36,8 45,42 5,42" />
         </svg>
-        <svg className="absolute text-white/[0.07]" style={{ top: '80%', left: '55%', width: '50px', height: '50px' }} viewBox="0 0 50 50" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg className="absolute text-white/[0.035]" style={{ top: '80%', left: '55%', width: '50px', height: '50px' }} viewBox="0 0 50 50" fill="none" stroke="currentColor" strokeWidth="2">
           <polygon points="16,8 45,8 34,42 5,42" />
         </svg>
-        <svg className="absolute text-[#8fb7ff]/[0.08]" style={{ top: '62%', left: '5%', width: '55px', height: '55px' }} viewBox="0 0 50 50" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg className="absolute text-[#8fb7ff]/[0.04]" style={{ top: '62%', left: '5%', width: '55px', height: '55px' }} viewBox="0 0 50 50" fill="none" stroke="currentColor" strokeWidth="2">
           <polygon points="25,5 42,14.5 42,33.5 25,43 8,33.5 8,14.5" />
           <path d="M8,14.5 L25,24 L42,14.5 M25,24 L25,43" />
         </svg>
-        <svg className="absolute text-white/[0.07]" style={{ top: '94%', right: '30%', width: '50px', height: '50px' }} viewBox="0 0 50 50" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg className="absolute text-white/[0.035]" style={{ top: '94%', right: '30%', width: '50px', height: '50px' }} viewBox="0 0 50 50" fill="none" stroke="currentColor" strokeWidth="2">
           <polygon points="25,3 30.5,19.5 47,25 30.5,30.5 25,47 19.5,30.5 3,25 19.5,19.5" />
         </svg>
-        <svg className="absolute text-[#8fb7ff]/[0.08]" style={{ top: '36%', right: '80%', width: '48px', height: '48px' }} viewBox="0 0 50 50" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg className="absolute text-[#8fb7ff]/[0.04]" style={{ top: '36%', right: '80%', width: '48px', height: '48px' }} viewBox="0 0 50 50" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M20,6 H30 V20 H44 V30 H30 V44 H20 V30 H6 V20 H20 Z" />
         </svg>
 
@@ -172,11 +173,11 @@ export default function HeroSection() {
       <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
         <div className="absolute top-24 right-[32%] h-80 w-80 rounded-full bg-[#3b6db4]/10 blur-[100px]" />
         <div className="absolute bottom-10 left-10 h-80 w-80 rounded-full bg-[#2f6fd8]/15 blur-[100px]" />
-        {/* (2-c) معادلات محيطية جديدة مختلفة عن جينيوس (a2+b2=c2 و f(x) القديمين) */}
-        <div dir="ltr" className="absolute top-16 right-10 text-[#8fb7ff]/10 text-6xl font-light select-none hidden lg:block">
+        {/* (2-c) معادلات محيطية جديدة مختلفة عن جينيوس (a2+b2=c2 و f(x) القديمين) — (و77) أنعم بالنص */}
+        <div dir="ltr" className="absolute top-16 right-10 text-[#8fb7ff]/5 text-6xl font-light select-none hidden lg:block">
           y=mx+b
         </div>
-        <div dir="ltr" className="absolute bottom-24 left-10 text-[#8fb7ff]/8 text-5xl font-light select-none hidden lg:block">
+        <div dir="ltr" className="absolute bottom-24 left-10 text-[#8fb7ff]/4 text-5xl font-light select-none hidden lg:block">
           x²+y²=r²
         </div>
       </div>
@@ -217,8 +218,10 @@ export default function HeroSection() {
             transition={{ duration: 0.7, ease: 'easeOut', delay: 0.15 }}
             className="space-y-6 text-center lg:text-right order-2 lg:order-1"
           >
-            {/* Title */}
-            <h1 className="tracking-tight">
+            {/* Title — (و77) شادو أسود ناعم على العنوان والفقرة
+                («خلي الـhero section فيه زي شادو أسود كده شوية») —
+                يرفع النص عن الخلفية من غير تقيل */}
+            <h1 className="tracking-tight drop-shadow-[0_16px_40px_rgba(0,0,0,0.55)]">
               {/* السطر الأول — أبيض كبير تقيل (افتراضي: مستر الماث) */}
               <span className="block text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-tight">
                 {L('hero_title_line1', 'مستر الماث', 'Mr. Math')}
@@ -230,7 +233,7 @@ export default function HeroSection() {
             </h1>
 
             {/* Subtitle — نفس نص الأدمن الافتراضي زي ما هو (و72) */}
-            <p className="max-w-xl text-white/80 text-base sm:text-lg leading-relaxed lg:mx-0 mx-auto">
+            <p className="max-w-xl text-white/80 text-base sm:text-lg leading-relaxed lg:mx-0 mx-auto drop-shadow-[0_10px_26px_rgba(0,0,0,0.45)]">
               {L(
                 'hero_subtitle',
                 'نبسّط لك الرياضيات ونجعلها سهلة وممتعة! Algebra, Geometry, Formulas, Cheat Sheets — واجبات أسبوعية، امتحانات منتظمة، ومتابعة مستمرة لتقدّمك الأكاديمي.',
@@ -301,10 +304,12 @@ export default function HeroSection() {
             className="flex justify-center lg:justify-center order-1 lg:order-2"
           >
             <div className="relative w-64 sm:w-80 lg:w-[420px] mb-4">
-              {/* التوهج الأزرق الأفتح خلف المعلم */}
-              <div aria-hidden="true" className="absolute top-[-12%] left-1/2 -translate-x-1/2 h-[340px] w-[340px] sm:h-[400px] sm:w-[400px] rounded-full bg-[#2f6fd8]/25 blur-[90px] z-0" />
+              {/* التوهج الأزرق الأفتح خلف المعلم — (و77) أنعم بالنص
+                  («الحاجات اللي ورا صورة المستر ما تقترهاش») 0.25→0.12 */}
+              <div aria-hidden="true" className="absolute top-[-12%] left-1/2 -translate-x-1/2 h-[340px] w-[340px] sm:h-[400px] sm:w-[400px] rounded-full bg-[#2f6fd8]/12 blur-[90px] z-0" />
 
-              {/* الشرارة النجمية الزرقاء خلف المعلم — نجمة 8 رؤوس حادة */}
+              {/* الشرارة النجمية الزرقاء خلف المعلم — نجمة 8 رؤوس حادة
+                  (و77) الشفافيات اتضاعفت بالنص 0.5→0.25 و0.28→0.14 */}
               <svg
                 aria-hidden="true"
                 viewBox="0 0 200 200"
@@ -312,8 +317,8 @@ export default function HeroSection() {
                 xmlns="http://www.w3.org/2000/svg"
               >
                 <g transform="rotate(10 100 100)">
-                  <polygon points={starPoints} fill="#2f6fd8" opacity="0.5" />
-                  <polygon points={starPoints} fill="#3b82f6" opacity="0.28" transform="translate(100 100) scale(0.62) translate(-100 -100)" />
+                  <polygon points={starPoints} fill="#2f6fd8" opacity="0.25" />
+                  <polygon points={starPoints} fill="#3b82f6" opacity="0.14" transform="translate(100 100) scale(0.62) translate(-100 -100)" />
                 </g>
               </svg>
 
@@ -362,7 +367,11 @@ export default function HeroSection() {
 
               {/* (2-c) السحابة الكرتونية المسطّحة — أبيض صافي ببفّات دائرية واضحة
                   زي الصورة المرجعية بالظبط (من غير أي تدرج — فلات فيكتور)،
-                  وبتغطي ذيل الصورة والمستر طالع من وراها */}
+                  وبتغطي ذيل الصورة والمستر طالع من وراها
+                  (و77) طلب المستر: «السحابة تكون فيها شادو أسود وخطوط» —
+                  أ) فيلتر feDropShadow أسود ناعم (dy=14 / blur=12 / أسود 45%)
+                  ب) خطوط كرتونية: ستروك كحلي #16233B بشفافية 0.3 وسُمك 3
+                     على البفّات والقاعدة (أوتلاين كرتوني) */}
               <div className="relative z-20 -mt-14 sm:-mt-20 flex justify-center">
                 <svg
                   aria-hidden="true"
@@ -374,11 +383,16 @@ export default function HeroSection() {
                     <filter id="heroCloudShadowBlur" x="-50%" y="-50%" width="200%" height="200%">
                       <feGaussianBlur stdDeviation="10" />
                     </filter>
+                    {/* (و77) الشادو الأسود الناعم للسحابة نفسها */}
+                    <filter id="heroCloudBlackShadow" x="-40%" y="-40%" width="180%" height="200%">
+                      <feDropShadow dx="0" dy="16" stdDeviation="14" floodColor="#000000" floodOpacity="0.5" />
+                    </filter>
                   </defs>
                   {/* ظل ناعم عريض تحت السحابة */}
                   <ellipse cx="280" cy="220" rx="248" ry="13" fill="#06122a" opacity="0.45" filter="url(#heroCloudShadowBlur)" />
-                  {/* جسم السحابة الأبيض الصافي — بيضاوية قاعدة + بفّات دائرية */}
-                  <g fill="#ffffff">
+                  {/* جسم السحابة الأبيض الصافي — بيضاوية قاعدة + بفّات دائرية
+                      (و77) + شادو أسود ناعم + ستروك كرتوني كحلي على كل بفة والقاعدة */}
+                  <g fill="#ffffff" stroke="#16233B" strokeOpacity="0.3" strokeWidth="3" filter="url(#heroCloudBlackShadow)">
                     <ellipse cx="280" cy="165" rx="215" ry="58" />
                     <circle cx="105" cy="150" r="55" />
                     <circle cx="175" cy="100" r="62" />

@@ -170,7 +170,8 @@ export function ChallengesSection() {
           <Button
             onClick={submit}
             disabled={sending}
-            className="mt-3 min-h-[44px] bg-[#C49A38] hover:bg-[#D4A843] text-white font-bold"
+            /* (و77) الزر بقى بالتوكن الأساسي الأزرق الملكي بدل الدهبي المكتوب يدوي */
+            className="mt-3 min-h-[44px] bg-primary text-primary-foreground hover:bg-primary/90 font-bold"
           >
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             {T('ابعت حلي', 'Submit solution')}

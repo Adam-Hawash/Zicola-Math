@@ -62,9 +62,9 @@ export function AIAssistant() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      /* (و75) رسالة الترحيب بالإنجليزي — طلب المستر الحرفي:
-         «تخليه يكتب اهلا انا المساعد الذكي بتاع منصة zicola in math بالانجليزي» */
-      content: "Hi 👋 I'm Zicola In Math's AI assistant. Ask me anything about math — and if you have homework: try solving it first, snap a photo of your work and send it to me — I'll review your answer question by question 📸",
+      /* (و77) رسالة الترحيب الجديدة بالعربي — طلب المستر الحرفي في و77
+         (بتلغي ترحيب و75 الإنجليزي) */
+      content: 'أهلاً بيك 👋 أنا المساعد الذكي لمستر أحمد شعبان. اسألني أي حاجة في الماث، ولو عندك واجب: جرب تحل الأول وصوّر حلك وابعتلي الصورة — هوريك إجابتك زي ما كتبتها وأقارنها بالإجابة الصحيحة سؤال بسؤال 📸',
     },
   ])
   const [input, setInput] = useState('')

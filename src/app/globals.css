@@ -49,6 +49,8 @@
 }
 
 /* ========== LIGHT MODE - White site + soft beige hero ========== */
+/* (و77) الهوية الأساسية بقت أزرق ملكي (طلب المستر: أزرق للزرار والتابات) —
+   #1E5FD6 منسجم مع تدرج الهيرو الكحلي (#0a4588→#073263) وكنتراست أبيض 5.7:1 */
 :root {
   --radius: 0.625rem;
   --background: #FFFFFF;
@@ -57,7 +59,7 @@
   --card-foreground: #1A1A1A;
   --popover: #FFFFFF;
   --popover-foreground: #1A1A1A;
-  --primary: #C49A38;
+  --primary: #1E5FD6;
   --primary-foreground: #FFFFFF;
   --secondary: #F5EFE0;
   --secondary-foreground: #1A1A1A;
@@ -68,7 +70,7 @@
   --destructive: #DC2626;
   --border: #D0D0D0;
   --input: #D0D0D0;
-  --ring: #C49A38;
+  --ring: #1E5FD6;
   --chart-1: #C49A38;
   --chart-2: #059669;
   --chart-3: #7C3AED;
@@ -76,15 +78,17 @@
   --chart-5: #DC2626;
   --sidebar: #FFFFFF;
   --sidebar-foreground: #1A1A1A;
-  --sidebar-primary: #C49A38;
+  --sidebar-primary: #1E5FD6;
   --sidebar-primary-foreground: #FFFFFF;
   --sidebar-accent: #F5EFE0;
   --sidebar-accent-foreground: #1A1A1A;
   --sidebar-border: #D0D0D0;
-  --sidebar-ring: #C49A38;
+  --sidebar-ring: #1E5FD6;
 }
 
-/* ========== DARK MODE - Sleek Black & Gold ========== */
+/* ========== DARK MODE - Sleek Black & Royal Blue ========== */
+/* (و77) أزرق ملكي أفتح شوية في الداكن (#3B79E8) عشان يبان على الأسود —
+   وفورجراوند أبيض (أعلى كنتراست متاح للاتنين الأبيض والكحلي الغامق) */
 .dark {
   --background: #09090B;
   --foreground: #F5F0E3;
@@ -92,8 +96,8 @@
   --card-foreground: #F5F0E3;
   --popover: #131316;
   --popover-foreground: #F5F0E3;
-  --primary: #D4A843;
-  --primary-foreground: #09090B;
+  --primary: #3B79E8;
+  --primary-foreground: #FFFFFF;
   --secondary: #1A1A1F;
   --secondary-foreground: #F5F0E3;
   --muted: #1A1A1F;
@@ -103,7 +107,7 @@
   --destructive: #EF4444;
   --border: #27272A;
   --input: #27272A;
-  --ring: #D4A843;
+  --ring: #3B79E8;
   --chart-1: #D4A843;
   --chart-2: #34D399;
   --chart-3: #A78BFA;
@@ -111,12 +115,12 @@
   --chart-5: #F87171;
   --sidebar: #0C0C0E;
   --sidebar-foreground: #F5F0E3;
-  --sidebar-primary: #D4A843;
-  --sidebar-primary-foreground: #09090B;
+  --sidebar-primary: #3B79E8;
+  --sidebar-primary-foreground: #FFFFFF;
   --sidebar-accent: #1A1A1F;
   --sidebar-accent-foreground: #F5F0E3;
   --sidebar-border: #27272A;
-  --sidebar-ring: #D4A843;
+  --sidebar-ring: #3B79E8;
 }
 
 @layer base {
