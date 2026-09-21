@@ -24,10 +24,15 @@ const GradesSection = dynamic(() => import('@/components/landing/GradesSection')
 })
 /* (2026-و29) قسم الأوائل اتشال من الصفحة الرئيسية بطلب المستر — بقى زرار
    «أوائل الطلبة» في النافبار يفتح دايلوج بأول 3 طلاب (TopStudentsDialog) */
-const TipsSection = dynamic(() => import('@/components/landing/TipsSection'), {
+/* (و70) قسم النصايح اتشال من الرئيسية بطلب المستر — والتسمية اتغيرت لـ The Scholar */
+const GallerySection = dynamic(() => import('@/components/landing/GallerySection'), {
   loading: () => <div className="h-20" />,
 })
-const GallerySection = dynamic(() => import('@/components/landing/GallerySection'), {
+/* (و70) الفيديو التعريفي في الأعلى + قسم التحديات (طلب المستر حرفيًا) */
+const IntroVideoSection = dynamic(() => import('@/components/landing/IntroVideoSection'), {
+  loading: () => <div className="h-20" />,
+})
+const ChallengesSection = dynamic(() => import('@/components/landing/ChallengesSection'), {
   loading: () => <div className="h-20" />,
 })
 const LessonsSection = dynamic(() => import('@/components/landing/LessonsSection'), {
@@ -174,12 +179,15 @@ export default function HomePage() {
       {currentView === 'landing' && (
         <main className="flex-1">
           <HeroSection />
+          {/* (و70) الفيديو التعريفي في الأعلى + قسم التحديات — طلب المستر */}
+          <IntroVideoSection />
           <FeaturesGuideSection />
           <FeaturesSection />
           <GradesSection />
-          {/* (2026-و29) أفضل 3 طلاب بقوا في النافبار (زرار أوائل الطلبة) بدل الرئيسية */}
+          {/* (2026-و29) أفضل 3 طلاب بقوا في النافبار (زرار أوائل الطلبة) بدل الرئيسية
+              (و70) زرار أوائل الطلبة اتشال من النافبار بطلب المستر (حاجات الطلاب) */}
           <LessonsSection />
-          <TipsSection />
+          <ChallengesSection />
           <GallerySection />
         </main>
       )}

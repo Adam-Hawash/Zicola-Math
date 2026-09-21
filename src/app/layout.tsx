@@ -19,9 +19,9 @@ const geistMono = Geist_Mono({
 });
 
 export var metadata: Metadata = {
-  title: "Zicola in Math — Zicola Math",
+  title: "The Scholar in Math | مستر أحمد شعبان",
   description:
-    "منصة Zicola in Math — منصة رياضيات متكاملة. تبسيط الرياضيات، واجبات أسبوعية، امتحانات منتظمة، ومتابعة مستمرة للتقدم.",
+    "منصة The Scholar in Math — مستر أحمد شعبان: منصة رياضيات متكاملة. تبسيط الرياضيات، واجبات أسبوعية، امتحانات منتظمة، ومتابعة مستمرة للتقدم.",
 };
 
 export default async function RootLayout({
@@ -46,8 +46,8 @@ export default async function RootLayout({
     /* DB not available yet — client will fetch via /api/config */
   }
 
-  // Favicon: لوجو المنصة (الصورة الدهبية اتشالت بطلب المستر — ملهاش علاقة بـ Zicola Math)
-  var faviconUrl = initialConfig.favicon_url || "/logo.svg";
+  // (و70) Favicon = صورة المستر الرسمية (favicon_url من الكونفيج — الافتراضي الصورة الجديدة)
+  var faviconUrl = initialConfig.favicon_url || "/images/the-scholar-favicon.png";
 
   return (
     <html lang="ar" dir="rtl" suppressHydrationWarning>

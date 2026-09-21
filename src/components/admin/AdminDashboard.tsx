@@ -36,7 +36,9 @@ import { GroupsManager } from './GroupsManager'
 import { AdminItemAnalytics } from './AdminItemAnalytics'
 import { GroupTargetPicker } from './GroupTargetPicker'
 import { VideoGroupScheduleDialog } from './VideoGroupScheduleDialog'
-import { CommunityPanel } from './CommunityPanel'
+/* (و70) CommunityPanel اتشالت من التابات بطلب المستر — الملف موجود لو احتاجت ترجع */
+// import { CommunityPanel } from './CommunityPanel'
+import { ChallengesPanel } from './ChallengesPanel'
 import { ActivityPanel } from './ActivityPanel'
 import { PaymentsPanel } from '@/components/PaymentsPanel'
 import { StudentTargetPicker, parseTargetStudentIds } from '@/components/admin/StudentTargetPicker'
@@ -410,7 +412,9 @@ export function AdminDashboard() {
             {/* (2026-و38) تحليلات الأسئلة — أكتر سؤال الطلاب غلطت فيه + أساميهم — طلب المستر */}
             <TabsTrigger value="item-analytics" className="text-xs sm:text-sm gap-1 text-violet-600 dark:text-violet-400"><PieChart className="h-4 w-4" /><span className="hidden sm:inline">{T('تحليلات الأسئلة', 'Analytics')}</span></TabsTrigger>
             <TabsTrigger value="announcements" className="text-xs sm:text-sm gap-1"><Megaphone className="h-4 w-4" /><span className="hidden sm:inline">{T('الإعلانات', 'Announcements')}</span></TabsTrigger>
-            <TabsTrigger value="community" className="text-xs sm:text-sm gap-1"><MessageSquare className="h-4 w-4" /><span className="hidden sm:inline">{T('المجتمعات', 'Communities')}</span>{newCommunityCount > 0 && <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-emerald-500 text-white text-[10px] font-bold">{newCommunityCount > 99 ? '99+' : newCommunityCount}</span>}</TabsTrigger>
+            {/* (و70) تاب المجتمعات اتشال بطلب المستر */}
+            {/* (و70) تاب التحديات — فيديو المستر + حلول الطلاب بترتيب الوصول */}
+            <TabsTrigger value="challenges" className="text-xs sm:text-sm gap-1 text-amber-600 dark:text-amber-400"><Trophy className="h-4 w-4" /><span className="hidden sm:inline">{T('التحديات', 'Challenges')}</span></TabsTrigger>
             <TabsTrigger value="activity" className="text-xs sm:text-sm gap-1"><Activity className="h-4 w-4" /><span className="hidden sm:inline">{T('المتابعة', 'Activity')}</span></TabsTrigger>
             <TabsTrigger value="gallery" className="text-xs sm:text-sm gap-1"><Camera className="h-4 w-4" /><span className="hidden sm:inline">{T('معرض الصور', 'Gallery')}</span></TabsTrigger>
             <TabsTrigger value="cms" className="text-xs sm:text-sm gap-1"><Settings className="h-4 w-4" /><span className="hidden sm:inline">{T('المحتوى', 'Content')}</span></TabsTrigger>
@@ -442,7 +446,9 @@ export function AdminDashboard() {
               fields={{ title: { label: 'عنوان | Title', type: 'text' }, content: { label: 'المحتوى | Content', type: 'textarea' } }}
               renderTitle={(item) => item.title} renderSubtitle={(item) => item.content?.substring(0, 100) + '...'} onRefresh={fetchStats} />
           </TabsContent>
-          <TabsContent value="community"><CommunityPanel /></TabsContent>
+          {/* (و70) تاب المجتمعات اتشال بطلب المستر */}
+          {/* (و70) تاب التحديات */}
+          <TabsContent value="challenges"><ChallengesPanel /></TabsContent>
           <TabsContent value="activity"><ActivityPanel /></TabsContent>
           <TabsContent value="gallery"><GalleryManager /></TabsContent>
           <TabsContent value="cms"><CMSPanel /></TabsContent>

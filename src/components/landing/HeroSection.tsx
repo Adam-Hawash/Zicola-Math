@@ -141,7 +141,7 @@ export default function HeroSection() {
         <div className="relative w-full">
           <img
             src={heroBg}
-            alt="Zicola Math Banner"
+            alt="The Scholar in Math Banner"
             className="w-full h-auto max-h-[360px] object-cover object-center"
           />
         </div>
@@ -183,10 +183,11 @@ export default function HeroSection() {
             {/* Title */}
             <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl text-white">
               <span className="block text-[#E5BE5A]">
-                {cfg.hero_title_line1 || 'Zicola in Math'}
+                {cfg.hero_title_line1 || 'The Scholar'}
               </span>
-              <span className="block mt-1 text-2xl sm:text-3xl lg:text-4xl font-semibold text-white/80">
-                {cfg.hero_title_line2 || 'مستر زيكولا'}
+              {/* (و70) «by مستر أحمد شعبان» — LTR عشان «by» تفضل قبل الاسم زي ما المستر كتبها */}
+              <span dir="ltr" className="block mt-1 text-2xl sm:text-3xl lg:text-4xl font-semibold text-white/80">
+                {cfg.hero_title_line2 || 'by مستر أحمد شعبان'}
               </span>
             </h1>
 
@@ -310,18 +311,21 @@ export default function HeroSection() {
               <svg className="absolute -bottom-6 -right-6 w-16 h-16 opacity-40 pointer-events-none" viewBox="0 0 100 100">
                 <circle cx="50" cy="50" r="42" fill="none" stroke="#C49A38" strokeWidth="2.5" strokeDasharray="3 7" />
               </svg>
-              {/* Square photo container with gold frame — صورة المستر مربعة وبتتعرض كاملة
-                  من غير أي قص (object-cover في مربع = الصورة كلها زي ما هي) */}
-              <div className="relative w-56 h-56 sm:w-64 sm:h-64 lg:w-72 lg:h-72 rounded-2xl overflow-hidden border-2 border-[#C49A38]/40 gold-glow bg-transparent shadow-2xl">
+              {/* (و70) صورة المستر طالع من السحابة — بتتعرض كاملة بأبعادها الطبيعية
+                  (landscape) زيها بالظبط من غير قص + تحميل فوري */}
+              <div className="relative w-72 sm:w-80 lg:w-[26rem] rounded-2xl overflow-hidden border-2 border-[#C49A38]/40 gold-glow bg-transparent shadow-2xl">
                 {showPhoto ? (
                   <img
                     src={heroPhoto}
-                    alt={cfg.instructor_name || 'Zicola Math'}
-                    className="w-full h-full object-cover"
-                    style={{ objectPosition: '50% 50%' }}
+                    alt={cfg.instructor_name || 'مستر أحمد شعبان'}
+                    width={853}
+                    height={549}
+                    loading="eager"
+                    fetchPriority="high"
+                    className="w-full h-auto object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-[#C49A38]/30">
+                  <div className="w-full aspect-square flex items-center justify-center text-[#C49A38]/30">
                     <GraduationCap className="h-24 w-24" />
                   </div>
                 )}
@@ -331,7 +335,7 @@ export default function HeroSection() {
               {/* Badge overlay — الاسم مرة واحدة بس (طلب المستر) */}
               <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-[#0F0D0A] border border-[#C49A38]/40 rounded-full px-5 py-2 shadow-lg">
                 <p className="text-[#E5BE5A] font-bold text-sm tracking-wider whitespace-nowrap">
-                  {cfg.instructor_name || 'مستر زيكولا'}
+                  {cfg.instructor_name || 'مستر أحمد شعبان'}
                 </p>
               </div>
             </div>

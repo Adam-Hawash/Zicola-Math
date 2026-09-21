@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     const discussion = await db.discussion.create({
       data: {
         studentId: studentId || 'admin',
-        studentName: studentName || 'Zicola Math',
+        studentName: studentName || 'The Scholar in Math',
         grade,
         content,
         isAdminReply: isAdminReply || false,

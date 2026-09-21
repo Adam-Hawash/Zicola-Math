@@ -19,8 +19,8 @@
 //     بتنبيه لطيف + لو أدوات المطور اتفتحت الفيديو بيوقف مؤقتًا.
 //  5) التقدم بيتقال للأب بـ postMessage كل 5 ثواني (مفيش أي لينك).
 //  6) حماية الفيديو من يوتيوب (أحدث قرار 2026-ط2 — «اعمل blur على كل حاجة،
-//     وغطّي اسم القناة اللي فوق بالكامل — علامة سودة أو كلمة Zicola Math»):
-//     **شريط علوي داكن + بلور بعرض الشاشة كلها مكتوب عليه Zicola Math**
+//     وغطّي اسم القناة اللي فوق بالكامل — علامة سودة أو كلمة The Scholar in Math»):
+//     **شريط علوي داكن + بلور بعرض الشاشة كلها مكتوب عليه The Scholar in Math**
 //     دايمًا شغال بيغطي العنوان + اسم القناة + أزرار الشير تغطية 100%.
 //  7) الواجهة (القرار النهائي 2026-ؤ — طلب المستر الحرفي: «مش لاقي زرار
 //     الإعدادات.. خبي علامة اليوتيوب.. علامة الـ share والـ time دي لغيها»):
@@ -229,7 +229,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     var wmQr = ''
     if (wmEnabled === '1' && (wmName || wmPhone)) {
       try {
-        const qrSvg = await QRCode.toString('Zicola Math | ' + wmName + ' | ' + wmPhone, {
+        const qrSvg = await QRCode.toString('The Scholar in Math | ' + wmName + ' | ' + wmPhone, {
           type: 'svg', margin: 0, width: 64, errorCorrectionLevel: 'M',
           color: { dark: '#000000', light: '#ffffff' },
         })
@@ -371,7 +371,7 @@ const PLAYER_PAGE = `<!doctype html>
      بتاعة يوتيوب تغطية كاملة + بتمنع الدوس عليها (فيه يوتيوب بس) */
   /* (2026-و9) الشريط السفلي بقى بنفس سمك العلوي بالظبط — طلب المستر:
      «تصغّر الشريط اللي تحت شوية، تقصّره، يكون بنفس سمك اللي فوق» —
-     نفس المعادلة 40–50px ونفس الطقم (أسود + بلور + Zicola Math) */
+     نفس المعادلة 40–50px ونفس الطقم (أسود + بلور + The Scholar in Math) */
   /* (MG-1) بدل المستطيلات السودة المعتمة — تدرجات شفافة ناعمة:
      بتغطي علامة الاشتراك/اللوجو بتاعة يوتيوب من غير مربع أسود صريح
      + pointer-events:auto زي ما هي — الدوس عليها ممنوعة لسه
@@ -381,16 +381,16 @@ const PLAYER_PAGE = `<!doctype html>
   #ytCoverL{position:absolute;z-index:45;bottom:0;left:0;width:min(150px,26%);height:calc(var(--mgBarH) + clamp(4px,0.7vw,10px));
     background:linear-gradient(to top,rgba(0,0,0,.55),rgba(0,0,0,0));pointer-events:auto}
   /* درع فوق كامل (2026-ط2 — طلب المستر: «اعمل blur على كل حاجة،
-     وغطّي اسم القناة اللي فوق بالكامل — علامة سودة أو كلمة Zicola Math —
+     وغطّي اسم القناة اللي فوق بالكامل — علامة سودة أو كلمة The Scholar in Math —
      أي حاجة بس تكون مغطية»): شريط داكن + بلور بعرض الشاشة كلها، ثابت
      دايمًا، بيغطي عنوان يوتيوب + اسم القناة + أزرار الشير/Watch on YouTube
      تغطية 100% — مستحيل يبانوا ولا حد يقدر يدوس عليهم — ومكتوب عليه
-     Zicola Math بدل أي برندنج يوتيوب.
+     The Scholar in Math بدل أي برندنج يوتيوب.
      **(2026-و3 — طلب المستر: «قصره شوية، ما تخليهوش نازل كده طويل»)** —
      الشريط بقى رفيع (40–50px بدل 96px) — التغطية زي ما هي بس من غير ماياخد
      مساحة كبيرة من الفيديو */
   /* 2026-و60-b — «الخط اللي فوق ده كبّره نص سم» — الشريط العلوي بقى أنصه
-     (58–68px بدل 40–50px) وكلمة Zicola Math أكبر شوية */
+     (58–68px بدل 40–50px) وكلمة The Scholar in Math أكبر شوية */
   #topShield{position:absolute;top:0;left:0;right:0;z-index:22;pointer-events:auto;
     height:max(58px,min(10%,68px)); /* (MG-2) بيتطبق عليها ارتفاع محفوظ من الكونفج عبر JS */
     /* (MG-1) بدل الخلفية المعتمة — تدرج شفاف نازل من فوق (from-black/40
@@ -718,8 +718,8 @@ function buildWm(){
   }
   /* 4) لوجو المنصة في النص — (MG-4) الشكل الجديد «زي الأول»:
      name = اسم الطالب الثنائي وتحتيه رقم تليفونه (سطرين — الافتراضي)
-     both = Zicola Math فوق + الاسم تحتيه + الرقم تحتيه
-     brand = «Zicola Math» بس */
+     both = The Scholar in Math فوق + الاسم تحتيه + الرقم تحتيه
+     brand = «The Scholar in Math» بس */
   if(PC.centerLogo.on){
     var lg = document.createElement('div'); lg.className = 'wmLogo s-' + PC.centerLogo.size;
     var lgContent = PC.centerLogo.content || 'name';
@@ -730,10 +730,10 @@ function buildWm(){
       if(lgContent === 'name'){
         lg.innerHTML = '<span class="in">' + esc(lgTwo || wmPhone) + '</span>' + lgSub;
       } else {
-        lg.innerHTML = '<span class="over">Zicola Math</span><span class="in">' + esc(lgTwo || wmPhone) + '</span>' + lgSub;
+        lg.innerHTML = '<span class="over">The Scholar in Math</span><span class="in">' + esc(lgTwo || wmPhone) + '</span>' + lgSub;
       }
     } else {
-      lg.textContent = 'Zicola Math';
+      lg.textContent = 'The Scholar in Math';
     }
     placeWm(lg, PC.centerLogo); layer.appendChild(lg);
   }
@@ -744,7 +744,7 @@ function buildWm(){
 function ensureTopShield(){
   if(document.getElementById('topShield')) return;
   var ts = document.createElement('div'); ts.id='topShield';
-  ts.innerHTML = '<span class="brand">Zicola Math</span>';
+  ts.innerHTML = '<span class="brand">The Scholar in Math</span>';
   wrap.appendChild(ts);
   applyPlayerChrome();
 }
@@ -754,7 +754,7 @@ function ensureTopShield(){
 function ensureBotShield(){
   if(document.getElementById('botShield')) return;
   var bs = document.createElement('div'); bs.id='botShield';
-  bs.innerHTML = '<span class="brand">Zicola Math</span>';
+  bs.innerHTML = '<span class="brand">The Scholar in Math</span>';
   wrap.appendChild(bs);
 }
 /* المستطيلات السودة تحت يمين وشمال — تغطية علامة الاشتراك/اللوجو بتاعة
@@ -1769,7 +1769,7 @@ function buildPlayer(){
    ============================================================
    • شريط تحكم عادي كامل من عندنا: تشغيل/إيقاف + شريط تقدم بالسحب
      + **الوقت (الحالي / المدة)** + كتم + **⚙ إعدادات الجودة** +
-     ملء شاشة + Zicola Math — نفس شكل الشريط المعتمد
+     ملء شاشة + The Scholar in Math — نفس شكل الشريط المعتمد
    • إعدادات الجودة شغالة بجد:
      - بث HLS (.m3u8) → قايمة حقيقية من ملف البث (تلقائي + 1080p/720p/480p…)
        والتبديل فوري من غير إعادة تحميل (hls.js)
@@ -2009,7 +2009,7 @@ function buildFileBar(){
   fsb.setAttribute('aria-label','ملء الشاشة');
   fsb.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>';
   fsb.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); toggleFs(); });
-  var brand = document.createElement('span'); brand.id = 'mgBrand'; brand.textContent = 'Zicola Math';
+  var brand = document.createElement('span'); brand.id = 'mgBrand'; brand.textContent = 'The Scholar in Math';
   bar.appendChild(play); bar.appendChild(tw); bar.appendChild(time); bar.appendChild(mute); bar.appendChild(gear); bar.appendChild(fsb); bar.appendChild(brand); bar.appendChild(mgYtMarkEl());
   wrap.appendChild(bar);
   applyPlayerChrome();

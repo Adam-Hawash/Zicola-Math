@@ -85,7 +85,7 @@ export default function FeaturesGuideSection() {
             {cfg.guide_title || 'كيف تستخدم المنصة؟ | How to Use the Platform'}
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto text-sm sm:text-base">
-            {cfg.guide_subtitle || 'ست خطوات بسيطة لتبدأ رحلتك التعليمية في Zicola Math — Six simple steps to begin your learning journey'}
+            {cfg.guide_subtitle || 'ست خطوات بسيطة لتبدأ رحلتك التعليمية في The Scholar in Math — Six simple steps to begin your learning journey'}
           </p>
         </div>
 

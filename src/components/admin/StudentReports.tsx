@@ -59,8 +59,8 @@ function ReportPaper({ title, titleEn, children }: { title: string; titleEn: str
       {/* هيدر الورقة */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '3px solid #0f172a', paddingBottom: 10, marginBottom: 14 }}>
         <div>
-          <p style={{ fontSize: 20, fontWeight: 900, margin: 0, lineHeight: 1.2 }}>Zicola Math</p>
-          <p style={{ fontSize: 11, color: '#475569', margin: '2px 0 0' }}>Zicola in Math — منصة الرياضيات</p>
+          <p style={{ fontSize: 20, fontWeight: 900, margin: 0, lineHeight: 1.2 }}>The Scholar in Math</p>
+          <p style={{ fontSize: 11, color: '#475569', margin: '2px 0 0' }}>The Scholar in Math — منصة الرياضيات</p>
         </div>
         <div style={{ textAlign: 'left', fontSize: 10.5, color: '#475569' }}>
           <p style={{ margin: 0 }}>تاريخ التقرير: <b>{fmtFull(new Date().toISOString())}</b></p>
@@ -77,8 +77,8 @@ function ReportPaper({ title, titleEn, children }: { title: string; titleEn: str
 
       {/* فوتر */}
       <div style={{ marginTop: 22, paddingTop: 8, borderTop: '1px solid #cbd5e1', display: 'flex', justifyContent: 'space-between', fontSize: 9.5, color: '#64748b' }}>
-        <span>تقرير آلي من منصة Zicola in Math</span>
-        <span>Zicola Math</span>
+        <span>تقرير آلي من منصة The Scholar in Math</span>
+        <span>The Scholar in Math</span>
       </div>
     </div>
   )

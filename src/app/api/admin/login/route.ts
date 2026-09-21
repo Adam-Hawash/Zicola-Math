@@ -6,7 +6,7 @@ export var maxDuration = 10
 
 var DEFAULT_EMAIL = '44444444444'
 var DEFAULT_PASSWORD = 'zicola2026#'
-var ADMIN_NAME = 'Zicola Math'
+var ADMIN_NAME = 'The Scholar in Math'
 
 export async function POST(request) {
   var body

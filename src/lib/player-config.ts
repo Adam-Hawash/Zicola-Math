@@ -60,7 +60,7 @@ export interface WmNameItem {
 }
 
 /* لوجو المنصة في نص الفيديو — محتواه قابل للتحكم (MG-3/MG-4):
-   brand = «Zicola Math» بس | name = اسم الطالب الثنائي وتحتيه رقمه
+   brand = «The Scholar in Math» بس | name = اسم الطالب الثنائي وتحتيه رقمه
    («زي الأول» — الافتراضي) | both = لوجو صغير فوق + اسم ورقم تحته */
 export type WmLogoContent = 'brand' | 'name' | 'both'
 

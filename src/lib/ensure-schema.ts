@@ -39,6 +39,9 @@ export var SCHEMA_TABLES = [
   'CREATE TABLE IF NOT EXISTS Book (id TEXT PRIMARY KEY, title TEXT NOT NULL, description TEXT NOT NULL DEFAULT \'\', filePath TEXT NOT NULL DEFAULT \'\', fileName TEXT NOT NULL DEFAULT \'\', sourceUrl TEXT NOT NULL DEFAULT \'\', fileType TEXT NOT NULL DEFAULT \'application/pdf\', sizeBytes INTEGER NOT NULL DEFAULT 0, grade TEXT NOT NULL DEFAULT \'\', createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updatedAt DATETIME NOT NULL)',
   // (2026-و44) الإشعارات — رد الشكوى/الكتب الجديدة/امتحانات وواجبات جديدة
   'CREATE TABLE IF NOT EXISTS Notification (id TEXT PRIMARY KEY, studentId TEXT NOT NULL, type TEXT NOT NULL DEFAULT \'general\', title TEXT NOT NULL, body TEXT NOT NULL DEFAULT \'\', read INTEGER NOT NULL DEFAULT 0, createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)',
+  // (و70) قسم التحديات — فيديو المستر + حلول الطلاب بترتيب الزمن (طلب المستر حرفيًا)
+  'CREATE TABLE IF NOT EXISTS Challenge (id TEXT PRIMARY KEY, title TEXT NOT NULL, description TEXT DEFAULT \'\', videoUrl TEXT DEFAULT \'\', videoType TEXT DEFAULT \'youtube\', active INTEGER NOT NULL DEFAULT 0, createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)',
+  'CREATE TABLE IF NOT EXISTS ChallengeSolution (id TEXT PRIMARY KEY, challengeId TEXT NOT NULL, studentName TEXT NOT NULL, phone TEXT DEFAULT \'\', content TEXT NOT NULL, createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (challengeId) REFERENCES Challenge(id) ON DELETE CASCADE)',
 ]
 
 var SCHEMA_COLUMNS = [
@@ -120,14 +123,14 @@ var SCHEMA_FIXES = [
   'UPDATE Student SET deviceType = \'\' WHERE deviceType IS NULL',
   // ===== تصحيح اسم المنصة (براند Zicola) لمرة واحدة =====
   // القيم المخزنة في قاعدة البيانات من نسخ قديمة — بنصححها مرة واحدة (idempotent)
-  "UPDATE SiteConfig SET value = REPLACE(REPLACE(value, 'Maths Genius', 'Zicola Math'), 'Math Genius', 'Zicola Math') WHERE key IN ('navbar_brand', 'hero_title_line1', 'footer_brand', 'footer_copyright', 'guide_subtitle') AND (value LIKE '%Math Genius%' OR value LIKE '%Maths Genius%')",
-  // ===== تصحيح اسم المستر (الاسم الرسمي للبراند: **مستر زيكولا**) =====
+  "UPDATE SiteConfig SET value = REPLACE(REPLACE(value, 'Maths Genius', 'The Scholar in Math'), 'Math Genius', 'The Scholar in Math') WHERE key IN ('navbar_brand', 'hero_title_line1', 'footer_brand', 'footer_copyright', 'guide_subtitle') AND (value LIKE '%Math Genius%' OR value LIKE '%Maths Genius%')",
+  // ===== تصحيح اسم المستر (الاسم الرسمي للبراند: **مستر أحمد شعبان**) =====
   // أي قيمة مخزنة فيها اسم غلط من ترحيل قديم
   // بتتصحح مرة واحدة هنا (idempotent) + على القراءة في /api/config
-  "UPDATE SiteConfig SET value = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(value, 'Mr. Sherif ElSayed', 'Zicola Math'), 'مستر شريف السيد', 'مستر زيكولا'), 'نصائح مستر شريف', 'نصائح مستر زيكولا'), 'Mr. Wael El-Khadiry', 'Zicola Math'), 'مستر وائل الخضيري', 'مستر زيكولا') WHERE value LIKE '%Sherif ElSayed%' OR value LIKE '%شريف السيد%' OR (value LIKE '%مستر شريف%' AND key LIKE 'tips_%') OR value LIKE '%Mr. Wael El-Khadiry%' OR value LIKE '%الخضيري%'",
-  // النافيبار بالعربي: مستر زيكولا — من غير العصاية (|) ومن غير الإنجليزي (طلب المستر)
-  "UPDATE SiteConfig SET value = 'مستر زيكولا' WHERE key = 'navbar_subtitle' AND (value LIKE '%خضير%' OR value LIKE '%Khadir%' OR value LIKE '%Khodair%' OR value LIKE '%Khudair%' OR value LIKE '%Khodier%' OR value LIKE '%El-Kh%' OR value LIKE '%Sherif%' OR value LIKE '%شريف%' OR value LIKE '%|%')",
-  "UPDATE SiteConfig SET value = 'مستر زيكولا' WHERE key IN ('hero_title_line2', 'instructor_name') AND (value LIKE '%Sherif%' OR value LIKE '%شريف%' OR value LIKE '%الخضيري%')",
+  "UPDATE SiteConfig SET value = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(value, 'Mr. Sherif ElSayed', 'The Scholar in Math'), 'مستر شريف السيد', 'مستر أحمد شعبان'), 'نصائح مستر أحمد شعبان', 'نصائح مستر أحمد شعبان'), 'Mr. Wael El-Khadiry', 'The Scholar in Math'), 'مستر وائل الخضيري', 'مستر أحمد شعبان') WHERE value LIKE '%Sherif ElSayed%' OR value LIKE '%شريف السيد%' OR (value LIKE '%مستر شريف%' AND key LIKE 'tips_%') OR value LIKE '%Mr. Wael El-Khadiry%' OR value LIKE '%الخضيري%'",
+  // النافيبار بالعربي: مستر أحمد شعبان — من غير العصاية (|) ومن غير الإنجليزي (طلب المستر)
+  "UPDATE SiteConfig SET value = 'مستر أحمد شعبان' WHERE key = 'navbar_subtitle' AND (value LIKE '%خضير%' OR value LIKE '%Khadir%' OR value LIKE '%Khodair%' OR value LIKE '%Khudair%' OR value LIKE '%Khodier%' OR value LIKE '%El-Kh%' OR value LIKE '%Sherif%' OR value LIKE '%شريف%' OR value LIKE '%|%')",
+  "UPDATE SiteConfig SET value = 'مستر أحمد شعبان' WHERE key IN ('hero_title_line2', 'instructor_name') AND (value LIKE '%Sherif%' OR value LIKE '%شريف%' OR value LIKE '%الخضيري%')",
   // ===== (2026-و31) صورة المعلم = الأساسية والبديلة (طلب المستر حرفيًا: «صورة المعلم
   // تكون هي الأساسية والبديلة، ما تحطش حاجة من دماغك») =====
   // روابط الصور القديمة (i.imghos.co) كانت متخزنة في الكاش عند الطلاب بصورة مش
@@ -135,6 +138,20 @@ var SCHEMA_FIXES = [
   // فيبقى الأساسي (قاعدة البيانات) والبديل (الفولباك في الكود) نفس الصورة بالظبط.
   // مرة واحدة فقط (idempotent): لو الأدمن رفع صورة تانية بعدين مش هتتلمس.
   "UPDATE SiteConfig SET value = '/images/mr-wael-photo.webp' WHERE key IN ('instructor_photo', 'site_logo', 'favicon_url') AND (value LIKE '%i.imghos.co%' OR value LIKE '%instructor.webp%')",
+  // ===== (و70) هوية The Scholar — طلب المستر حرفيًا: الاسم في النافيبار
+  // «The Scholar in Math» والهيرو «The Scholar by مستر أحمد شعبان» + صورة
+  // المستر طالع من السحابة في الهيرو + صورته الرسمية في النافيبار.
+  // idempotent: القيم الجديدة مفيهاش Zicola فمش هتتلمس تاني.
+  "UPDATE SiteConfig SET value = REPLACE(REPLACE(value, 'Zicola in Math', 'The Scholar in Math'), 'Zicola Math', 'The Scholar in Math') WHERE key IN ('navbar_brand', 'footer_brand', 'footer_copyright', 'guide_subtitle', 'schedule_brand') AND value LIKE '%Zicola%'",
+  "UPDATE SiteConfig SET value = 'The Scholar' WHERE key = 'hero_title_line1' AND value LIKE '%Zicola%'",
+  "UPDATE SiteConfig SET value = 'by مستر أحمد شعبان' WHERE key = 'hero_title_line2' AND (value LIKE '%زيكولا%' OR value LIKE '%Zicola%')",
+  "UPDATE SiteConfig SET value = 'مستر أحمد شعبان' WHERE key IN ('navbar_subtitle', 'instructor_name') AND (value LIKE '%زيكولا%' OR value LIKE '%Zicola%')",
+  // صورة الهيرو = مستر طالع من السحابة (الصورة الرسمية الجديدة) — بتستبدل صورة
+  // mr-wael القديمة الوارثة من نسخة Maths-Genius + أي رابط خارجي قديم
+  "UPDATE SiteConfig SET value = '/images/the-scholar-hero.png' WHERE key = 'instructor_photo' AND (value LIKE '%mr-wael%' OR value LIKE '%i.imghos.co%' OR value = '')",
+  // صورة النافيبار الرسمية + الفيفيكون (مفاتيح جديدة أو قيم قديمة وارثة)
+  "UPDATE SiteConfig SET value = '/images/the-scholar-nav.png' WHERE key = 'navbar_photo' AND (value LIKE '%mr-wael%' OR value = '')",
+  "UPDATE SiteConfig SET value = '/images/the-scholar-favicon.png' WHERE key = 'favicon_url' AND (value LIKE '%mr-wael%' OR value LIKE '%logo.svg%' OR value = '')",
   // ===== ترحيل لمرة واحدة (idempotent) =====
   // الحسابات الموجودة اللي ملهاش ربط إنشاء: نثبّت الربط الحالي كـ"جهاز إنشاء"
   // عشان مفيش حساب يتحجب فجأة بعد الترقية. الربط ده بعدها **ثابت** — أي جهاز
@@ -174,7 +191,7 @@ export var SCHEMA_INDEXES = [
   'CREATE INDEX IF NOT EXISTS idx_notification_created ON Notification(createdAt)',
 ]
 
-export var CORE_TABLES = ['Admin', 'Student', 'StudentActivity', 'Video', 'Homework', 'Exam', 'ExamResult', 'Announcement', 'Discussion', 'SiteConfig', 'Media', 'VideoProgress', 'GalleryImage', 'Payment', 'VideoAccess', 'Complaint', 'Parent', 'Book', 'Notification']
+export var CORE_TABLES = ['Admin', 'Student', 'StudentActivity', 'Video', 'Homework', 'Exam', 'ExamResult', 'Announcement', 'Discussion', 'SiteConfig', 'Media', 'VideoProgress', 'GalleryImage', 'Payment', 'VideoAccess', 'Complaint', 'Parent', 'Book', 'Notification', 'Challenge', 'ChallengeSolution']
 
 /* (2026-و38) مفتاح البصمة اتبدل — البصمة القديمة كانت اتخزنت على الإنتاج
  * بعد ما كود و37 نزل (والجدول وقتها مش معمول لسه في CORE_TABLES فالترميم

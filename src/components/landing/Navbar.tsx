@@ -23,21 +23,17 @@ import {
   Shield,
   Youtube,
   Shapes,
-  Trophy,
   CalendarClock,
 } from 'lucide-react'
 import { toast } from 'sonner'
 /* (و64) زراير الثيم + اللغة الموحدة في كل المنصة + الترجمة الحقيقية */
 import { PlatformToggles } from '@/components/platform-toggles'
 import { useT } from '@/lib/i18n'
-/* (2026-و29) «أوائل الطلبة» في النافبار — طلب المستر: زرار جنب Geometry
-   يفتح دايلوج بأول 3 طلاب — والقسم اتشال من الصفحة الرئيسية */
-import { TopStudentsDialog } from './TopStudentsDialog'
+/* (و70) زرار «أوائل الطلبة» اتشال من النافبار بطلب المستر (حاجات الطلاب) */
 
 export function Navbar() {
   const [mobileMenu, setMobileMenu] = useState(false)
   /* (2026-و29) دايلوج أوائل الطلبة */
-  const [topStudentsOpen, setTopStudentsOpen] = useState(false)
   /* (و64) الترجمة الحقيقية — عربي/إنجليزي */
   const T = useT()
 
@@ -56,11 +52,13 @@ export function Navbar() {
   } = useAppStore()
 
   const cfg = siteConfig
-  const instructorPhoto = cfg.instructor_photo || ''
+  /* (و70) صورة النافيبار = صورة المستر الرسمية (navbar_photo) — مستقلة عن
+     صورة الهيرو (instructor_photo) بطلب المستر: نافيبار بصورته الرسمية */
+  const instructorPhoto = cfg.navbar_photo || cfg.instructor_photo || ''
   const youtubeLink = cfg.social_youtube || ''
-  // اسم المنصة جنب صورة المستر — "Zicola Math" بالإنجليزي (طلب المستر حرفيًا:
+  // اسم المنصة جنب صورة المستر — "The Scholar in Math" بالإنجليزي (طلب المستر حرفيًا:
   // "انت كتبلي مستر بالعربي — لا، عايزك تكتبلي ماث جينيس بالانجليزي زي المكتوب في المنصة")
-  const navName = cfg.navbar_brand || 'Zicola Math'
+  const navName = cfg.navbar_brand || 'The Scholar in Math'
 
   const isAuthenticated = !!currentStudent || isAdminLoggedIn
   const isAuthPage = currentView === 'auth-login' || currentView === 'auth-register'
@@ -115,18 +113,19 @@ export function Navbar() {
             {instructorPhoto ? (
               <img
                 src={instructorPhoto}
-                alt="Zicola Math"
+                alt="The Scholar in Math"
                 width={36}
                 height={36}
+                loading="eager"
                 className="h-9 w-9 rounded-lg object-cover border border-primary/30"
               />
             ) : (
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <span className="text-xs font-bold">ZM</span>
+                <span className="text-xs font-bold">TS</span>
               </div>
             )}
             <div className="hidden sm:block">
-              {/* Zicola Math — بالإنجليزي زي اسم المنصة (طلب المستر) */}
+              {/* The Scholar in Math — بالإنجليزي زي اسم المنصة (طلب المستر) */}
               <h1 dir="ltr" className="text-sm font-bold leading-tight text-foreground whitespace-nowrap">
                 {navName}
               </h1>
@@ -135,16 +134,7 @@ export function Navbar() {
 
           {/* Desktop Nav */}
           <nav className="hidden md:flex items-center gap-2">
-            {/* (2026-و32) أوائل الطلبة أول عنصر — طلب المستر: «في منصات مش شيماء تبقى هي الاولانيه برده» */}
-            <button
-              type="button"
-              onClick={function () { setTopStudentsOpen(true) }}
-              title="أوائل الطلبة — أفضل 3 طلاب"
-              className="inline-flex items-center gap-1.5 min-h-[44px] px-3 rounded-xl text-sm font-bold text-[#8A6D22] dark:text-[#E5BE5A] hover:bg-[#C49A38]/10 transition-colors cursor-pointer"
-            >
-              <Trophy className="h-4 w-4" />
-              {T('أوائل الطلبة', 'Top Students')}
-            </button>
+            {/* (و70) زرار أوائل الطلبة اتشال من الديسك توب بطلب المستر (حاجات الطلاب) */}
             {/* Geometry Laws — قوانين الهندسة (طلب المستر: حاجة اسمها بالانجليزي جنب الرئيسية) */}
             <a
               href="/geometry-laws"
@@ -220,17 +210,7 @@ export function Navbar() {
 
           {/* YouTube + Theme Toggle + Mobile Menu Button */}
           <div className="flex items-center gap-2">
-            {/* (2026-و32) «أوائل الطلبة» أول عنصر في الموبايل — طلب المستر: في منصات مش شيماء تبقى الأولى */}
-            <button
-              type="button"
-              onClick={function () { setTopStudentsOpen(true) }}
-              title="أوائل الطلبة — أفضل 3"
-              aria-label="أوائل الطلبة — أفضل 3 طلاب"
-              className="md:hidden flex items-center gap-1 min-h-[44px] px-2.5 rounded-xl text-[#8A6D22] dark:text-[#E5BE5A] bg-[#C49A38]/10 border border-[#C49A38]/40 hover:bg-[#C49A38]/20 transition-colors cursor-pointer"
-            >
-              <Trophy className="h-5 w-5" />
-              <span className="text-xs font-bold">الأوائل</span>
-            </button>
+            {/* (و70) زرار الأوائل في الموبايل اتشال بطلب المستر */}
             {/* Geometry Laws — ظاهر على طول في الموبايل فوق من غير فتح القائمة
                 (طلب المستر: «عاوزه يبقى باين في الموبايل»)
                 (2026-و29) طلب المستر: الأيقونة لوحدها مش كفاية — اكتبوا Geometry جنبها */}
@@ -278,15 +258,7 @@ export function Navbar() {
         {/* Mobile Menu */}
         {mobileMenu && (
           <div className="md:hidden border-t bg-background/95 backdrop-blur-md px-4 py-3 space-y-2">
-            {/* (2026-و32) أوائل الطلبة أول عنصر في قايمة الموبايل — طلب المستر */}
-            <button
-              type="button"
-              onClick={function () { setMobileMenu(false); setTopStudentsOpen(true) }}
-              className="flex items-center gap-2 min-h-[44px] px-3 rounded-xl border border-[#C49A38]/40 bg-[#C49A38]/10 text-[#8A6D22] dark:text-[#E5BE5A] font-bold text-sm cursor-pointer"
-            >
-              <Trophy className="h-4 w-4" />
-              {T('أوائل الطلبة', 'Top Students')}
-            </button>
+            {/* (و70) أوائل الطلبة اتشال من قايمة الموبايل بطلب المستر */}
             {/* Geometry Laws — قوانين الهندسة (ظاهر للكل: زائر/طالب/أدمن) */}
             <a
               href="/geometry-laws"
@@ -373,7 +345,7 @@ export function Navbar() {
       </header>
 
       {/* (2026-و29) دايلوج أوائل الطلبة — أول 3 طلاب */}
-      <TopStudentsDialog open={topStudentsOpen} onOpenChange={setTopStudentsOpen} />
+      {/* (و70) دايلوج أوائل الطلبة اتشال بالكامل بطلب المستر (حاجات الطلاب) */}
 
       {/* Admin Login Dialog - Hidden Entry Point */}
       <AdminLoginDialog />

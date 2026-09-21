@@ -9,7 +9,7 @@
      الأرقام بصريًا (درس و65).
    ============================================================ */
 
-export const WA_TEACHER_NAME = 'Zicola Math'
+export const WA_TEACHER_NAME = 'The Scholar in Math'
 
 /* تطبيع رقم واتساب: مسح المسافات/الزائد/الشرطات والأرقام العربية —
    11 رقم بتبدأ بـ 0 (مثال 01012345678) → 201012345678 */
@@ -27,7 +27,7 @@ export function normalizeWaPhone(raw: string): string {
 export const DEFAULT_PARENT_TEMPLATE = [
   'أهلاً حضرتكم 🌹',
   'الطالب/ة: {student}',
-  'إحنا من منصة Zicola in Math بنتابع معاكم خطوة بخطوة، ودي آخر حالة للمستوى:',
+  'إحنا من منصة The Scholar in Math بنتابع معاكم خطوة بخطوة، ودي آخر حالة للمستوى:',
   '',
   '📘 الامتحانات:',
   '{exams}',

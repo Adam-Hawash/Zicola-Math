@@ -475,7 +475,7 @@ function StudentPortalInner() {
     /* (2026-و40) الكتب والملازم — مكتبة PDF الطالب يفتحها/يحملها */
     { id: 'books', label: T('الكتب والملازم', 'Books'), icon: BookOpen },
     { id: 'announcements', label: T('التنبيهات', 'Alerts'), icon: Megaphone },
-    { id: 'discussions', label: T('المجتمع', 'Community'), icon: MessageSquare },
+    /* (و70) تاب المجتمع اتشال بطلب المستر (المجتمعات) */
     { id: 'complaints', label: T('الشكاوي', 'Complaints'), icon: Flag },
   ]
 
@@ -536,7 +536,7 @@ function StudentPortalInner() {
         {activeTab === 'exams' && <ExamsTab exams={dashboardData.exams} results={dashboardData.examResults} completedExamIds={completedExamIds} onExamSubmitted={(id) => setCompletedExamIds(prev => new Set([...prev, id]))} studentId={studentId} resultsLoaded={examResultsLoaded} onGoHome={() => setActiveTab('videos')} />}
         {activeTab === 'books' && <BooksTab grade={grade} />}
         {activeTab === 'announcements' && <AnnouncementsTab announcements={dashboardData.announcements} />}
-        {activeTab === 'discussions' && <DiscussionsTab grade={grade} studentId={studentId} studentName={currentStudent?.name || ''} />}
+        {/* (و70) تاب المجتمع اتشال بطلب المستر */}
         {activeTab === 'complaints' && <StudentComplaints studentId={studentId} studentName={currentStudent?.name || ''} studentPhone={currentStudent?.phone || ''} grade={grade} />}
       </div>
     </div>
@@ -2824,7 +2824,7 @@ function ExamsTab({ exams, results, completedExamIds, onExamSubmitted, studentId
         <div className="text-center space-y-2">
           <h2 className="text-xl font-bold text-red-600">تم تقديم هذا الامتحان بالفعل ولا يمكنك إعادته</h2>
           {blockedExam && <p className="text-sm text-muted-foreground">{blockedExam.title}</p>}
-          <p className="text-sm text-muted-foreground">انتظر النتيجة من مستر زيكولا</p>
+          <p className="text-sm text-muted-foreground">انتظر النتيجة من مستر أحمد شعبان</p>
         </div>
         <Button
           onClick={() => {
@@ -3570,12 +3570,6 @@ function StudentGuide({ onClose, onEnterPortal }: { onClose: () => void; onEnter
       title: 'التنبيهات',
       desc: 'تاب "التنبيهات" فيه كل الإعلانات المهمة من المستر - مواعيد، أخبار، وملاحظات مهمة. دايماً تابعها.',
       color: 'text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30',
-    },
-    {
-      icon: MessageSquare,
-      title: 'اسأل وزملائك',
-      desc: 'تاب "المجتمع" تقدر تسأل أي سؤال وتشارك مع زملائك في نفس الصف. المستر بيرد عليكوا كمان.',
-      color: 'text-amber-600 bg-amber-100 dark:bg-amber-900/30',
     },
   ]
 

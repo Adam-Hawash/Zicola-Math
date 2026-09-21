@@ -251,7 +251,7 @@ export function ProtectedYouTubePlayer({
       if (k === 'printscreen' || e.keyCode === 44) {
         warnRecording('🛡️ الخاصية دي ممنوعة')
         try {
-          if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText('🔒 المحتوى محمي — Zicola Math').catch(function () {})
+          if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText('🔒 المحتوى محمي — The Scholar in Math').catch(function () {})
         } catch (err) {}
       }
     }
@@ -1030,7 +1030,7 @@ export function ProtectedYouTubePlayer({
             <img src={poster} alt="فيديو الدرس" className="w-full h-full object-cover bg-black" draggable={false} />
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src="/images/mr-wael-cover-v2.png" alt="Zicola Math" className="w-full h-full object-contain bg-black" draggable={false} />
+            <img src="/images/mr-wael-cover-v2.png" alt="The Scholar in Math" className="w-full h-full object-contain bg-black" draggable={false} />
           )}
           <div className={'absolute inset-0 ' + (poster ? 'bg-black/30' : 'bg-black/45')}>
             <div

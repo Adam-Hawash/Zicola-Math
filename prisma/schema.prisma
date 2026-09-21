@@ -395,3 +395,36 @@ model Book {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+// ============================================================
+// (و70) قسم التحديات — طلب المستر: «المدرس يرفع فيديو → كل طالب
+// يكتب حله تحت → الحلول تظهر بترتيب ما كتبها الطلاب»
+// تحدي واحد نشط في المرة (active) + حلول الطلاب بترتيب الزمن
+// ============================================================
+model Challenge {
+  id          String   @id @default(cuid())
+  title       String
+  description String   @default("")
+  videoUrl    String   @default("")
+  videoType   String   @default("youtube") // youtube | file
+  active      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  solutions ChallengeSolution[]
+
+  @@index([active, createdAt])
+}
+
+model ChallengeSolution {
+  id          String   @id @default(cuid())
+  challengeId String
+  studentName String
+  phone       String   @default("")
+  content     String
+  createdAt   DateTime @default(now())
+
+  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+
+  @@index([challengeId, createdAt])
+}

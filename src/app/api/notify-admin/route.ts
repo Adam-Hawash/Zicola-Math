@@ -22,13 +22,13 @@ export async function POST(request: Request) {
               <p style="margin: 8px 0;"><strong>هاتف ولي الأمر:</strong> ${parentPhone || '—'}</p>` : ''
 
     await resend.emails.send({
-      from: 'Zicola in Math <onboarding@resend.dev>',
+      from: 'The Scholar in Math <onboarding@resend.dev>',
       to: [adminEmail],
-      subject: `طالب جديد مسجّل: ${studentName} — Zicola in Math`,
+      subject: `طالب جديد مسجّل: ${studentName} — The Scholar in Math`,
       html: `
         <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 24px;">
           <div style="background: #09090B; border-radius: 12px; padding: 24px; color: #F5F0E3;">
-            <h1 style="margin: 0 0 8px 0; color: #D4A843;">Zicola in Math</h1>
+            <h1 style="margin: 0 0 8px 0; color: #D4A843;">The Scholar in Math</h1>
             <p style="color: #8C8577; margin: 0 0 20px 0;">إشعار تسجيل طالب جديد</p>
             <div style="background: #1A1A1F; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
               <p style="margin: 8px 0;"><strong>اسم الطالب:</strong> ${studentName}</p>

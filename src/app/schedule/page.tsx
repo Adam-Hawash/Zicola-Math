@@ -106,7 +106,7 @@ export default function SchedulePage() {
   let scheduleSubtitle = 'جدول مواعيد الحصص الأسبوعية لكل الصفوف الدراسية — اختر اليوم المناسب لك وتابع موعد حصتك'
   let scheduleBadge = 'جدول الحصص الأسبوعي'
   let scheduleFooterNote = 'جميع المواعيد بتوقيت القاهرة. لو عندك أي استفسار عن موعد حصتك تواصل معنا عبر واتساب.'
-  let brandName = 'Zicola in Math'
+  let brandName = 'The Scholar in Math'
 
   try {
     if (siteConfig.schedule_data) {
