@@ -395,6 +395,15 @@ export function CMSPanel() {
             <CardContent>
               <div className="grid gap-5 sm:grid-cols-2">
                 {section.fields.map(function(field) {
+                  /* (و71) ثنائية اللغة: كل خانة نص بيتولد تحتها خانة **إنجليزي**
+                     تلقائيًا (مفتاح key_en) — المستر يكتب العربي والإنجليزي كل واحد
+                     لوحده، والطالب بيشوف لغته على الموقع. استثناءات: المفاتيح
+                     اللي هي أصلًا *_en أو روابط/أرقام/JSON مش بتتزوج. */
+                  var isEnField = field.key.slice(-3) === '_en'
+                  var paired = section.fields.some(function(f) { return f.key === field.key + '_en' })
+                  var noPair = /(_url$|_number$|^schedule_data$|^payment_)/.test(field.key)
+                  var showEn = !isEnField && !paired && !noPair
+                  var enKey = field.key + '_en'
                   return (
                     <div key={field.key} className={field.type === 'textarea' ? 'sm:col-span-2' : ''}>
                       <Label className="text-xs mb-1 block">{field.label}</Label>
@@ -409,6 +418,26 @@ export function CMSPanel() {
                           value={config[field.key] || ''}
                           onChange={function(e) { var n = Object.assign({}, config); n[field.key] = e.target.value; setConfig(n) }}
                         />
+                      )}
+                      {showEn && (
+                        <div className="mt-1.5">
+                          <Label className="text-[10px] mb-1 block text-muted-foreground" dir="ltr">English — {field.label}</Label>
+                          {field.type === 'textarea' ? (
+                            <Textarea
+                              value={config[enKey] || ''}
+                              onChange={function(e) { var n = Object.assign({}, config); n[enKey] = e.target.value; setConfig(n) }}
+                              rows={3}
+                              dir="ltr"
+                              className="text-sm"
+                            />
+                          ) : (
+                            <Input
+                              value={config[enKey] || ''}
+                              onChange={function(e) { var n = Object.assign({}, config); n[enKey] = e.target.value; setConfig(n) }}
+                              dir="ltr"
+                            />
+                          )}
+                        </div>
                       )}
                     </div>
                   )

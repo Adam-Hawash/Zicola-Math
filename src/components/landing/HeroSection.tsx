@@ -3,13 +3,15 @@
 import { Button } from '@/components/ui/button'
 import { useAppStore } from '@/stores/app-store'
 /* (و64) الترجمة الحقيقية عربي/إنجليزي */
-import { useT } from '@/lib/i18n'
+import { useT, useLangStore } from '@/lib/i18n'
 import { useEffect, useState } from 'react'
 import { Award, GraduationCap, Users, BookOpen, Clock, CalendarClock } from 'lucide-react'
 
 export default function HeroSection() {
   /* (و64) الترجمة */
   const T = useT()
+  /* (و71) لغة الزائر الحالية — لعرض المحتوى المكتوب من الأدمن بالعربي/الإنجليزي */
+  var lang = useLangStore(function (s) { return s.lang })
   const {
     setView,
     siteConfig,
@@ -63,6 +65,19 @@ export default function HeroSection() {
 
   const showBg = !!dbBg || fallbackBgExists
   const showPhoto = !!dbPhoto || fallbackPhotoExists
+
+  /* (و71) اختيار نص الأدمن حسب اللغة: إنجليزي بقرأ المفتاح *_en من لوحة
+     الأدمن (أو الافتراضي الإنجليزي)، عربي بقرأ المفتاح الأساسي —
+     فالمستر يكتب العربي والإنجليزي كل واحد لوحده من لوحة التحكم */
+  var L = function (key: string, arFallback: string, enFallback: string): string {
+    if (lang === 'en') {
+      var en = (cfg as any)[key + '_en']
+      if (en && String(en).trim() !== '') return String(en)
+      return enFallback
+    }
+    var ar = (cfg as any)[key]
+    return ar && String(ar).trim() !== '' ? String(ar) : arFallback
+  }
 
   return (
     <section className="relative overflow-hidden bg-[#0F0D0A]" dir="rtl">
@@ -175,27 +190,28 @@ export default function HeroSection() {
             <div className="inline-flex items-center gap-2 rounded-full bg-[#C49A38]/15 px-4 py-1.5 text-sm font-medium text-[#E5BE5A] border border-[#C49A38]/20">
               <Award className="h-4 w-4" />
               <span>
-                {cfg.hero_badge ||
-                  'Comprehensive Learning Platform | منصة تعليمية متكاملة'}
+                {L('hero_badge', 'منصة تعليمية متكاملة', 'Comprehensive Learning Platform')}
               </span>
             </div>
 
             {/* Title */}
             <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl text-white">
               <span className="block text-[#E5BE5A]">
-                {cfg.hero_title_line1 || 'The Scholar'}
+                {L('hero_title_line1', 'The Scholar', 'The Scholar')}
               </span>
               {/* (و70) «by مستر أحمد شعبان» — LTR عشان «by» تفضل قبل الاسم زي ما المستر كتبها */}
               <span dir="ltr" className="block mt-1 text-2xl sm:text-3xl lg:text-4xl font-semibold text-white/80">
-                {cfg.hero_title_line2 || 'by مستر أحمد شعبان'}
+                {L('hero_title_line2', 'by مستر أحمد شعبان', 'by Mr. Ahmed Shaaban')}
               </span>
             </h1>
 
             {/* Subtitle */}
             <p className="max-w-xl text-white/70 text-base sm:text-lg leading-relaxed lg:mx-0 mx-auto">
-              {cfg.hero_subtitle ||
-                T('نبسّط لك الرياضيات ونجعلها سهلة وممتعة! Algebra, Geometry, Formulas, Cheat Sheets — واجبات أسبوعية، امتحانات منتظمة، ومتابعة مستمرة لتقدّمك الأكاديمي.',
-                  'We make math simple and fun! Algebra, Geometry, Formulas, Cheat Sheets — weekly homework, regular exams, and continuous tracking of your progress.')}
+              {L(
+                'hero_subtitle',
+                'نبسّط لك الرياضيات ونجعلها سهلة وممتعة! Algebra, Geometry, Formulas, Cheat Sheets — واجبات أسبوعية، امتحانات منتظمة، ومتابعة مستمرة لتقدّمك الأكاديمي.',
+                'We make math simple and fun! Algebra, Geometry, Formulas, Cheat Sheets — weekly homework, regular exams, and continuous tracking of your academic progress.'
+              )}
             </p>
 
             {/* CTA Buttons */}
@@ -226,7 +242,7 @@ export default function HeroSection() {
                 onClick={() => window.location.href = '/schedule'}
               >
                 <CalendarClock className="h-4 w-4" />
-                مواعيد السنتر
+                {T('مواعيد السنتر', 'Center Schedule')}
               </Button>
             </div>
 
@@ -263,7 +279,7 @@ export default function HeroSection() {
                   </p>
                 </div>
                 <p className="text-xs text-white/70">
-                  {cfg.hero_stat1_label || 'Video Lessons | دروس فيديو'}
+                  {L('hero_stat1_label', 'دروس فيديو', 'Video Lessons')}
                 </p>
               </div>
 
@@ -279,7 +295,7 @@ export default function HeroSection() {
                   </p>
                 </div>
                 <p className="text-xs text-white/70">
-                  {cfg.hero_stat2_label || 'Students | طالب'}
+                  {L('hero_stat2_label', 'طالب', 'Students')}
                 </p>
               </div>
 
@@ -293,15 +309,17 @@ export default function HeroSection() {
                   </p>
                 </div>
                 <p className="text-xs text-white/70">
-                  {cfg.hero_stat3_label || 'Tracking | متابعة'}
+                  {L('hero_stat3_label', 'متابعة', 'Tracking')}
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Instructor Photo - Square shape with elegant frame */}
+          {/* Instructor Photo — (و71) المستر طالع من سحابة: الصورة الرسمية **كاملة**
+              من غير أي قص (object-contain) وسحابة بيضاء فخمة بتغطي أسفل الصورة
+              وإسمه واقف على السحابة — زي الصورة المرجعية بالظبط */}
           <div className="flex justify-center lg:justify-end order-1 lg:order-2 -mt-4 sm:-mt-8">
-            <div className="relative group">
+            <div className="relative group mb-14">
               {/* Gold ambient glow */}
               <div className="absolute -inset-3 bg-gradient-to-br from-[#C49A38]/30 dark:from-[#E5BE5A]/40 via-[#C49A38]/15 to-transparent blur-2xl transition-opacity duration-500 group-hover:opacity-90" />
               {/* Decorative dotted frame */}
@@ -311,32 +329,57 @@ export default function HeroSection() {
               <svg className="absolute -bottom-6 -right-6 w-16 h-16 opacity-40 pointer-events-none" viewBox="0 0 100 100">
                 <circle cx="50" cy="50" r="42" fill="none" stroke="#C49A38" strokeWidth="2.5" strokeDasharray="3 7" />
               </svg>
-              {/* (و70) صورة المستر طالع من السحابة — بتتعرض كاملة بأبعادها الطبيعية
-                  (landscape) زيها بالظبط من غير قص + تحميل فوري */}
-              <div className="relative w-72 sm:w-80 lg:w-[26rem] rounded-2xl overflow-hidden border-2 border-[#C49A38]/40 gold-glow bg-transparent shadow-2xl">
-                {showPhoto ? (
-                  <img
-                    src={heroPhoto}
-                    alt={cfg.instructor_name || 'مستر أحمد شعبان'}
-                    width={853}
-                    height={549}
-                    loading="eager"
-                    fetchPriority="high"
-                    className="w-full h-auto object-cover"
-                  />
-                ) : (
-                  <div className="w-full aspect-square flex items-center justify-center text-[#C49A38]/30">
-                    <GraduationCap className="h-24 w-24" />
-                  </div>
-                )}
-                {/* Subtle gradient overlay for depth */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent pointer-events-none" />
-              </div>
-              {/* Badge overlay — الاسم مرة واحدة بس (طلب المستر) */}
-              <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-[#0F0D0A] border border-[#C49A38]/40 rounded-full px-5 py-2 shadow-lg">
-                <p className="text-[#E5BE5A] font-bold text-sm tracking-wider whitespace-nowrap">
-                  {cfg.instructor_name || 'مستر أحمد شعبان'}
-                </p>
+              <div className="relative w-72 sm:w-80 lg:w-[26rem]">
+                {/* الإطار الذهبي — الصورة كاملة من غير قص */}
+                <div className="relative overflow-hidden rounded-2xl border-2 border-[#C49A38]/40 gold-glow bg-[#0d1b3a] shadow-2xl">
+                  {showPhoto ? (
+                    <img
+                      src={heroPhoto}
+                      alt={L('instructor_name', 'مستر أحمد شعبان', 'Mr. Ahmed Shaaban')}
+                      width={1024}
+                      height={1024}
+                      loading="eager"
+                      fetchPriority="high"
+                      className="w-full h-auto object-contain"
+                    />
+                  ) : (
+                    <div className="w-full aspect-square flex items-center justify-center text-[#C49A38]/30">
+                      <GraduationCap className="h-24 w-24" />
+                    </div>
+                  )}
+                  {/* تدرّج ناعم عند أسفل الصورة — بيذوّبها في منطقة السحابة */}
+                  <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#0F0D0A]/80 via-[#0F0D0A]/30 to-transparent pointer-events-none" />
+                </div>
+
+                {/* (و71) السحابة البيضاء — المستر طالع منها (جسمه بس زي المرجع) */}
+                <div aria-hidden="true" className="pointer-events-none absolute inset-x-[-8%] bottom-[-2.6rem] z-10">
+                  <svg
+                    viewBox="0 0 440 150"
+                    className="w-full drop-shadow-[0_14px_30px_rgba(0,0,0,0.55)]"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <g fill="#f5f8fd">
+                      <ellipse cx="220" cy="108" rx="215" ry="40" />
+                      <circle cx="72" cy="86" r="40" />
+                      <circle cx="140" cy="64" r="50" />
+                      <circle cx="222" cy="54" r="58" />
+                      <circle cx="305" cy="62" r="52" />
+                      <circle cx="372" cy="88" r="38" />
+                    </g>
+                    <g fill="#dbe4f1" opacity="0.5">
+                      <circle cx="165" cy="110" r="26" />
+                      <circle cx="250" cy="116" r="30" />
+                      <circle cx="330" cy="108" r="22" />
+                    </g>
+                  </svg>
+                </div>
+
+                {/* (و71) Badge الاسم واقف على السحابة — الاسم مرة واحدة بس (طلب المستر) */}
+                <div className="absolute bottom-[-2.4rem] left-1/2 -translate-x-1/2 z-20 bg-[#0F0D0A] border-2 border-[#C49A38]/50 rounded-full px-6 py-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
+                  <p className="text-[#E5BE5A] font-bold text-sm tracking-wider whitespace-nowrap">
+                    {L('instructor_name', 'مستر أحمد شعبان', 'Mr. Ahmed Shaaban')}
+                  </p>
+                </div>
               </div>
             </div>
           </div>

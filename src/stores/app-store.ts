@@ -139,6 +139,8 @@ export interface StudentActivity {
 }
 
 export const GRADES = [
+  'رابعة ابتدائي',
+  'خمسة ابتدائي',
   'الصف السادس الابتدائي',
   'أولى إعدادي',
   'تانية إعدادي',
@@ -147,6 +149,8 @@ export const GRADES = [
 ] as const
 
 export const GRADE_SHORT_NAMES: Record<string, string> = {
+  'رابعة ابتدائي': 'G4',
+  'خمسة ابتدائي': 'G5',
   'الصف السادس الابتدائي': 'G6',
   'أولى إعدادي': '1',
   'تانية إعدادي': '2',
@@ -155,6 +159,8 @@ export const GRADE_SHORT_NAMES: Record<string, string> = {
 }
 
 export const GRADES_EN = [
+  { ar: 'رابعة ابتدائي', en: 'Grade 4', icon: 'G4' },
+  { ar: 'خمسة ابتدائي', en: 'Grade 5', icon: 'G5' },
   { ar: 'الصف السادس الابتدائي', en: 'Grade 6', icon: 'G6' },
   { ar: 'أولى إعدادي', en: 'Prep 1', icon: '1' },
   { ar: 'تانية إعدادي', en: 'Prep 2', icon: '2' },
@@ -177,6 +183,10 @@ export interface GradeItem {
 }
 
 export const DEFAULT_GRADES: GradeItem[] = [
+  /* (و71) رابعة وخمسة ابتدائي — طلب المستر حرفيًا: «رابعة ابتدائي / Grade 4
+     وخمسة ابتدائي / Grade 5» — قبل السادس الابتدائي (الترتيب المدرسي) */
+  { ar: 'رابعة ابتدائي', en: 'Grade 4', emoji: '4️⃣', short: 'G4' },
+  { ar: 'خمسة ابتدائي', en: 'Grade 5', emoji: '5️⃣', short: 'G5' },
   { ar: 'الصف السادس الابتدائي', en: 'Grade 6', emoji: '6️⃣', short: 'G6' },
   { ar: 'أولى إعدادي', en: 'Prep 1', emoji: '1️⃣', short: '1' },
   { ar: 'تانية إعدادي', en: 'Prep 2', emoji: '2️⃣', short: '2' },
@@ -207,7 +217,34 @@ export function gradesFromConfig(siteConfig: SiteConfig | null | undefined): Gra
         for (var j = 0; j < items.length; j++) {
           if (items[j].ar.trim() !== '') { hasAny = true; break }
         }
-        if (hasAny) return items
+        if (hasAny) {
+          /* (و71) دمج رابعة وخمسة ابتدائي: لو قاعدة البيانات (أو تخصيص أدمن قديم)
+             مفيهوش الصفين الجداد — بندخلهم قبل «السادس الابتدائي» (أول القايمة لو
+             مش موجودة) من غير ما نلمس باقي تخصيص الأدمن */
+          var hasG4 = false
+          var hasG5 = false
+          for (var m = 0; m < items.length; m++) {
+            var nm = items[m].ar || ''
+            if (nm === 'رابعة ابتدائي' || nm === 'الصف الرابع الابتدائي') hasG4 = true
+            if (nm === 'خمسة ابتدائي' || nm === 'الصف الخامس الابتدائي') hasG5 = true
+          }
+          if (!hasG4 || !hasG5) {
+            var g4: GradeItem = { ar: 'رابعة ابتدائي', en: 'Grade 4', emoji: '4️⃣', short: 'G4' }
+            var g5: GradeItem = { ar: 'خمسة ابتدائي', en: 'Grade 5', emoji: '5️⃣', short: 'G5' }
+            var insertAt = 0
+            for (var s = 0; s < items.length; s++) {
+              if ((items[s].ar || '').indexOf('السادس') !== -1) { insertAt = s; break }
+            }
+            if (insertAt === 0 && items.length > 0 && (items[0].ar || '').indexOf('السادس') === -1) {
+              /* مفيش سادس في القايمة — ندخلهم في الأول */
+              insertAt = 0
+            }
+            if (!hasG4 && !hasG5) items.splice(insertAt, 0, g4, g5)
+            else if (!hasG4) items.splice(insertAt, 0, g4)
+            else items.splice(insertAt, 0, g5)
+          }
+          return items
+        }
       }
     }
   } catch (e) { /* فولباك تحت */ }

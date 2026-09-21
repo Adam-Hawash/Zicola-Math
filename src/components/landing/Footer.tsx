@@ -1,6 +1,8 @@
 'use client'
 
 import { useAppStore } from '@/stores/app-store'
+/* (و71) ترجمة حسب لغة الزائر */
+import { useLangStore, pickConfig } from '@/lib/i18n'
 import { GraduationCap, Heart } from 'lucide-react'
 
 const FALLBACK_PORTFOLIO_URL = 'https://prime-developer-portfolio-11.vercel.app'
@@ -48,14 +50,15 @@ function HeroDevIcon({ className }: { className?: string }) {
 export function Footer() {
   const year = new Date().getFullYear()
   const { siteConfig } = useAppStore()
+  var lang = useLangStore(function (s) { return s.lang })
 
   var cfg = siteConfig
   var portfolioUrl = cfg.hero_developer_url || FALLBACK_PORTFOLIO_URL
   var primeUrl = cfg.prime_developer_url || FALLBACK_PORTFOLIO_URL
   var heroDevLabel = cfg.hero_developer_label || 'Hero Developer'
   var madeByLabel = cfg.footer_made_by_label || 'Developed by Adam Hawash'
-  var brandName = cfg.footer_brand || 'The Scholar in Math'
-  var copyrightText = cfg.footer_copyright || 'جميع الحقوق محفوظة لـ The Scholar in Math'
+  var brandName = pickConfig(cfg, 'footer_brand', lang, 'The Scholar in Math', 'The Scholar in Math')
+  var copyrightText = pickConfig(cfg, 'footer_copyright', lang, 'جميع الحقوق محفوظة لـ أدهم حواش', 'All rights reserved to Adham Hawash')
 
   var fb = cfg.social_facebook || ''
   var wa = cfg.social_whatsapp_channel || ''

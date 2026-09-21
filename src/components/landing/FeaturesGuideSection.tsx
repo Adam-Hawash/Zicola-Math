@@ -3,6 +3,8 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useAppStore } from '@/stores/app-store'
+/* (و71) ترجمة حسب لغة الزائر — النصوص من الأدمن عربي/إنجليزي */
+import { useLangStore, pickConfig } from '@/lib/i18n'
 import {
   BookOpen,
   Video,
@@ -26,6 +28,8 @@ var GUIDE_COLORS = [
 export default function FeaturesGuideSection() {
   var { siteConfig } = useAppStore()
   var cfg = siteConfig
+  /* (و71) لغة الزائر */
+  var lang = useLangStore(function (s) { return s.lang })
 
   var cards = [
     {
@@ -33,6 +37,7 @@ export default function FeaturesGuideSection() {
       titleAr: cfg.guide_card1_title || 'تسجيل حسابك',
       titleEn: cfg.guide_card1_title_en || 'Register',
       description: cfg.guide_card1_desc || 'أنشئ حسابك في المنصة بسرعة وسهولة. اختر صفّك الدراسي وابدأ رحلتك التعليمية فوراً. Create your account quickly and start learning.',
+      descriptionEn: cfg.guide_card1_desc_en || 'Create your account quickly and easily. Pick your grade and start your learning journey right away.',
       color: GUIDE_COLORS[0],
     },
     {
@@ -40,6 +45,7 @@ export default function FeaturesGuideSection() {
       titleAr: cfg.guide_card2_title || 'مشاهدة الدروس',
       titleEn: cfg.guide_card2_title_en || 'Watch Lessons',
       description: cfg.guide_card2_desc || 'تابع شروحات مبسّطة ومتسلسلة لكل درس رياضيات بأسلوب تفاعلي يجعل الفهم أسهل. Watch simplified, step-by-step video lessons.',
+      descriptionEn: cfg.guide_card2_desc_en || 'Follow simplified, sequential video explanations for every lesson in an interactive style.',
       color: GUIDE_COLORS[1],
     },
     {
@@ -47,6 +53,7 @@ export default function FeaturesGuideSection() {
       titleAr: cfg.guide_card3_title || 'حل الواجبات',
       titleEn: cfg.guide_card3_title_en || 'Homework',
       description: cfg.guide_card3_desc || 'أكمل واجباتك الأسبوعية وحلّ التمارين لتثبيت المعلومات واختبار فهمك. Complete weekly homework to reinforce your learning.',
+      descriptionEn: cfg.guide_card3_desc_en || 'Complete your weekly homework and exercises to lock in knowledge and test your understanding.',
       color: GUIDE_COLORS[2],
     },
     {
@@ -54,6 +61,7 @@ export default function FeaturesGuideSection() {
       titleAr: cfg.guide_card4_title || 'أداء الامتحانات',
       titleEn: cfg.guide_card4_title_en || 'Take Exams',
       description: cfg.guide_card4_desc || 'شارك في الامتحانات الدورية لمتابعة مستواك والاستعداد للامتحانات النهائية. Take periodic exams to track your progress.',
+      descriptionEn: cfg.guide_card4_desc_en || 'Take the periodic exams to track your level and prepare for the final exams.',
       color: GUIDE_COLORS[3],
     },
     {
@@ -61,6 +69,7 @@ export default function FeaturesGuideSection() {
       titleAr: cfg.guide_card5_title || 'بطاقات تعليمية',
       titleEn: cfg.guide_card5_title_en || 'Flashcards',
       description: cfg.guide_card5_desc || 'استخدم البطاقات التعليمية لمراجعة المصطلحات والقوانين الرياضية بشكل سريع. Review formulas and terms with flashcards.',
+      descriptionEn: cfg.guide_card5_desc_en || 'Use flashcards to review math terms and formulas quickly.',
       color: GUIDE_COLORS[4],
     },
     {
@@ -68,6 +77,7 @@ export default function FeaturesGuideSection() {
       titleAr: cfg.guide_card6_title || 'تحديات ومسابقات',
       titleEn: cfg.guide_card6_title_en || 'Challenges',
       description: cfg.guide_card6_desc || 'تنافس مع زملائك في تحديات رياضية ممتعة واربح مراكز متقدمة. Compete in fun math challenges with your classmates.',
+      descriptionEn: cfg.guide_card6_desc_en || 'Compete with your classmates in fun math challenges and climb the leaderboard.',
       color: GUIDE_COLORS[5],
     },
   ]
@@ -79,13 +89,13 @@ export default function FeaturesGuideSection() {
         <div className="text-center mb-12 space-y-3">
           <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary">
             <Compass className="h-4 w-4" />
-            <span>{cfg.guide_badge || 'دليلك التعليمي | Learning Guide'}</span>
+            <span>{pickConfig(cfg, 'guide_badge', lang, 'دليلك التعليمي', 'Learning Guide')}</span>
           </div>
           <h2 className="text-2xl font-bold sm:text-3xl text-foreground">
-            {cfg.guide_title || 'كيف تستخدم المنصة؟ | How to Use the Platform'}
+            {pickConfig(cfg, 'guide_title', lang, 'كيف تستخدم المنصة؟', 'How to Use the Platform')}
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto text-sm sm:text-base">
-            {cfg.guide_subtitle || 'ست خطوات بسيطة لتبدأ رحلتك التعليمية في The Scholar in Math — Six simple steps to begin your learning journey'}
+            {pickConfig(cfg, 'guide_subtitle', lang, 'ست خطوات بسيطة لتبدأ رحلتك التعليمية في The Scholar in Math', 'Six simple steps to begin your learning journey with The Scholar in Math')}
           </p>
         </div>
 
@@ -115,15 +125,23 @@ export default function FeaturesGuideSection() {
 
                   {/* Title */}
                   <h3 className="font-semibold text-base leading-snug text-foreground">
-                    <span className="block">{card.titleAr}</span>
-                    <span className="block text-sm text-muted-foreground font-normal mt-0.5">
-                      {card.titleEn}
-                    </span>
+                    {/* (و71) حسب اللغة */}
+                    {lang === 'en' ? (
+                      <>
+                        <span className="block">{card.titleEn}</span>
+                        <span className="block text-sm text-muted-foreground font-normal mt-0.5" dir="rtl">{card.titleAr}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="block">{card.titleAr}</span>
+                        <span className="block text-sm text-muted-foreground font-normal mt-0.5" dir="ltr">{card.titleEn}</span>
+                      </>
+                    )}
                   </h3>
 
                   {/* Description */}
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    {card.description}
+                    {lang === 'en' ? card.descriptionEn : card.description}
                   </p>
                 </CardContent>
               </Card>

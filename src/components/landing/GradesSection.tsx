@@ -3,8 +3,11 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { useAppStore, gradesFromConfig } from '@/stores/app-store'
 import { toast } from 'sonner'
+/* (و71) ترجمة عناوين القسم حسب لغة الزائر */
+import { useT } from '@/lib/i18n'
 
 export function GradesSection() {
+  var T = useT()
   var siteConfig = useAppStore(function (s) { return s.siteConfig })
   var cfg = siteConfig
   // (24-b) القايمة بقت ديناميكية من لوحة الأدمن — والإيموجي هو اللي
@@ -12,7 +15,7 @@ export function GradesSection() {
   var grades = gradesFromConfig(siteConfig)
 
   var handleGradeClick = function(gradeName: string) {
-    toast.info('سجّل أولاً ثم ادخل حسابك للوصول إلى مواد ' + gradeName)
+    toast.info(T('سجّل أولاً ثم ادخل حسابك للوصول إلى مواد ', 'Register first, then log in to access ') + gradeName)
     useAppStore.getState().setShowStudentRegister(true)
   }
 
@@ -20,12 +23,15 @@ export function GradesSection() {
     <section className="py-12 sm:py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <div className="text-center mb-12">
-          <h2 className="text-2xl font-bold sm:text-3xl">{cfg.grades_title || 'السنوات الدراسية'}</h2>
+          <h2 className="text-2xl font-bold sm:text-3xl">
+            {T(cfg.grades_title || 'السنوات الدراسية', cfg.grades_title_en || 'Academic Years')}
+          </h2>
           <p className="mt-3 text-muted-foreground max-w-2xl mx-auto">
-            {cfg.grades_subtitle || 'اختر صفك الدراسي للوصول إلى المحتوى التعليمي المخصص لك'}
+            {T(cfg.grades_subtitle || 'اختر صفك الدراسي للوصول إلى المحتوى التعليمي المخصص لك', cfg.grades_subtitle_en || 'Choose your grade to access the learning content made for you')}
           </p>
         </div>
-        <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+        {/* (و71) سبعة صفوف بعد إضافة رابعة وخمسة ابتدائي */}
+        <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7">
           {grades.map(function(grade) {
             return (
               <Card

@@ -2,6 +2,8 @@
 
 import { Card, CardContent } from '@/components/ui/card'
 import { useAppStore } from '@/stores/app-store'
+/* (و71) ترجمة حسب لغة الزائر — النصوص من الأدمن عربي/إنجليزي */
+import { useLangStore, pickConfig } from '@/lib/i18n'
 import { Lightbulb, Clock, Brain, Pencil, MessageCircle } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
@@ -15,6 +17,8 @@ var TIP_COLORS = [
 
 export default function TipsSection() {
   var { siteConfig, setSiteConfig, configLoaded } = useAppStore()
+  /* (و71) لغة الزائر */
+  var lang = useLangStore(function (s) { return s.lang })
 
   var initialCfg = (typeof window !== 'undefined' && (window as any).__INITIAL_CONFIG__) || {}
   var cfg = configLoaded ? siteConfig : (Object.keys(siteConfig).length > 0 ? siteConfig : initialCfg)
@@ -47,28 +51,32 @@ export default function TipsSection() {
       icon: TIP_ICONS[0],
       titleAr: cfg.tips_card1_title || 'حدد وقت يومي للمراجعة',
       titleEn: cfg.tips_card1_title_en || 'Set Daily Review Time',
-      description: cfg.tips_card1_desc || 'خصص 20-30 دقيقة كل يوم لمراجعة ما تعلمته. الاستمرارية هي مفتاح التفوّق في الرياضيات. Dedicate 20-30 minutes daily for review.',
+      description: cfg.tips_card1_desc || 'خصص 20-30 دقيقة كل يوم لمراجعة ما تعلمته. الاستمرارية هي مفتاح التفوّق في الرياضيات.',
+      descriptionEn: cfg.tips_card1_desc_en || 'Dedicate 20-30 minutes every day to review what you learned. Consistency is the key to excellence in mathematics.',
       color: TIP_COLORS[0],
     },
     {
       icon: TIP_ICONS[1],
       titleAr: cfg.tips_card2_title || 'ركز على الفهم وليس الحفظ',
       titleEn: cfg.tips_card2_title_en || 'Focus on Understanding, Not Memorization',
-      description: cfg.tips_card2_desc || 'حاول فهم لماذا وليس كيف فقط. الفهم العميق يبقي المعلومة لفترة أطول ويساعدك في حل مسائل جديدة. Understand why, not just how.',
+      description: cfg.tips_card2_desc || 'حاول فهم لماذا وليس كيف فقط. الفهم العميق يبقي المعلومة لفترة أطول ويساعدك في حل مسائل جديدة.',
+      descriptionEn: cfg.tips_card2_desc_en || 'Try to understand why, not just how. Deep understanding keeps knowledge longer and helps you solve new problems.',
       color: TIP_COLORS[1],
     },
     {
       icon: TIP_ICONS[2],
       titleAr: cfg.tips_card3_title || 'حل مسائل إضافية كل يوم',
       titleEn: cfg.tips_card3_title_en || 'Solve Extra Problems Daily',
-      description: cfg.tips_card3_desc || 'لا تكتفي بالواجبات فقط. حل مسائل إضافية من الكتاب المدرسي لتعزيز مهاراتك. Practice beyond homework for stronger skills.',
+      description: cfg.tips_card3_desc || 'لا تكتفي بالواجبات فقط. حل مسائل إضافية من الكتاب المدرسي لتعزيز مهاراتك.',
+      descriptionEn: cfg.tips_card3_desc_en || 'Do not stop at homework. Solve extra problems from the textbook to strengthen your skills.',
       color: TIP_COLORS[2],
     },
     {
       icon: TIP_ICONS[3],
       titleAr: cfg.tips_card4_title || 'لا تتردد في السؤال',
       titleEn: cfg.tips_card4_title_en || 'Never Hesitate to Ask',
-      description: cfg.tips_card4_desc || 'إذا لم تفهم شيئاً اسأل فوراً. السؤال الجيد هو بداية الفهم العميق. Ask immediately when something is unclear.',
+      description: cfg.tips_card4_desc || 'إذا لم تفهم شيئاً اسأل فوراً. السؤال الجيد هو بداية الفهم العميق.',
+      descriptionEn: cfg.tips_card4_desc_en || 'If you do not understand something, ask immediately. A good question is the start of deep understanding.',
       color: TIP_COLORS[3],
     },
   ]
@@ -100,13 +108,21 @@ export default function TipsSection() {
           )}
           <div className="space-y-1.5 min-w-0">
             <h3 className="font-semibold text-sm sm:text-base text-foreground leading-snug">
-              <span className="block">{tip.titleAr}</span>
-              <span className="block text-xs sm:text-sm text-muted-foreground font-normal mt-0.5">
-                {tip.titleEn}
-              </span>
+              {/* (و71) حسب اللغة: إنجليزي = العنوان الإنجليزي رئيسي والعربي تحته، والعكس */}
+              {lang === 'en' ? (
+                <>
+                  <span className="block">{tip.titleEn}</span>
+                  <span className="block text-xs sm:text-sm text-muted-foreground font-normal mt-0.5" dir="rtl">{tip.titleAr}</span>
+                </>
+              ) : (
+                <>
+                  <span className="block">{tip.titleAr}</span>
+                  <span className="block text-xs sm:text-sm text-muted-foreground font-normal mt-0.5" dir="ltr">{tip.titleEn}</span>
+                </>
+              )}
             </h3>
             <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              {tip.description}
+              {lang === 'en' ? tip.descriptionEn : tip.description}
             </p>
           </div>
         </CardContent>
@@ -140,13 +156,13 @@ export default function TipsSection() {
         <div className="text-center mb-10 sm:mb-12 space-y-3">
           <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary">
             <Lightbulb className="h-4 w-4" />
-            <span>{cfg.tips_badge || 'نصائح للتفوّق | Tips for Excellence'}</span>
+            <span>{pickConfig(cfg, 'tips_badge', lang, 'نصائح للتفوّق', 'Tips for Excellence')}</span>
           </div>
           <h2 className="text-2xl font-bold sm:text-3xl text-foreground">
-            {cfg.tips_title || 'نصائح للتفوّق في الرياضيات | Tips for Excellence'}
+            {pickConfig(cfg, 'tips_title', lang, 'نصائح للمستر', "Teacher's Tips")}
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto text-sm sm:text-base">
-            {cfg.tips_subtitle || 'نصائح ذهبية للتفوّق في الرياضيات — Golden advice for excellence in Mathematics'}
+            {pickConfig(cfg, 'tips_subtitle', lang, 'نصائح ذهبية من مستر أحمد شعبان للتفوّق في الرياضيات', 'Golden advice from Mr. Ahmed Shaaban to excel in mathematics')}
           </p>
         </div>
 

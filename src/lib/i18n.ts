@@ -74,3 +74,17 @@ export function LangBoot() {
   }, [])
   return null
 }
+
+/* (و71) اختيار قيمة نصية من كونفيج الأدمن حسب لغة الزائر:
+   إنجليزي بقرأ المفتاح *_en (لو الأدمن كاتبه أو فيه افتراضي)،
+   عربي بقرأ المفتاح الأساسي — المستر يكتب كل لغة لوحدها من لوحة التحكم */
+export function pickConfig(cfg: any, key: string, lang: string, arFallback?: string, enFallback?: string): string {
+  if (lang === 'en') {
+    var en = cfg ? cfg[key + '_en'] : ''
+    if (en && String(en).trim() !== '') return String(en)
+    return enFallback || arFallback || ''
+  }
+  var v = cfg ? cfg[key] : ''
+  if (v && String(v).trim() !== '') return String(v)
+  return arFallback || ''
+}

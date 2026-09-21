@@ -152,6 +152,28 @@ var SCHEMA_FIXES = [
   // صورة النافيبار الرسمية + الفيفيكون (مفاتيح جديدة أو قيم قديمة وارثة)
   "UPDATE SiteConfig SET value = '/images/the-scholar-nav.png' WHERE key = 'navbar_photo' AND (value LIKE '%mr-wael%' OR value = '')",
   "UPDATE SiteConfig SET value = '/images/the-scholar-favicon.png' WHERE key = 'favicon_url' AND (value LIKE '%mr-wael%' OR value LIKE '%logo.svg%' OR value = '')",
+  // ===== (و71) تصحيح هوية قاعدة بيانات إنتاج قديمة بتظهر للطلاب «مهندس الماث
+  // م/مصطفى حسام» بدل The Scholar — المستر شاف المنصة المعروضة بالاسم الغلط
+  // والصورة الغلط (الشاب المقتطع من مرجع تاني). بنصلح كل مفاتيح الهوية نهائيًا
+  // في قاعدة البيانات + على القراءة في /api/config. idempotent.
+  "UPDATE SiteConfig SET value = 'The Scholar in Math' WHERE key IN ('navbar_brand', 'footer_brand', 'guide_subtitle', 'schedule_brand') AND (value LIKE '%مهندس الماث%' OR value LIKE '%مصطفى%' OR value LIKE '%حسام%' OR value LIKE '%Mostafa%' OR value LIKE '%Hossam%' OR value LIKE '%Math Engineer%')",
+  "UPDATE SiteConfig SET value = 'The Scholar' WHERE key = 'hero_title_line1' AND (value LIKE '%مهندس%' OR value LIKE '%مصطفى%' OR value LIKE '%حسام%' OR value LIKE '%Mostafa%' OR value LIKE '%Hossam%' OR value LIKE '%Math Engineer%' OR value LIKE '%Zicola%')",
+  "UPDATE SiteConfig SET value = 'by مستر أحمد شعبان' WHERE key = 'hero_title_line2' AND (value LIKE '%مهندس الماث%' OR value LIKE '%مصطفى%' OR value LIKE '%حسام%' OR value LIKE '%Mostafa%' OR value LIKE '%Hossam%' OR value LIKE '%زيكولا%' OR value LIKE '%Zicola%')",
+  "UPDATE SiteConfig SET value = 'مستر أحمد شعبان' WHERE key IN ('navbar_subtitle', 'instructor_name') AND (value LIKE '%مهندس الماث%' OR value LIKE '%مصطفى%' OR value LIKE '%حسام%' OR value LIKE '%Mostafa%' OR value LIKE '%Hossam%' OR value LIKE '%زيكولا%' OR value LIKE '%Zicola%')",
+  // صورة الهيرو: الصورة القديمة (الشاب من مرجع تاني) والروابط الخارجية القديمة
+  // = صورة المستر الرسمية **كاملة** (the-scholar-full) اللي هتظهر في إطار
+  // فخم وهو طالع من السحابة — من غير أي قص (طلب المستر حرفيًا)
+  "UPDATE SiteConfig SET value = '/images/the-scholar-full.png' WHERE key = 'instructor_photo' AND (value LIKE '%the-scholar-hero%' OR value LIKE '%mr-wael%' OR value LIKE '%i.imghos.co%' OR value LIKE '%mostafa%' OR value LIKE '%hossam%' OR value = '')",
+  "UPDATE SiteConfig SET value = '/images/the-scholar-nav.png' WHERE key = 'navbar_photo' AND (value LIKE '%i.imghos.co%' OR value LIKE '%mostafa%' OR value LIKE '%hossam%' OR value = '')",
+  "UPDATE SiteConfig SET value = '/images/the-scholar-favicon.png' WHERE key = 'favicon_url' AND (value LIKE '%i.imghos.co%' OR value LIKE '%logo.svg%' OR value = '')",
+  // ===== (و71) رابعة وخمسة ابتدائي — طلب المستر: «تضيف لي الصف الرابع
+  // الابتدائي اسمه رابعة ابتدائي بالانجليزي Grade 4 وبعديه خمسة ابتدائي
+  // Grade 5» — لو grades_data مش موجودة خالص بنكتب الافتراضي بسبعة صفوف،
+  // ولو موجودة (حتى لو قديمة من غير رابعة/خامسة) الدمج بيحصل في الكود
+  // gradesFromConfig — **ممنوع** نكتب فوق تخصيص الأدمن (idempotent).
+  "INSERT INTO SiteConfig (id, key, value, updatedAt) SELECT 'cfg_grades_w71', 'grades_data', '[{\"ar\":\"رابعة ابتدائي\",\"en\":\"Grade 4\",\"emoji\":\"4️⃣\",\"short\":\"G4\"},{\"ar\":\"خمسة ابتدائي\",\"en\":\"Grade 5\",\"emoji\":\"5️⃣\",\"short\":\"G5\"},{\"ar\":\"الصف السادس الابتدائي\",\"en\":\"Grade 6\",\"emoji\":\"6️⃣\",\"short\":\"G6\"},{\"ar\":\"أولى إعدادي\",\"en\":\"Prep 1\",\"emoji\":\"1️⃣\",\"short\":\"1\"},{\"ar\":\"تانية إعدادي\",\"en\":\"Prep 2\",\"emoji\":\"2️⃣\",\"short\":\"2\"},{\"ar\":\"تالتة إعدادي\",\"en\":\"Prep 3\",\"emoji\":\"3️⃣\",\"short\":\"3\"},{\"ar\":\"أولى بكالوريا\",\"en\":\"1 Bac\",\"emoji\":\"🅱️\",\"short\":\"1B\"}]', CURRENT_TIMESTAMP WHERE NOT EXISTS (SELECT 1 FROM SiteConfig WHERE key = 'grades_data')",
+  // الصفوف الافتراضية في الكود اتحدثت برضه — للقواعد اللي grades_data فيها
+  // صفوف مخصصة من الأدمن بنحافظ عليها زي ما هي (الدمج في gradesFromConfig)
   // ===== ترحيل لمرة واحدة (idempotent) =====
   // الحسابات الموجودة اللي ملهاش ربط إنشاء: نثبّت الربط الحالي كـ"جهاز إنشاء"
   // عشان مفيش حساب يتحجب فجأة بعد الترقية. الربط ده بعدها **ثابت** — أي جهاز
@@ -212,7 +234,7 @@ export var CORE_TABLES = ['Admin', 'Student', 'StudentActivity', 'Video', 'Homew
 /* (و45) مفتاح البصمة اتبدّل رابع — عمود GalleryImage.thumbnail (صورة مصغرة
  * لفيديوهات المعرض) دخل SCHEMA_TABLES + SCHEMA_COLUMNS — نفس الدرس الموثق:
  * من غير البَمب العمود مش هيتضاف على Turso أول ريكوست بعد النشر. */
-var SCHEMA_HASH_KEY = 'schema_heal_hash_v2_w45'
+var SCHEMA_HASH_KEY = 'schema_heal_hash_v3_w71'
 
 /* ============================================================
  * 2026-و23 — **إصلاح بطء المنصة** (طلب المستر: «المنصة بطيئة، تسجيل

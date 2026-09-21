@@ -28,7 +28,7 @@ import {
 import { toast } from 'sonner'
 /* (و64) زراير الثيم + اللغة الموحدة في كل المنصة + الترجمة الحقيقية */
 import { PlatformToggles } from '@/components/platform-toggles'
-import { useT } from '@/lib/i18n'
+import { useT, useLangStore, pickConfig } from '@/lib/i18n'
 /* (و70) زرار «أوائل الطلبة» اتشال من النافبار بطلب المستر (حاجات الطلاب) */
 
 export function Navbar() {
@@ -36,6 +36,8 @@ export function Navbar() {
   /* (2026-و29) دايلوج أوائل الطلبة */
   /* (و64) الترجمة الحقيقية — عربي/إنجليزي */
   const T = useT()
+  /* (و71) اسم النافيبار حسب اللغة (الأدمن يكتب عربي/إنجليزي) */
+  var lang = useLangStore(function (s) { return s.lang })
 
   const {
     currentView,
@@ -58,7 +60,7 @@ export function Navbar() {
   const youtubeLink = cfg.social_youtube || ''
   // اسم المنصة جنب صورة المستر — "The Scholar in Math" بالإنجليزي (طلب المستر حرفيًا:
   // "انت كتبلي مستر بالعربي — لا، عايزك تكتبلي ماث جينيس بالانجليزي زي المكتوب في المنصة")
-  const navName = cfg.navbar_brand || 'The Scholar in Math'
+  const navName = pickConfig(cfg, 'navbar_brand', lang, 'The Scholar in Math', 'The Scholar in Math')
 
   const isAuthenticated = !!currentStudent || isAdminLoggedIn
   const isAuthPage = currentView === 'auth-login' || currentView === 'auth-register'
