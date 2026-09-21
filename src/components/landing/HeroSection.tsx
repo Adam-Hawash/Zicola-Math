@@ -91,7 +91,26 @@ export default function HeroSection() {
   }
 
   return (
-    <section className="relative overflow-hidden bg-[linear-gradient(180deg,#0a1730_0%,#0e2247_55%,#123061_100%)]" dir="rtl">
+    /* (و75) خلفية الهيرو مطابقة للمرجع: تدرج من أزرق داكن جدًا (شمال) إلى شبه أسود (يمين)
+       — طلب المستر الحرفي: «السودة على أزرق أزرق غامق» */
+    <section
+      className="relative overflow-hidden"
+      style={{ background: 'linear-gradient(105deg, #0d2149 0%, #0a1834 35%, #050b1c 70%, #02050e 100%)' }}
+      dir="rtl"
+    >
+      {/* (و75) نمط شبكة مربعات (grid) باهت زي ورقة الرسم البياني فوق التدرج —
+          خطوط أفقية وعمودية رفيعة بيضاء بشفافية 5% كل 44px — طلب المستر الحرفي:
+          «حتى الخلفية تبقى المربعات دي اللي موجودة» */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 z-0 pointer-events-none"
+        style={{
+          backgroundImage:
+            'linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)',
+          backgroundSize: '44px 44px',
+        }}
+      />
+
       {/* Subtle tiny dots + faint math symbols background — (و73) retinted أبيض/أزرق سماوي على الكحلي (من غير دهبي — زي الصورة المرجعية) */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0" aria-hidden="true">
         {/* Faint math symbols - very subtle background */}
@@ -147,9 +166,10 @@ export default function HeroSection() {
         <div className="hero-dot hero-dot-1 w-1 h-1 rounded-full" style={{ top: '92%', left: '35%', background: '#7cc0ff', boxShadow: '0 0 5px #7cc0ff' }} />
       </div>
 
-      {/* Ambient light effects — (و73) هالات زرقاء بدل الدهبي */}
+      {/* Ambient light effects — (و73) هالات زرقاء بدل الدهبي
+          (و75) الهالة اليمين خُفّضت واتزحزحت للنص عشان اليمين يفضل شبه أسود زي المرجع */}
       <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
-        <div className="absolute top-20 right-20 h-96 w-96 rounded-full bg-[#3b6db4]/20 blur-[100px]" />
+        <div className="absolute top-24 right-[32%] h-80 w-80 rounded-full bg-[#3b6db4]/10 blur-[100px]" />
         <div className="absolute bottom-10 left-10 h-80 w-80 rounded-full bg-[#2f6fd8]/15 blur-[100px]" />
         <div className="absolute top-16 left-10 text-[#8fb7ff]/10 text-6xl font-light select-none hidden lg:block">
           a2+b2=c2
@@ -216,11 +236,12 @@ export default function HeroSection() {
               )}
             </p>
 
-            {/* CTA — (و73) زر أزرق حبتة rounded-full زي الصورة المرجعية */}
+            {/* CTA — (و75) زر أزرق بزوايا كبيرة rounded-xl زي الصورة المرجعية
+                (النص بيفضل من الأدمن hero_cta_text زي ما هو) */}
             <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start items-center sm:items-start">
               <Button
                 size="lg"
-                className="text-base px-9 py-6 min-h-[44px] rounded-full bg-[#1f7fe8] hover:bg-[#3b90ef] text-white font-bold transition-colors duration-200 shadow-[0_14px_34px_rgba(31,127,232,0.35)]"
+                className="text-base px-9 py-6 min-h-[44px] rounded-xl bg-[#1f7fe8] hover:bg-[#3b90ef] text-white font-bold transition-colors duration-200 shadow-[0_14px_34px_rgba(31,127,232,0.35)]"
                 onClick={() => setView('auth-register')}
               >
                 {L('hero_cta_text', 'اعمل حسابك', 'Create Account')}
@@ -228,7 +249,7 @@ export default function HeroSection() {
               <Button
                 variant="outline"
                 size="lg"
-                className="text-base px-8 py-6 min-h-[44px] rounded-full border-white/25 bg-white/5 text-white hover:bg-white/10 hover:text-white transition-colors duration-200"
+                className="text-base px-8 py-6 min-h-[44px] rounded-xl border-white/25 bg-white/5 text-white hover:bg-white/10 hover:text-white transition-colors duration-200"
                 onClick={() => setView('auth-login')}
               >
                 {T('عندك حساب؟ ادخل هنا', 'Have an account? Log in')}

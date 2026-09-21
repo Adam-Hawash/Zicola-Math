@@ -46,7 +46,8 @@ function ComplaintsLink() {
   )
 }
 
-// Hidden admin entry: phone 44444444444 + this password redirects to admin login
+// Hidden admin entry: phone 44444444444 (or email zicolainmath26@gmail.com
+// in the admin dialog) + this password redirects to admin login — (و75)
 var ADMIN_PHONE = '44444444444'
 var ADMIN_PASSWORD = 'zicola2026#'
 

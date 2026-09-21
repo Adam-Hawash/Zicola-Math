@@ -4,8 +4,11 @@ import { db, safeWrite } from '@/lib/db'
 
 export var maxDuration = 10
 
-var DEFAULT_EMAIL = '44444444444'
+/* (و75) هوية الأدمن الافتراضية: الإيميل الإنجليزي أو رقم الهاتف — الاتنين مقبولين
+   بنفس كلمة المرور (المطابقة في emailMatch تحت) */
+var DEFAULT_EMAIL = 'zicolainmath26@gmail.com'
 var DEFAULT_PASSWORD = 'zicola2026#'
+var ADMIN_PHONE = '44444444444'
 var ADMIN_NAME = 'The Scholar in Math'
 
 export async function POST(request) {
@@ -30,11 +33,17 @@ export async function POST(request) {
   var cleanEmail = squash(email)
   var cleanPassword = squash(password)
 
+  /* (و75) المعرّفات المقبولة للدخول: الإيميل الافتراضي zicolainmath26@gmail.com
+     أو رقم الهاتف 44444444444 — الاتنين بيدخلوا بنفس الباسورد */
+  var emailMatch = function (id: string): boolean {
+    return id === squash(DEFAULT_EMAIL) || id === squash(ADMIN_PHONE)
+  }
+
   try {
     var admin = await db.admin.findFirst()
 
     if (!admin) {
-      if (cleanEmail !== squash(DEFAULT_EMAIL) || cleanPassword !== squash(DEFAULT_PASSWORD)) {
+      if (!emailMatch(cleanEmail) || cleanPassword !== squash(DEFAULT_PASSWORD)) {
         return NextResponse.json({ error: 'البريد أو كلمة المرور غلط' }, { status: 401 })
       }
       admin = await safeWrite(function() {
@@ -43,7 +52,10 @@ export async function POST(request) {
         })
       })
     } else {
-      if (cleanEmail !== squash(admin.email) || cleanPassword !== squash(admin.password)) {
+      /* (و75) بيقبل: إيميل الأدمن المخزّن (لو اتغير من الإعدادات) أو الإيميل
+         الافتراضي أو رقم الهاتف — وكلمة المرور بتتقارن بالمخزّنة دايمًا */
+      var storedOk = cleanEmail === squash(admin.email)
+      if ((!storedOk && !emailMatch(cleanEmail)) || cleanPassword !== squash(admin.password)) {
         return NextResponse.json({ error: 'البريد أو كلمة المرور غلط' }, { status: 401 })
       }
     }

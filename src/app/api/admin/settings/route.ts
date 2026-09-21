@@ -2,7 +2,9 @@
 import { NextResponse } from 'next/server'
 import { db, safeWrite } from '@/lib/db'
 
-var DEFAULT_EMAIL = '44444444444'
+/* (و75) الإيميل الافتراضي للأدمن بقى الإيميل الإنجليزي —
+   رقم الهاتف 44444444444 بيفضل مقبول في اللوجين كمان (login/route.ts) */
+var DEFAULT_EMAIL = 'zicolainmath26@gmail.com'
 var DEFAULT_PASSWORD = 'zicola2026#'
 var DEFAULT_NAME = 'The Scholar in Math'
 

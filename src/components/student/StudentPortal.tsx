@@ -78,6 +78,9 @@ import {
 } from '@/components/worksheet/WorksheetParts'
 
 export function StudentPortal() {
+  /* (و75) ملاحظة: المساعد الذكي (زرار عائم + شات) مربوط عالميًا في
+     src/app/layout.tsx (سطر <AIAssistant /> — نفس أسلوب maths-genius)
+     فبيظهر جوه البورتال تلقائيًا من غير تركيب مزدوج */
   return <StudentPortalInner />
 }
 
