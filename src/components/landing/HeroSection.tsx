@@ -91,59 +91,60 @@ export default function HeroSection() {
   }
 
   return (
-    /* (و75) خلفية الهيرو مطابقة للمرجع: تدرج من أزرق داكن جدًا (شمال) إلى شبه أسود (يمين)
-       — طلب المستر الحرفي: «السودة على أزرق أزرق غامق» */
+    /* (2-c) خلفية الهيرو مطابقة للصورة المرجعية: أزرق ملكي مشع فوق (بهوت سبوت
+       أفتح عند منطقة النص يمين فوق) بيبهد لأسود/فحمي تحت — عكس النسخة القديمة
+       اللي كانت مائلة 105deg */
     <section
       className="relative overflow-hidden"
-      style={{ background: 'linear-gradient(105deg, #0d2149 0%, #0a1834 35%, #050b1c 70%, #02050e 100%)' }}
+      style={{ background: 'radial-gradient(ellipse at 75% 0%, rgba(59,130,246,0.30) 0%, transparent 55%), linear-gradient(180deg, #0a4588 0%, #073263 22%, #041a33 55%, #020b16 85%, #01060c 100%)' }}
       dir="rtl"
     >
-      {/* (و75) نمط شبكة مربعات (grid) باهت زي ورقة الرسم البياني فوق التدرج —
-          خطوط أفقية وعمودية رفيعة بيضاء بشفافية 5% كل 44px — طلب المستر الحرفي:
-          «حتى الخلفية تبقى المربعات دي اللي موجودة» */}
+      {/* (2-c) نمط شبكة مربعات بخطوط زرقاء فاتحة (زي المرجع) بحجم 64px */}
       <div
         aria-hidden="true"
         className="absolute inset-0 z-0 pointer-events-none"
         style={{
           backgroundImage:
-            'linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px)',
-          backgroundSize: '44px 44px',
+            'linear-gradient(rgba(125,180,255,0.10) 1px, transparent 1px), linear-gradient(90deg, rgba(125,180,255,0.10) 1px, transparent 1px)',
+          backgroundSize: '64px 64px',
         }}
       />
 
       {/* Subtle tiny dots + faint math symbols background — (و73) retinted أبيض/أزرق سماوي على الكحلي (من غير دهبي — زي الصورة المرجعية) */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0" aria-hidden="true">
-        {/* Faint math symbols - very subtle background */}
-        <div className="absolute text-[120px] font-bold text-white/[0.05] leading-none select-none" style={{ top: '5%', right: '5%' }}>√</div>
-        <div className="absolute text-[90px] font-bold text-[#8fb7ff]/[0.08] leading-none select-none" style={{ top: '15%', left: '8%' }}>π</div>
-        <div className="absolute text-[100px] font-bold text-white/[0.05] leading-none select-none" style={{ top: '50%', left: '5%' }}>∑</div>
-        <div className="absolute text-[80px] font-bold text-white/[0.05] leading-none select-none" style={{ top: '65%', right: '10%' }}>∫</div>
-        <div className="absolute text-[70px] font-bold text-[#8fb7ff]/[0.07] leading-none select-none" style={{ top: '85%', left: '15%' }}>∞</div>
-        <div className="absolute text-[60px] font-bold text-[#7cc0ff]/[0.08] leading-none select-none" style={{ top: '25%', right: '40%' }}>a²</div>
-        <div className="absolute text-[55px] font-bold text-white/[0.05] leading-none select-none" style={{ top: '70%', left: '40%' }}>b²</div>
-        <div className="absolute text-[65px] font-bold text-[#7cc0ff]/[0.07] leading-none select-none" style={{ top: '40%', right: '8%' }}>Δ</div>
-        <div className="absolute text-[50px] font-bold text-white/[0.05] leading-none select-none" style={{ top: '10%', left: '30%' }}>θ</div>
-        <div className="absolute text-[75px] font-bold text-[#8fb7ff]/[0.06] leading-none select-none" style={{ top: '80%', right: '30%' }}>÷</div>
+        {/* (2-c) رموز خلفية باهتة — رموز وأماكن مختلفة تمامًا عن منصة Maths
+            Genius (طلب المستر: «الرموز في الباك جراوند خليها في أماكن مختلفة
+            وأشكال مختلفة عن الـ جينيوس») — نفس المعاملة الباهتة */}
+        <div className="absolute text-[85px] font-bold text-white/[0.05] leading-none select-none" style={{ top: '16%', right: '24%' }}>×</div>
+        <div className="absolute text-[90px] font-bold text-[#8fb7ff]/[0.08] leading-none select-none" style={{ top: '34%', left: '10%' }}>+</div>
+        <div className="absolute text-[75px] font-bold text-white/[0.05] leading-none select-none" style={{ top: '7%', left: '52%' }}>=</div>
+        <div className="absolute text-[65px] font-bold text-[#8fb7ff]/[0.07] leading-none select-none" style={{ top: '58%', right: '36%' }}>%</div>
+        <div dir="ltr" className="absolute text-[55px] font-bold text-white/[0.05] leading-none select-none" style={{ top: '86%', right: '10%' }}>f(x)</div>
+        <div className="absolute text-[70px] font-bold text-[#8fb7ff]/[0.08] leading-none select-none" style={{ top: '70%', left: '28%' }}>∠</div>
+        <div className="absolute text-[60px] font-bold text-white/[0.05] leading-none select-none" style={{ top: '45%', right: '58%' }}>½</div>
+        <div dir="ltr" className="absolute text-[45px] font-bold text-[#8fb7ff]/[0.07] leading-none select-none" style={{ top: '92%', left: '45%' }}>90°</div>
 
-        {/* Geometric shapes - very subtle background */}
-        <svg className="absolute text-white/[0.07]" style={{ top: '8%', left: '20%', width: '50px', height: '50px' }} viewBox="0 0 50 50" fill="none" stroke="currentColor" strokeWidth="2">
-          <polygon points="25,5 45,45 5,45" />
+        {/* (2-c) أشكال هندسية جديدة كلها: معيّن/شبه منحرف/متوازي أضلاع/مكعب
+            أيزومتري/نجمة رباعية/علامة زائد — في أماكن مختلفة عن مثلث/دائرة/
+            مربع/خماسي/سداسي جينيوس — نفس ستايل الستروك الباهت */}
+        <svg className="absolute text-white/[0.07]" style={{ top: '22%', left: '38%', width: '52px', height: '52px' }} viewBox="0 0 50 50" fill="none" stroke="currentColor" strokeWidth="2">
+          <polygon points="25,5 45,25 25,45 5,25" />
         </svg>
-        <svg className="absolute text-white/[0.07]" style={{ top: '55%', right: '20%', width: '55px', height: '55px' }} viewBox="0 0 50 50" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="25" cy="25" r="20" />
+        <svg className="absolute text-[#8fb7ff]/[0.08]" style={{ top: '48%', right: '6%', width: '55px', height: '55px' }} viewBox="0 0 50 50" fill="none" stroke="currentColor" strokeWidth="2">
+          <polygon points="14,8 36,8 45,42 5,42" />
         </svg>
-        <svg className="absolute text-white/[0.07]" style={{ top: '78%', left: '40%', width: '45px', height: '45px' }} viewBox="0 0 50 50" fill="none" stroke="currentColor" strokeWidth="2">
-          <rect x="8" y="8" width="34" height="34" />
+        <svg className="absolute text-white/[0.07]" style={{ top: '80%', left: '55%', width: '50px', height: '50px' }} viewBox="0 0 50 50" fill="none" stroke="currentColor" strokeWidth="2">
+          <polygon points="16,8 45,8 34,42 5,42" />
         </svg>
-        <svg className="absolute text-[#8fb7ff]/[0.08]" style={{ top: '32%', right: '45%', width: '50px', height: '50px' }} viewBox="0 0 50 50" fill="none" stroke="currentColor" strokeWidth="2">
-          <polygon points="25,5 45,20 38,45 12,45 5,20" />
+        <svg className="absolute text-[#8fb7ff]/[0.08]" style={{ top: '62%', left: '5%', width: '55px', height: '55px' }} viewBox="0 0 50 50" fill="none" stroke="currentColor" strokeWidth="2">
+          <polygon points="25,5 42,14.5 42,33.5 25,43 8,33.5 8,14.5" />
+          <path d="M8,14.5 L25,24 L42,14.5 M25,24 L25,43" />
         </svg>
-        <svg className="absolute text-[#8fb7ff]/[0.08]" style={{ top: '92%', right: '5%', width: '55px', height: '55px' }} viewBox="0 0 50 50" fill="none" stroke="currentColor" strokeWidth="2">
-          <polygon points="25,5 42,15 42,35 25,45 8,35 8,15" />
+        <svg className="absolute text-white/[0.07]" style={{ top: '94%', right: '30%', width: '50px', height: '50px' }} viewBox="0 0 50 50" fill="none" stroke="currentColor" strokeWidth="2">
+          <polygon points="25,3 30.5,19.5 47,25 30.5,30.5 25,47 19.5,30.5 3,25 19.5,19.5" />
         </svg>
-        <svg className="absolute text-white/[0.07]" style={{ top: '45%', left: '48%', width: '50px', height: '50px' }} viewBox="0 0 50 50" fill="none" stroke="currentColor" strokeWidth="2">
-          <polygon points="5,45 45,45 5,5" />
-          <path d="M 5,15 L 15,15 L 15,45" stroke="currentColor" strokeWidth="1.5" fill="none" />
+        <svg className="absolute text-[#8fb7ff]/[0.08]" style={{ top: '36%', right: '80%', width: '48px', height: '48px' }} viewBox="0 0 50 50" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M20,6 H30 V20 H44 V30 H30 V44 H20 V30 H6 V20 H20 Z" />
         </svg>
 
         {/* 18 dots — منتشرة بألوان أزرق/سماوي/أبيض (بدل دهبي القديم) */}
@@ -171,11 +172,12 @@ export default function HeroSection() {
       <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
         <div className="absolute top-24 right-[32%] h-80 w-80 rounded-full bg-[#3b6db4]/10 blur-[100px]" />
         <div className="absolute bottom-10 left-10 h-80 w-80 rounded-full bg-[#2f6fd8]/15 blur-[100px]" />
-        <div className="absolute top-16 left-10 text-[#8fb7ff]/10 text-6xl font-light select-none hidden lg:block">
-          a2+b2=c2
+        {/* (2-c) معادلات محيطية جديدة مختلفة عن جينيوس (a2+b2=c2 و f(x) القديمين) */}
+        <div dir="ltr" className="absolute top-16 right-10 text-[#8fb7ff]/10 text-6xl font-light select-none hidden lg:block">
+          y=mx+b
         </div>
-        <div className="absolute bottom-32 right-16 text-[#8fb7ff]/8 text-5xl font-light select-none hidden lg:block">
-          f(x)
+        <div dir="ltr" className="absolute bottom-24 left-10 text-[#8fb7ff]/8 text-5xl font-light select-none hidden lg:block">
+          x²+y²=r²
         </div>
       </div>
 
@@ -358,43 +360,42 @@ export default function HeroSection() {
                 </span>
               </div>
 
-              {/* السحابة البيضاء القطنية الكبيرة — بتغطي ذيل الصورة (z فوق الصورة) */}
+              {/* (2-c) السحابة الكرتونية المسطّحة — أبيض صافي ببفّات دائرية واضحة
+                  زي الصورة المرجعية بالظبط (من غير أي تدرج — فلات فيكتور)،
+                  وبتغطي ذيل الصورة والمستر طالع من وراها */}
               <div className="relative z-20 -mt-14 sm:-mt-20 flex justify-center">
                 <svg
                   aria-hidden="true"
-                  viewBox="0 0 560 200"
+                  viewBox="0 0 560 230"
                   className="w-[112%] max-w-none drop-shadow-[0_20px_44px_rgba(2,8,23,0.55)]"
                   xmlns="http://www.w3.org/2000/svg"
                 >
                   <defs>
-                    <linearGradient id="heroCloudGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#ffffff" />
-                      <stop offset="55%" stopColor="#f6f8fe" />
-                      <stop offset="100%" stopColor="#e0e9f8" />
-                    </linearGradient>
                     <filter id="heroCloudShadowBlur" x="-50%" y="-50%" width="200%" height="200%">
                       <feGaussianBlur stdDeviation="10" />
                     </filter>
                   </defs>
                   {/* ظل ناعم عريض تحت السحابة */}
-                  <ellipse cx="280" cy="180" rx="256" ry="14" fill="#06122a" opacity="0.45" filter="url(#heroCloudShadowBlur)" />
-                  {/* طبقات السحابة — بفّات أكتر وأنعم (كارتوني قطني) */}
-                  <g fill="url(#heroCloudGrad)">
-                    <ellipse cx="280" cy="134" rx="266" ry="50" />
-                    <circle cx="78" cy="110" r="44" />
-                    <circle cx="150" cy="78" r="54" />
-                    <circle cx="248" cy="56" r="62" />
-                    <circle cx="352" cy="66" r="58" />
-                    <circle cx="448" cy="92" r="50" />
-                    <circle cx="506" cy="120" r="36" />
+                  <ellipse cx="280" cy="220" rx="248" ry="13" fill="#06122a" opacity="0.45" filter="url(#heroCloudShadowBlur)" />
+                  {/* جسم السحابة الأبيض الصافي — بيضاوية قاعدة + بفّات دائرية */}
+                  <g fill="#ffffff">
+                    <ellipse cx="280" cy="165" rx="215" ry="58" />
+                    <circle cx="105" cy="150" r="55" />
+                    <circle cx="175" cy="100" r="62" />
+                    <circle cx="280" cy="75" r="72" />
+                    <circle cx="385" cy="100" r="60" />
+                    <circle cx="462" cy="150" r="52" />
+                    {/* بفّات سفلية بارزة تحت الجسم — حافة كرتونية مسنّنة */}
+                    <circle cx="150" cy="195" r="38" />
+                    <circle cx="245" cy="205" r="42" />
+                    <circle cx="335" cy="205" r="42" />
+                    <circle cx="420" cy="195" r="36" />
                   </g>
-                  {/* تظليل رمادي-أزرق خفيف تحت البفّات (عمق) */}
-                  <g fill="#d5e0f3" opacity="0.55">
-                    <ellipse cx="176" cy="160" rx="82" ry="16" />
-                    <ellipse cx="390" cy="162" rx="90" ry="16" />
-                  </g>
-                  <g fill="#c8d6ee" opacity="0.4">
-                    <ellipse cx="280" cy="168" rx="120" ry="14" />
+                  {/* طبقة تظليل مسطحة واحدة أسفل الجسم (عمق من غير تدرج) */}
+                  <g fill="#e6edf8" opacity="0.8">
+                    <ellipse cx="170" cy="198" rx="85" ry="17" />
+                    <ellipse cx="395" cy="200" rx="92" ry="17" />
+                    <ellipse cx="280" cy="208" rx="130" ry="15" />
                   </g>
                 </svg>
               </div>

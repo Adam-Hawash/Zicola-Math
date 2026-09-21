@@ -129,7 +129,7 @@ export function Navbar() {
               target="_blank"
               rel="noopener noreferrer"
               title="Developer Portfolio"
-              className="flex items-center justify-center py-1.5 text-[11px] text-muted-foreground hover:text-foreground hover:underline underline-offset-2 transition-colors"
+              className="flex items-center justify-center py-2 text-[13px] font-medium md:text-[15px] text-muted-foreground hover:text-foreground hover:underline underline-offset-2 transition-colors"
             >
               <span dir="ltr">
                 {cfg.footer_made_by_label || 'Developed by Adam Hawash'}
@@ -239,9 +239,6 @@ export function Navbar() {
                 </Button>
               </>
             )}
-            {/* (و73) سويتش اللغة الحبة — ظاهر في كل الحالات (زائر/طالب/أدمن)
-                جنب أزرار الدخول في الديسكتوب زي منصة د. شيماء */}
-            <LangPillToggle />
           </nav>
 
           {/* YouTube + Theme Toggle + Mobile Menu Button */}
@@ -264,14 +261,13 @@ export function Navbar() {
                 href={youtubeLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center min-h-[44px] min-w-[44px] text-muted-foreground hover:text-red-500 transition-colors"
+                className="hidden sm:flex items-center justify-center min-h-[44px] min-w-[44px] text-muted-foreground hover:text-red-500 transition-colors"
                 title="YouTube"
               >
                 <Youtube className="h-4 w-4" />
               </a>
             )}
 
-            {/* (و64) زرار الثيم — (و73) اللغة بقت الحبة الجديدة فوق في شريط اللينكات */}
             <ThemeToggle />
 
             {/* Mobile Hamburger */}
@@ -288,6 +284,11 @@ export function Navbar() {
                 <Menu className="h-5 w-5" />
               )}
             </Button>
+
+            {/* (2-c) سويتش اللغة الحبة — آخر عنصر في الصف (أقصى الطرف):
+                باين دايمًا على الموبايل والديسكتوب في كل الحالات (زائر/طالب/أدمن)
+                من غير فتح القايمة — والتعريف نفسه فوق زي ما هو */}
+            <LangPillToggle />
           </div>
         </div>
 
@@ -295,6 +296,20 @@ export function Navbar() {
         {mobileMenu && (
           <div className="md:hidden border-t bg-background/95 backdrop-blur-md px-4 py-3 space-y-2">
             {/* (و70) أوائل الطلبة اتشال من قايمة الموبايل بطلب المستر */}
+            {/* (2-c) YouTube — أول عنصر في قايمة الموبايل (اتخفى من صف النافبار
+                على الموبايل عشان الـoverflow، فاتنقل هنا مكانه) */}
+            {youtubeLink && (
+              <a
+                href={youtubeLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMobileMenu(false)}
+                className="flex items-center gap-2 min-h-[44px] px-3 rounded-xl border border-border bg-muted/40 text-foreground font-bold text-sm"
+              >
+                <Youtube className="h-4 w-4" />
+                YouTube
+              </a>
+            )}
             {/* Geometry Laws — قوانين الهندسة (ظاهر للكل: زائر/طالب/أدمن) */}
             <a
               href="/geometry-laws"
@@ -376,11 +391,6 @@ export function Navbar() {
                 </Button>
               </>
             )}
-
-            {/* (و73) سويتش اللغة الحبة في قايمة الموبايل — ظاهر للكل (زائر/طالب/أدمن) */}
-            <div className="flex justify-center pt-1">
-              <LangPillToggle />
-            </div>
           </div>
         )}
       </header>
