@@ -249,7 +249,7 @@ export function PlayerSettingsPanel() {
   async function testSend() {
     setTesting(true)
     try {
-      const r = await fetch('/api/admin/messages/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'test', message: 'رسالة تجربة من منصة The Scholar in Math — لو وصلتك يبقى الإرسال شغال ✅' }) })
+      const r = await fetch('/api/admin/messages/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'test', message: 'رسالة تجربة من منصة Zicola In Math — لو وصلتك يبقى الإرسال شغال ✅' }) })
       const d = await r.json()
       if (d && d.ok && d.mode === 'manual') {
         toast.info('الإرسال التلقائي مش مفعّل — فتحتلك واتساب جاهز على موبايل الأدمن')
@@ -289,7 +289,7 @@ export function PlayerSettingsPanel() {
           </div>
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <Label className="text-sm">ارتفاع الدرع العلوي (شريط The Scholar in Math فوق)</Label>
+              <Label className="text-sm">ارتفاع الدرع العلوي (شريط Zicola In Math فوق)</Label>
               <Badge variant="secondary" className="font-bold">{cfg.topShieldHeight ? cfg.topShieldHeight + 'px' : 'تلقائي'}</Badge>
             </div>
             <Slider value={[cfg.topShieldHeight]} min={0} max={96} step={2} onValueChange={(v) => setCfg((p) => ({ ...p, topShieldHeight: v[0] }))} />
@@ -339,9 +339,9 @@ export function PlayerSettingsPanel() {
                 onPointerDown={(e) => onItemPointerDown(e, { kind: 'logo' })}
               >
                 {/* (MG-4) نفس شكل المشغل: brand = لوجو بس | name = اسم ثنائي وتحتيه الرقم | both = لوجو فوق + اسم ورقم */}
-                {cfg.centerLogo.content === 'both' && <span style={{ display: 'block', fontSize: '0.42em', fontWeight: 900, letterSpacing: 0.5, marginBottom: 2, opacity: 0.9 }}>The Scholar in Math</span>}
+                {cfg.centerLogo.content === 'both' && <span style={{ display: 'block', fontSize: '0.42em', fontWeight: 900, letterSpacing: 0.5, marginBottom: 2, opacity: 0.9 }}>Zicola In Math</span>}
                 {cfg.centerLogo.content === 'brand' ? (
-                  <span style={{ display: 'block' }}>The Scholar in Math</span>
+                  <span style={{ display: 'block' }}>Zicola In Math</span>
                 ) : (
                   <>
                     <span style={{ display: 'block' }}>اسم الطالب الثنائي</span>

@@ -6,7 +6,7 @@ import { db, safeWrite } from '@/lib/db'
    رقم الهاتف 44444444444 بيفضل مقبول في اللوجين كمان (login/route.ts) */
 var DEFAULT_EMAIL = 'zicolainmath26'
 var DEFAULT_PASSWORD = 'zicola2026#'
-var DEFAULT_NAME = 'The Scholar in Math'
+var DEFAULT_NAME = 'Zicola In Math'
 
 export async function GET() {
   try {

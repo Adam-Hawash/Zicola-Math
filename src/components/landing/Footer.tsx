@@ -56,8 +56,8 @@ export function Footer() {
   var portfolioUrl = cfg.hero_developer_url || FALLBACK_PORTFOLIO_URL
   var primeUrl = cfg.prime_developer_url || FALLBACK_PORTFOLIO_URL
   var heroDevLabel = cfg.hero_developer_label || 'Hero Developer'
-  var madeByLabel = cfg.footer_made_by_label || 'Developed by Adam Hawash'
-  var brandName = pickConfig(cfg, 'footer_brand', lang, 'The Scholar in Math', 'The Scholar in Math')
+  var madeByLabel = cfg.footer_made_by_label || 'Developed by Adham Hawash'
+  var brandName = pickConfig(cfg, 'footer_brand', lang, 'Zicola In Math', 'Zicola In Math')
   var copyrightText = pickConfig(cfg, 'footer_copyright', lang, 'جميع الحقوق محفوظة لـ أدهم حواش', 'All rights reserved to Adham Hawash')
 
   var fb = cfg.social_facebook || ''
@@ -141,7 +141,7 @@ export function Footer() {
           </a>
         </div>
         
-        {/* Powered by Prime Developer + Developed by Adam Hawash */}
+        {/* Powered by Prime Developer + Developed by Adham Hawash */}
         <div className="mt-6 pt-4 border-t border-border/40 text-center">
           <p className="text-xs text-foreground flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1">
             <span>Powered by</span>

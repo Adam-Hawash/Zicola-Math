@@ -46,6 +46,30 @@ export default function TipsSection() {
   var [bgLoaded, setBgLoaded] = useState(false)
   var [sectionImgLoaded, setSectionImgLoaded] = useState(false)
 
+  /* (و78) النصائح الإضافية اللي المستر بيضيفها من لوحة الأدمن — مفتاح
+     custom_tips في الإعدادات (JSON مصفوفة عناصر: titleAr/titleEn/descAr/descEn).
+     بتظهر بعد النصائح الأصلية بنفس شكل الكارت بالظبط، والأيقونة واللون
+     بيلفوا على المجموعات الموجودة. أي JSON بايظ = نتجاهله بأمان. */
+  var customTips: any[] = []
+  try {
+    var parsedCustomTips = typeof cfg.custom_tips === 'string' ? JSON.parse(cfg.custom_tips) : cfg.custom_tips
+    if (Array.isArray(parsedCustomTips)) {
+      for (var ci = 0; ci < parsedCustomTips.length; ci++) {
+        var ct = parsedCustomTips[ci]
+        if (!ct || typeof ct !== 'object' || (!ct.titleAr && !ct.titleEn)) continue
+        customTips.push({
+          uid: 'custom-tip-' + ci,
+          icon: TIP_ICONS[(4 + ci) % TIP_ICONS.length],
+          titleAr: String(ct.titleAr || ''),
+          titleEn: String(ct.titleEn || ''),
+          description: String(ct.descAr || ''),
+          descriptionEn: String(ct.descEn || ''),
+          color: TIP_COLORS[(4 + ci) % TIP_COLORS.length],
+        })
+      }
+    }
+  } catch (e) {}
+
   var tips = [
     {
       icon: TIP_ICONS[0],
@@ -79,12 +103,12 @@ export default function TipsSection() {
       descriptionEn: cfg.tips_card4_desc_en || 'If you do not understand something, ask immediately. A good question is the start of deep understanding.',
       color: TIP_COLORS[3],
     },
-  ]
+  ].concat(customTips)
 
   function renderTipCard(tip, idx) {
     return (
       <Card
-        key={tip.titleEn}
+        key={tip.uid || tip.titleEn}
         className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 border-border/50 bg-card"
       >
         <CardContent className="p-4 sm:p-5 flex gap-4 items-start">

@@ -4,12 +4,47 @@ import { useAppStore } from '@/stores/app-store'
 import { Card, CardContent } from '@/components/ui/card'
 /* (و71) ترجمة حسب لغة الزائر — النصوص من الأدمن عربي/إنجليزي */
 import { useLangStore, pickConfig } from '@/lib/i18n'
-import { BookOpen, Brain, Puzzle, ClipboardCheck } from 'lucide-react'
+import { BookOpen, Brain, Puzzle, ClipboardCheck, Star, Target, Zap, Award, Sparkles, TrendingUp } from 'lucide-react'
+
+/* (و78) أيقونات وألوان إضافية للنصائح/المميزات اللي المستر بيضيفها من الأدمن — بتلف بالتدوير */
+var EXTRA_FEATURE_ICONS = [Star, Target, Zap, Award, Sparkles, TrendingUp]
+var ALL_FEATURE_ICONS = [BookOpen, Brain, Puzzle, ClipboardCheck].concat(EXTRA_FEATURE_ICONS)
+var ALL_FEATURE_COLORS = [
+  'bg-[#C49A38]/10 text-[#C49A38] dark:bg-[#C49A38]/15 dark:text-[#E5BE5A]',
+  'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400',
+  'bg-amber-500/10 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400',
+  'bg-rose-500/10 text-rose-600 dark:bg-rose-500/15 dark:text-rose-400',
+  'bg-sky-500/10 text-sky-600 dark:bg-sky-500/15 dark:text-sky-400',
+  'bg-violet-500/10 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400',
+  'bg-teal-500/10 text-teal-600 dark:bg-teal-500/15 dark:text-teal-400',
+  'bg-orange-500/10 text-orange-600 dark:bg-orange-500/15 dark:text-orange-400',
+]
 
 export function FeaturesSection() {
   const { siteConfig } = useAppStore()
   const cfg = siteConfig
   var lang = useLangStore(function (s) { return s.lang })
+
+  /* (و78) المميزات الإضافية من لوحة الأدمن — مفتاح custom_features (JSON مصفوفة:
+     titleAr/titleEn/descAr/descEn) — بتظهر بعد المميزات الأصلية بنفس الكارت،
+     وأيقونة/لون بالتدوير. أي JSON بايظ = نتجاهله بأمان. */
+  var customFeatures: any[] = []
+  try {
+    var parsedCustomFeatures = typeof cfg.custom_features === 'string' ? JSON.parse(cfg.custom_features) : cfg.custom_features
+    if (Array.isArray(parsedCustomFeatures)) {
+      for (var cf = 0; cf < parsedCustomFeatures.length; cf++) {
+        var cc = parsedCustomFeatures[cf]
+        if (!cc || typeof cc !== 'object' || (!cc.titleAr && !cc.titleEn)) continue
+        customFeatures.push({
+          uid: 'custom-feature-' + cf,
+          icon: ALL_FEATURE_ICONS[(4 + cf) % ALL_FEATURE_ICONS.length],
+          title: lang === 'en' ? (String(cc.titleEn || '') || String(cc.titleAr || '')) : (String(cc.titleAr || '') || String(cc.titleEn || '')),
+          description: lang === 'en' ? (String(cc.descEn || '') || String(cc.descAr || '')) : (String(cc.descAr || '') || String(cc.descEn || '')),
+          color: ALL_FEATURE_COLORS[(4 + cf) % ALL_FEATURE_COLORS.length],
+        })
+      }
+    }
+  } catch (e) {}
 
   const features = [
     {
@@ -36,7 +71,7 @@ export function FeaturesSection() {
       description: pickConfig(cfg, 'feature4_desc', lang, 'تحضير شامل ومراجعات دورية واختبارات أسبوعية لضمان التفوّق والاستعداد الكامل للامتحانات النهائية في جميع فروع الرياضيات.', 'Comprehensive preparation, regular reviews, and weekly exams to guarantee excellence and full readiness for final exams.'),
       color: 'bg-rose-500/10 text-rose-600 dark:bg-rose-500/15 dark:text-rose-400',
     },
-  ]
+  ].concat(customFeatures)
 
   return (
     <section className="py-16 sm:py-20 bg-muted/30">
@@ -48,9 +83,9 @@ export function FeaturesSection() {
           </p>
         </div>
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {features.map((feature) => (
+          {features.map((feature: any) => (
             <Card
-              key={feature.title}
+              key={feature.uid || feature.title}
               className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-border/50"
             >
               <CardContent className="p-6 space-y-4">

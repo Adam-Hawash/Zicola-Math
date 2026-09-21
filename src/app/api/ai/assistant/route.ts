@@ -176,7 +176,7 @@ export async function POST(request: Request) {
     }
 
     var systemPrompt = buildSystemPrompt(
-      'منصة The Scholar in Math (مستر أحمد شعبان)',
+      'منصة Zicola In Math (مستر أحمد شعبان)',
       isSherinePersona(persona) ? 'مدرّبة رياضيات شاطرة بتشرح بالعامية وبتساعد الطلاب في الـ Math.' : 'مدرّب رياضيات شاطر بيساعد الطلاب في الـ Math.',
       persona
     )

@@ -95,7 +95,7 @@ export default function FeaturesGuideSection() {
             {pickConfig(cfg, 'guide_title', lang, 'كيف تستخدم المنصة؟', 'How to Use the Platform')}
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto text-sm sm:text-base">
-            {pickConfig(cfg, 'guide_subtitle', lang, 'ست خطوات بسيطة لتبدأ رحلتك التعليمية في The Scholar in Math', 'Six simple steps to begin your learning journey with The Scholar in Math')}
+            {pickConfig(cfg, 'guide_subtitle', lang, 'ست خطوات بسيطة لتبدأ رحلتك التعليمية في Zicola In Math', 'Six simple steps to begin your learning journey with Zicola In Math')}
           </p>
         </div>
 

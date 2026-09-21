@@ -272,7 +272,7 @@ export default function HeroSection() {
               </a>
             </div>
 
-            {/* Hero Developer / Adam Hawash branding */}
+            {/* Hero Developer / Adham Hawash branding */}
             <div className="pt-2 flex flex-col items-center lg:items-start gap-1">
               <a
                 href={cfg.hero_developer_url || 'https://prime-developer-portfolio-11.vercel.app'}
@@ -289,7 +289,7 @@ export default function HeroSection() {
                 rel="noopener noreferrer"
                 className="text-xs text-white/40 font-light tracking-wider hover:text-[#7cc0ff] transition-colors"
               >
-                {cfg.footer_made_by_label || 'Developed by Adam Hawash'}
+                {cfg.footer_made_by_label || 'Developed by Adham Hawash'}
               </a>
             </div>
           </motion.div>
@@ -303,7 +303,7 @@ export default function HeroSection() {
             transition={{ duration: 0.85, ease: 'easeOut', delay: 0.05 }}
             className="flex justify-center lg:justify-center order-1 lg:order-2"
           >
-            <div className="relative w-64 sm:w-80 lg:w-[420px] mb-4">
+            <div className="relative w-64 sm:w-80 lg:w-[440px] mb-4">
               {/* التوهج الأزرق الأفتح خلف المعلم — (و77) أنعم بالنص
                   («الحاجات اللي ورا صورة المستر ما تقترهاش») 0.25→0.12 */}
               <div aria-hidden="true" className="absolute top-[-12%] left-1/2 -translate-x-1/2 h-[340px] w-[340px] sm:h-[400px] sm:w-[400px] rounded-full bg-[#2f6fd8]/12 blur-[90px] z-0" />
@@ -330,10 +330,17 @@ export default function HeroSection() {
                   height={1024}
                   loading="eager"
                   fetchPriority="high"
-                  className="relative z-10 w-full h-auto max-h-[420px] sm:max-h-[460px] mx-auto object-contain object-top"
+                  className="relative z-10 w-full h-auto max-h-[460px] sm:max-h-[520px] mx-auto object-contain object-top"
                   style={{
-                    WebkitMaskImage: 'linear-gradient(to bottom, black 62%, transparent 96%)',
-                    maskImage: 'linear-gradient(to bottom, black 62%, transparent 96%)',
+                    /* (و78) طلب المستر: الصورة كانت مخفية من تحت (فيد تدريجي بقّى
+                       من 62% بس!) + السحابة مغطيها — عاوز الصورة تبقى باينة.
+                       الماسك دلوقتي: بيخلي المحتوى كله باين (الفيدي بقت على آخر
+                       15% بس ورا السحابة) + حواف ناعمة على الجوانب والفوق
+                       عشان مستطيل خلفية الصورة ميبانش — بماسكين متقاطعين */
+                    WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 8%, black 84%, transparent 100%), linear-gradient(to right, transparent 0%, black 14%, black 86%, transparent 100%)',
+                    maskImage: 'linear-gradient(to bottom, transparent 0%, black 8%, black 84%, transparent 100%), linear-gradient(to right, transparent 0%, black 14%, black 86%, transparent 100%)',
+                    WebkitMaskComposite: 'source-in',
+                    maskComposite: 'intersect',
                   }}
                 />
               ) : (
@@ -372,7 +379,7 @@ export default function HeroSection() {
                   أ) فيلتر feDropShadow أسود ناعم (dy=14 / blur=12 / أسود 45%)
                   ب) خطوط كرتونية: ستروك كحلي #16233B بشفافية 0.3 وسُمك 3
                      على البفّات والقاعدة (أوتلاين كرتوني) */}
-              <div className="relative z-20 -mt-14 sm:-mt-20 flex justify-center">
+              <div className="relative z-20 -mt-8 sm:-mt-12 flex justify-center">
                 <svg
                   aria-hidden="true"
                   viewBox="0 0 560 230"

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Settings, Save, Upload, Loader2, Image as ImageIcon, Trash2, Link2, Type, Layout, GraduationCap, Compass, Lightbulb, BookOpen, Smartphone, Globe, CalendarClock } from 'lucide-react'
+import { Settings, Save, Upload, Loader2, Image as ImageIcon, Trash2, Link2, Type, Layout, GraduationCap, Compass, Lightbulb, BookOpen, Smartphone, Globe, CalendarClock, PlusCircle } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import type { SiteConfig } from '@/stores/app-store'
@@ -300,6 +300,131 @@ export function CMSPanel() {
     setPreviews(function(prev) { var n = Object.assign({}, prev); n[configKey] = url; return n })
   }
 
+  /* ==================== (و78) النصائح والمميزات الإضافية ====================
+     المستر طلب: «أنا اقدر في جميع المنصات اني اضيف نصيحة، اضيف مميزات،
+     اضيف الحاجات دي» — تخزين JSON في مفاتيح custom_tips / custom_features،
+     الإضافة والحذف بيحفظوا فورًا، وتعديل النصوص بيزرار الحفظ. */
+  var parseCustomList = function(raw: any): any[] {
+    try {
+      var v = typeof raw === 'string' ? JSON.parse(raw) : raw
+      if (!Array.isArray(v)) return []
+      return v.filter(function(x) { return x && typeof x === 'object' })
+    } catch (e) { return [] }
+  }
+
+  var persistNow = async function(newConfig: Record<string, string>, successMsg?: string) {
+    setSaving(true)
+    try {
+      var clean: Record<string, string> = {}
+      var ks = Object.keys(newConfig)
+      for (var i = 0; i < ks.length; i++) {
+        if (ks[i] === 'error' || ks[i] === 'defaults') continue
+        clean[ks[i]] = newConfig[ks[i]]
+      }
+      var res = await fetch('/api/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(clean),
+      })
+      if (res.ok) {
+        toast.success(successMsg || 'تم الحفظ بنجاح')
+        var storeState = await (await import('@/stores/app-store')).useAppStore.getState()
+        storeState.setSiteConfig(clean)
+      } else {
+        var errText = ''
+        try { errText = await res.text() } catch (x) {}
+        toast.error('خطأ في الحفظ: ' + res.status + ' ' + errText.substring(0, 150))
+      }
+    } catch (e) { toast.error('خطأ في الاتصال') }
+    setSaving(false)
+  }
+
+  var updateCustomList = function(listKey: string, list: any[], persist: boolean) {
+    var n = Object.assign({}, config)
+    n[listKey] = JSON.stringify(list)
+    setConfig(n)
+    if (persist) persistNow(n, 'تم الحفظ — التغيير ظهر في الصفحة الرئيسية فورًا')
+  }
+
+  var renderCustomListEditor = function(listKey: string, titleAr: string, titleEn: string, addLabel: string, emptyHint: string) {
+    var items = parseCustomList(config[listKey])
+    var updateField = function(idx: number, field: string, value: string) {
+      var list = parseCustomList(config[listKey]).map(function(it: any, i: number) {
+        if (i !== idx) return it
+        var n = Object.assign({}, it)
+        n[field] = value
+        return n
+      })
+      updateCustomList(listKey, list, false)
+    }
+    var removeItem = function(idx: number) {
+      var list = parseCustomList(config[listKey]).filter(function(_it: any, i: number) { return i !== idx })
+      updateCustomList(listKey, list, true)
+    }
+    var addItem = function() {
+      var list = parseCustomList(config[listKey])
+      list.push({ titleAr: '', titleEn: '', descAr: '', descEn: '' })
+      updateCustomList(listKey, list, true)
+    }
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h3 className="font-semibold text-sm">{titleAr} | {titleEn}</h3>
+            <p className="text-[11px] text-muted-foreground">{emptyHint}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={addItem} className="h-8">
+              <PlusCircle className="h-3.5 w-3.5 ml-1" />
+              {addLabel}
+            </Button>
+            <Button size="sm" onClick={function() { persistNow(Object.assign({}, config)) }} disabled={saving} className="h-8">
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              <span className="text-xs mr-1">حفظ</span>
+            </Button>
+          </div>
+        </div>
+        {items.length === 0 ? (
+          <p className="text-xs text-muted-foreground border border-dashed rounded-lg p-4 text-center">مفيش عناصر إضافية لسه — دوس «{addLabel}» عشان تضيف أول واحدة</p>
+        ) : (
+          <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+            {items.map(function(item: any, idx: number) {
+              return (
+                <div key={idx} className="border border-border/60 rounded-lg p-3 space-y-2.5 bg-muted/20">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground">#{idx + 1}</span>
+                    <Button variant="ghost" size="sm" onClick={function() { removeItem(idx) }} className="h-7 px-2">
+                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      <span className="text-[10px] mr-1 text-destructive">حذف</span>
+                    </Button>
+                  </div>
+                  <div className="grid gap-2.5 sm:grid-cols-2">
+                    <div>
+                      <Label className="text-[11px] mb-1 block">العنوان (عربي)</Label>
+                      <Input value={item.titleAr || ''} onChange={function(e) { updateField(idx, 'titleAr', e.target.value) }} className="h-8 text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-[11px] mb-1 block" dir="ltr">Title (English)</Label>
+                      <Input value={item.titleEn || ''} onChange={function(e) { updateField(idx, 'titleEn', e.target.value) }} dir="ltr" className="h-8 text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-[11px] mb-1 block">الوصف (عربي)</Label>
+                      <Textarea value={item.descAr || ''} onChange={function(e) { updateField(idx, 'descAr', e.target.value) }} rows={2} className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-[11px] mb-1 block" dir="ltr">Description (English)</Label>
+                      <Textarea value={item.descEn || ''} onChange={function(e) { updateField(idx, 'descEn', e.target.value) }} rows={2} dir="ltr" className="text-sm" />
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
 
   return (
@@ -382,6 +507,16 @@ export function CMSPanel() {
             </Button>
           )
         })}
+        {/* (و78) تاب إضافة النصائح والمميزات — المستر يضيف نصيحة/ميزة جديدة يتسجل فورًا */}
+        <Button
+          variant={activeSection === 'custom-content' ? 'default' : 'outline'}
+          size="sm"
+          onClick={function() { setActiveSection('custom-content') }}
+          className="text-xs"
+        >
+          <Lightbulb className="h-3.5 w-3.5 mr-1.5" />
+          إضافة نصائح ومميزات
+        </Button>
       </div>
 
       {/* Active Section Fields */}
@@ -456,6 +591,34 @@ export function CMSPanel() {
           </Card>
         )
       })}
+
+      {/* (و78) محرر النصائح والمميزات الإضافية — إضافة/حذف/تعديل أي عدد */}
+      {activeSection === 'custom-content' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Lightbulb className="h-5 w-5" />إضافة نصائح ومميزات | Add Tips &amp; Features
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-8">
+            {renderCustomListEditor(
+              'custom_tips',
+              'نصائح إضافية',
+              'Custom Tips',
+              '+ إضافة نصيحة جديدة',
+              'بتظهر بعد النصائح الأصلية في قسم النصائح بالصفحة الرئيسية — الإضافة والحذف بيحفظوا فورًا'
+            )}
+            <div className="border-t border-border/40" />
+            {renderCustomListEditor(
+              'custom_features',
+              'مميزات إضافية',
+              'Custom Features',
+              '+ إضافة ميزة جديدة',
+              'بتظهر بعد المميزات الأصلية في قسم «لماذا تختارنا» — الإضافة والحذف بيحفظوا فورًا'
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

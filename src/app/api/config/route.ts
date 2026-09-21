@@ -56,7 +56,7 @@ var DEFAULTS = {
   hero_stat3_label_en: 'Progress Tracking',
   hero_developer_url: 'https://prime-developer-portfolio-11.vercel.app',
   hero_developer_label: 'Hero Developer',
-  footer_made_by_label: 'Developed by Adam Hawash',
+  footer_made_by_label: 'Developed by Adham Hawash',
   prime_developer_url: 'https://prime-developer-portfolio-11.vercel.app',
 
   // === Schedule Page ===
@@ -215,16 +215,16 @@ export async function GET() {
     var rawNavbarBrand = typeof map['navbar_brand'] === 'string' ? map['navbar_brand'] : ''
     var rawNavbarBrandEn = typeof map['navbar_brand_en'] === 'string' ? map['navbar_brand_en'] : ''
     var rawHeroTitle2En = typeof map['hero_title_line2_en'] === 'string' ? map['hero_title_line2_en'] : ''
-    // اسم المنصة الصحيح: The Scholar in Math (من غير s) — لو قاعدة البيانات لسه فيها
+    // اسم المنصة الصحيح: Zicola In Math (من غير s) — لو قاعدة البيانات لسه فيها
     // الاسم القديم من نسخة قديمة بنصلحه على القراءة، والترحيل في ensure-schema
     // بصلحه نهائيًا في قاعدة البيانات
     var brandKeys = ['navbar_brand', 'footer_brand', 'footer_copyright', 'guide_subtitle', 'schedule_brand']
     for (var b = 0; b < brandKeys.length; b++) {
       /* (و73) أي قيمة مخزنة قديمة (Zicola Math / Zicola in Math / Maths Genius
-         / The Scholar in Math) بتتصحح فورًا على القراءة إلى «Zicola In Math»
+         / Zicola In Math) بتتصحح فورًا على القراءة إلى «Zicola In Math»
          — الاسم اللي طلبه المستر صراحةً — والترحيل في ensure-schema بصلحها نهائيًا */
       if (typeof map[brandKeys[b]] === 'string' && (map[brandKeys[b]].indexOf('Zicola') !== -1 || map[brandKeys[b]].indexOf('Math Genius') !== -1 || map[brandKeys[b]].indexOf('Maths Genius') !== -1)) {
-        map[brandKeys[b]] = map[brandKeys[b]].split('Zicola in Math').join('Zicola In Math').split('Zicola Math').join('Zicola In Math').split('Maths Genius').join('Zicola In Math').split('Math Genius').join('Zicola In Math').split('The Scholar in Math').join('Zicola In Math')
+        map[brandKeys[b]] = map[brandKeys[b]].split('Zicola in Math').join('Zicola In Math').split('Zicola Math').join('Zicola In Math').split('Maths Genius').join('Zicola In Math').split('Math Genius').join('Zicola In Math').split('Zicola In Math').join('Zicola In Math')
       }
     }
     /* (و73) تصحيح البراند القديم (الاختصار الغلط M بدل Mr) → «Mr. Ahmed Shaban» —
@@ -236,6 +236,16 @@ export async function GET() {
       var mv = map[mrBrandKeys[m]]
       if (typeof mv === 'string' && mv.indexOf(LEGACY_MISTAKE_BRAND) !== -1) {
         map[mrBrandKeys[m]] = mv.split(LEGACY_MISTAKE_BRAND).join(LEGACY_MISTER_BRAND)
+      }
+    }
+    /* (و78) اسم المطوّر الصحيح «Adham Hawash» — أي قيمة مخزنة قديمة فيها اللقب
+       الغلط «Adam Hawash» بتتصحح على القراءة فورًا (والترحيل في ensure-schema
+       بصلّحها نهائيًا في قاعدة البيانات) — توحيد الفوتر في كل المنصات */
+    var devNameKeys = ['footer_made_by_label', 'footer_made_by_label_en', 'hero_developer_label', 'hero_developer_label_en']
+    for (var d = 0; d < devNameKeys.length; d++) {
+      var dv = map[devNameKeys[d]]
+      if (typeof dv === 'string' && dv.indexOf('Adam Hawash') !== -1) {
+        map[devNameKeys[d]] = dv.split('Adam Hawash').join('Adham Hawash')
       }
     }
     /* (و73) وصف الهيرو القديم المخلوط بكلمات إنجليزية → النص العربي النضيف
@@ -312,26 +322,26 @@ export async function GET() {
         v = map[cfgKeys[k]]
       }
       if (v.indexOf('Mr. Sherif ElSayed') !== -1 || v.indexOf('مستر شريف السيد') !== -1 || v.indexOf('نصائح مستر أحمد شعبان') !== -1 || v.indexOf('Mr. Wael El-Khadiry') !== -1 || v.indexOf('مستر أحمد شعبان') !== -1) {
-        map[cfgKeys[k]] = v.split('Mr. Sherif ElSayed').join('Zicola In Math').split('مستر شريف السيد').join('مستر أحمد شعبان').split('نصائح مستر أحمد شعبان').join('نصائح مستر أحمد شعبان').split('Mr. Wael El-Khadiry').join('Zicola In Math').split('The Scholar in Math').join('Zicola In Math').split('مستر أحمد شعبان').join('مستر أحمد شعبان')
+        map[cfgKeys[k]] = v.split('Mr. Sherif ElSayed').join('Zicola In Math').split('مستر شريف السيد').join('مستر أحمد شعبان').split('نصائح مستر أحمد شعبان').join('نصائح مستر أحمد شعبان').split('Mr. Wael El-Khadiry').join('Zicola In Math').split('Zicola In Math').join('Zicola In Math').split('مستر أحمد شعبان').join('مستر أحمد شعبان')
       }
     }
     /* (و72) الهوية الجديدة للنافبار: «Zicola In Math» + تهجئة الاسم Shaban —
        آخر خطوة بعد كل ترميمات The Scholar القديمة (اللي كانت بتترجم أي
        Zicola إلى The Scholar في brandKeys فوق):
        - أي قيمة مخزنة فيها Zicola In Math بترجع زي ما هي (الترميم القديم كان بيغيرها)
-       - أي قيمة مخزنة = The Scholar in Math بالظبط بتتحول Zicola In Math
+       - أي قيمة مخزنة = Zicola In Math بالظبط بتتحول Zicola In Math
          وبتتكتب نهائيًا في قاعدة البيانات (write-through)
        - hero_title_line2_en القديمة (Shaaban) بتتهجأ Shaban بنفس النمط */
     var brandFixups: string[][] = []
     if (rawNavbarBrand.indexOf('Zicola In Math') !== -1) {
       map['navbar_brand'] = 'Zicola In Math'
-    } else if (rawNavbarBrand === 'The Scholar in Math') {
+    } else if (rawNavbarBrand === 'Zicola In Math') {
       map['navbar_brand'] = 'Zicola In Math'
       brandFixups.push(['navbar_brand', 'Zicola In Math'])
     }
     if (rawNavbarBrandEn.indexOf('Zicola In Math') !== -1) {
       map['navbar_brand_en'] = 'Zicola In Math'
-    } else if (rawNavbarBrandEn === 'The Scholar in Math') {
+    } else if (rawNavbarBrandEn === 'Zicola In Math') {
       map['navbar_brand_en'] = 'Zicola In Math'
       brandFixups.push(['navbar_brand_en', 'Zicola In Math'])
     }

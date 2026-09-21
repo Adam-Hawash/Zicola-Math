@@ -110,7 +110,7 @@ export default function SchedulePage() {
   let scheduleSubtitle = pickConfig(siteConfig, 'schedule_subtitle', lang, 'جدول مواعيد الحصص الأسبوعية لكل الصفوف الدراسية — اختر اليوم المناسب لك وتابع موعد حصتك', 'Weekly class schedule for all grades — pick the day that suits you and catch your class on time')
   let scheduleBadge = pickConfig(siteConfig, 'schedule_badge', lang, 'جدول الحصص الأسبوعي', 'Weekly Class Schedule')
   let scheduleFooterNote = 'جميع المواعيد بتوقيت القاهرة. لو عندك أي استفسار عن موعد حصتك تواصل معنا عبر واتساب.'
-  let brandName = 'The Scholar in Math'
+  let brandName = 'Zicola In Math'
 
   try {
     if (siteConfig.schedule_data) {

@@ -123,11 +123,11 @@ var SCHEMA_FIXES = [
   'UPDATE Student SET deviceType = \'\' WHERE deviceType IS NULL',
   // ===== تصحيح اسم المنصة (براند Zicola) لمرة واحدة =====
   // القيم المخزنة في قاعدة البيانات من نسخ قديمة — بنصححها مرة واحدة (idempotent)
-  "UPDATE SiteConfig SET value = REPLACE(REPLACE(value, 'Maths Genius', 'The Scholar in Math'), 'Math Genius', 'The Scholar in Math') WHERE key IN ('navbar_brand', 'hero_title_line1', 'footer_brand', 'footer_copyright', 'guide_subtitle') AND (value LIKE '%Math Genius%' OR value LIKE '%Maths Genius%')",
+  "UPDATE SiteConfig SET value = REPLACE(REPLACE(value, 'Maths Genius', 'Zicola In Math'), 'Math Genius', 'Zicola In Math') WHERE key IN ('navbar_brand', 'hero_title_line1', 'footer_brand', 'footer_copyright', 'guide_subtitle') AND (value LIKE '%Math Genius%' OR value LIKE '%Maths Genius%')",
   // ===== تصحيح اسم المستر (الاسم الرسمي للبراند: **مستر أحمد شعبان**) =====
   // أي قيمة مخزنة فيها اسم غلط من ترحيل قديم
   // بتتصحح مرة واحدة هنا (idempotent) + على القراءة في /api/config
-  "UPDATE SiteConfig SET value = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(value, 'Mr. Sherif ElSayed', 'The Scholar in Math'), 'مستر شريف السيد', 'مستر أحمد شعبان'), 'نصائح مستر أحمد شعبان', 'نصائح مستر أحمد شعبان'), 'Mr. Wael El-Khadiry', 'The Scholar in Math'), 'مستر وائل الخضيري', 'مستر أحمد شعبان') WHERE value LIKE '%Sherif ElSayed%' OR value LIKE '%شريف السيد%' OR (value LIKE '%مستر شريف%' AND key LIKE 'tips_%') OR value LIKE '%Mr. Wael El-Khadiry%' OR value LIKE '%الخضيري%'",
+  "UPDATE SiteConfig SET value = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(value, 'Mr. Sherif ElSayed', 'Zicola In Math'), 'مستر شريف السيد', 'مستر أحمد شعبان'), 'نصائح مستر أحمد شعبان', 'نصائح مستر أحمد شعبان'), 'Mr. Wael El-Khadiry', 'Zicola In Math'), 'مستر وائل الخضيري', 'مستر أحمد شعبان') WHERE value LIKE '%Sherif ElSayed%' OR value LIKE '%شريف السيد%' OR (value LIKE '%مستر شريف%' AND key LIKE 'tips_%') OR value LIKE '%Mr. Wael El-Khadiry%' OR value LIKE '%الخضيري%'",
   // النافيبار بالعربي: مستر أحمد شعبان — من غير العصاية (|) ومن غير الإنجليزي (طلب المستر)
   "UPDATE SiteConfig SET value = 'مستر أحمد شعبان' WHERE key = 'navbar_subtitle' AND (value LIKE '%خضير%' OR value LIKE '%Khadir%' OR value LIKE '%Khodair%' OR value LIKE '%Khudair%' OR value LIKE '%Khodier%' OR value LIKE '%El-Kh%' OR value LIKE '%Sherif%' OR value LIKE '%شريف%' OR value LIKE '%|%')",
   "UPDATE SiteConfig SET value = 'مستر أحمد شعبان' WHERE key IN ('hero_title_line2', 'instructor_name') AND (value LIKE '%Sherif%' OR value LIKE '%شريف%' OR value LIKE '%الخضيري%')",
@@ -139,10 +139,10 @@ var SCHEMA_FIXES = [
   // مرة واحدة فقط (idempotent): لو الأدمن رفع صورة تانية بعدين مش هتتلمس.
   "UPDATE SiteConfig SET value = '/images/mr-wael-photo.webp' WHERE key IN ('instructor_photo', 'site_logo', 'favicon_url') AND (value LIKE '%i.imghos.co%' OR value LIKE '%instructor.webp%')",
   // ===== (و70) هوية The Scholar — طلب المستر حرفيًا: الاسم في النافيبار
-  // «The Scholar in Math» والهيرو «The Scholar by مستر أحمد شعبان» + صورة
+  // «Zicola In Math» والهيرو «The Scholar by مستر أحمد شعبان» + صورة
   // المستر طالع من السحابة في الهيرو + صورته الرسمية في النافيبار.
   // idempotent: القيم الجديدة مفيهاش Zicola فمش هتتلمس تاني.
-  "UPDATE SiteConfig SET value = REPLACE(REPLACE(value, 'Zicola in Math', 'The Scholar in Math'), 'Zicola Math', 'The Scholar in Math') WHERE key IN ('navbar_brand', 'footer_brand', 'footer_copyright', 'guide_subtitle', 'schedule_brand') AND value LIKE '%Zicola%'",
+  "UPDATE SiteConfig SET value = REPLACE(REPLACE(value, 'Zicola in Math', 'Zicola In Math'), 'Zicola Math', 'Zicola In Math') WHERE key IN ('navbar_brand', 'footer_brand', 'footer_copyright', 'guide_subtitle', 'schedule_brand') AND value LIKE '%Zicola%'",
   "UPDATE SiteConfig SET value = 'The Scholar' WHERE key = 'hero_title_line1' AND value LIKE '%Zicola%'",
   "UPDATE SiteConfig SET value = 'by مستر أحمد شعبان' WHERE key = 'hero_title_line2' AND (value LIKE '%زيكولا%' OR value LIKE '%Zicola%')",
   "UPDATE SiteConfig SET value = 'مستر أحمد شعبان' WHERE key IN ('navbar_subtitle', 'instructor_name') AND (value LIKE '%زيكولا%' OR value LIKE '%Zicola%')",
@@ -156,7 +156,7 @@ var SCHEMA_FIXES = [
   // م/مصطفى حسام» بدل The Scholar — المستر شاف المنصة المعروضة بالاسم الغلط
   // والصورة الغلط (الشاب المقتطع من مرجع تاني). بنصلح كل مفاتيح الهوية نهائيًا
   // في قاعدة البيانات + على القراءة في /api/config. idempotent.
-  "UPDATE SiteConfig SET value = 'The Scholar in Math' WHERE key IN ('navbar_brand', 'footer_brand', 'guide_subtitle', 'schedule_brand') AND (value LIKE '%مهندس الماث%' OR value LIKE '%مصطفى%' OR value LIKE '%حسام%' OR value LIKE '%Mostafa%' OR value LIKE '%Hossam%' OR value LIKE '%Math Engineer%')",
+  "UPDATE SiteConfig SET value = 'Zicola In Math' WHERE key IN ('navbar_brand', 'footer_brand', 'guide_subtitle', 'schedule_brand') AND (value LIKE '%مهندس الماث%' OR value LIKE '%مصطفى%' OR value LIKE '%حسام%' OR value LIKE '%Mostafa%' OR value LIKE '%Hossam%' OR value LIKE '%Math Engineer%')",
   "UPDATE SiteConfig SET value = 'The Scholar' WHERE key = 'hero_title_line1' AND (value LIKE '%مهندس%' OR value LIKE '%مصطفى%' OR value LIKE '%حسام%' OR value LIKE '%Mostafa%' OR value LIKE '%Hossam%' OR value LIKE '%Math Engineer%' OR value LIKE '%Zicola%')",
   "UPDATE SiteConfig SET value = 'by مستر أحمد شعبان' WHERE key = 'hero_title_line2' AND (value LIKE '%مهندس الماث%' OR value LIKE '%مصطفى%' OR value LIKE '%حسام%' OR value LIKE '%Mostafa%' OR value LIKE '%Hossam%' OR value LIKE '%زيكولا%' OR value LIKE '%Zicola%')",
   "UPDATE SiteConfig SET value = 'مستر أحمد شعبان' WHERE key IN ('navbar_subtitle', 'instructor_name') AND (value LIKE '%مهندس الماث%' OR value LIKE '%مصطفى%' OR value LIKE '%حسام%' OR value LIKE '%Mostafa%' OR value LIKE '%Hossam%' OR value LIKE '%زيكولا%' OR value LIKE '%Zicola%')",
@@ -187,6 +187,10 @@ var SCHEMA_FIXES = [
   'UPDATE ExamResult SET score = 0 WHERE score IS NULL',
   'UPDATE ExamResult SET maxScore = 100 WHERE maxScore IS NULL',
   'UPDATE Payment SET amount = 0 WHERE amount IS NULL',
+  // ===== (و78) اسم المطوّر الصحيح «Adham Hawash» — القيم المخزنة قديمًا
+  // كانت فيها اللقب الغلط «Adam Hawash» (من غير h) والمستر طلب توحيد
+  // الكلمة في كل المنصات. idempotent: القيم الصح مفيهاش Adam فمش هتتلمس.
+  "UPDATE SiteConfig SET value = REPLACE(value, 'Adam Hawash', 'Adham Hawash') WHERE (key LIKE '%made_by%' OR key LIKE '%developer_label%') AND value LIKE '%Adam Hawash%'",
 ]
 
 /* ============================================================

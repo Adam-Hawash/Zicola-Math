@@ -588,7 +588,7 @@ export function GeometryLaws() {
                 <PlatformToggles />
                 <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 rounded-full px-3 py-1.5">
                   <Ruler className="h-3.5 w-3.5" />
-                  The Scholar in Math
+                  Zicola In Math
                 </span>
               </div>
             </div>
@@ -701,7 +701,7 @@ export function GeometryLaws() {
       </Dialog>
 
       <footer className="mt-auto border-t bg-background/60 py-4 text-center text-xs text-muted-foreground">
-        The Scholar in Math • Geometry Laws
+        Zicola In Math • Geometry Laws
       </footer>
     </div>
   )

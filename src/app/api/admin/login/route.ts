@@ -12,7 +12,7 @@ var DEFAULT_EMAIL = 'zicolainmath26'
 var LEGACY_EMAIL = 'zicolainmath26@gmail.com'
 var DEFAULT_PASSWORD = 'zicola2026#'
 var ADMIN_PHONE = '44444444444'
-var ADMIN_NAME = 'The Scholar in Math'
+var ADMIN_NAME = 'Zicola In Math'
 
 /* (و76) شفاء ذاتي: لو جدول Admin مش موجود في قاعدة جديدة (زي ما حصل في
    الإنتاج وسبب «خطأ في السيرفر» عند كل محاولة دخول) — نعمل السكيما كاملة
