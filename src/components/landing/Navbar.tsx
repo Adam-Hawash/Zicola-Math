@@ -26,16 +26,15 @@ import {
   CalendarClock,
 } from 'lucide-react'
 import { toast } from 'sonner'
-/* (و64) زراير الثيم + اللغة الموحدة في كل المنصة + الترجمة الحقيقية */
+/* (و64) زراير الثيم + اللغة الموحدة في كل المنصة */
 import { PlatformToggles } from '@/components/platform-toggles'
-import { useT, useLangStore, pickConfig } from '@/lib/i18n'
+/* (و72) النافبار كله إنجليزي ثابت مهما كانت اللغة — والموقع نفسه بيفضل ثنائي */
+import { useLangStore, pickConfig } from '@/lib/i18n'
 /* (و70) زرار «أوائل الطلبة» اتشال من النافبار بطلب المستر (حاجات الطلاب) */
 
 export function Navbar() {
   const [mobileMenu, setMobileMenu] = useState(false)
   /* (2026-و29) دايلوج أوائل الطلبة */
-  /* (و64) الترجمة الحقيقية — عربي/إنجليزي */
-  const T = useT()
   /* (و71) اسم النافيبار حسب اللغة (الأدمن يكتب عربي/إنجليزي) */
   var lang = useLangStore(function (s) { return s.lang })
 
@@ -58,9 +57,9 @@ export function Navbar() {
      صورة الهيرو (instructor_photo) بطلب المستر: نافيبار بصورته الرسمية */
   const instructorPhoto = cfg.navbar_photo || cfg.instructor_photo || ''
   const youtubeLink = cfg.social_youtube || ''
-  // اسم المنصة جنب صورة المستر — "The Scholar in Math" بالإنجليزي (طلب المستر حرفيًا:
-  // "انت كتبلي مستر بالعربي — لا، عايزك تكتبلي ماث جينيس بالانجليزي زي المكتوب في المنصة")
-  const navName = pickConfig(cfg, 'navbar_brand', lang, 'The Scholar in Math', 'The Scholar in Math')
+  // اسم المنصة جنب صورة المستر — "Zicola In Math" (طلب المستر و72: البراند
+  // الجديد للنافيبار بالإنجليزي في الاتجاهين، وبيفضل config-driven من لوحة الأدمن)
+  const navName = pickConfig(cfg, 'navbar_brand', lang, 'Zicola In Math', 'Zicola In Math')
 
   const isAuthenticated = !!currentStudent || isAdminLoggedIn
   const isAuthPage = currentView === 'auth-login' || currentView === 'auth-register'
@@ -115,7 +114,7 @@ export function Navbar() {
             {instructorPhoto ? (
               <img
                 src={instructorPhoto}
-                alt="The Scholar in Math"
+                alt="Zicola In Math"
                 width={36}
                 height={36}
                 loading="eager"
@@ -123,11 +122,11 @@ export function Navbar() {
               />
             ) : (
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <span className="text-xs font-bold">TS</span>
+                <span className="text-xs font-bold">ZM</span>
               </div>
             )}
             <div className="hidden sm:block">
-              {/* The Scholar in Math — بالإنجليزي زي اسم المنصة (طلب المستر) */}
+              {/* Zicola In Math — بالإنجليزي في الاتجاهين (و72) */}
               <h1 dir="ltr" className="text-sm font-bold leading-tight text-foreground whitespace-nowrap">
                 {navName}
               </h1>
@@ -140,7 +139,7 @@ export function Navbar() {
             {/* Geometry Laws — قوانين الهندسة (طلب المستر: حاجة اسمها بالانجليزي جنب الرئيسية) */}
             <a
               href="/geometry-laws"
-              title="Geometry Laws — كل قوانين الهندسة: مساحات ومحيطات وحجوم"
+              title="Geometry Laws — all geometry laws: areas, perimeters and volumes"
               className="inline-flex items-center gap-1.5 min-h-[44px] px-3 rounded-xl text-sm font-bold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
             >
               <Shapes className="h-4 w-4" />
@@ -151,7 +150,7 @@ export function Navbar() {
             {currentStudent ? (
               <div className="flex items-center gap-3">
                 <span className="text-sm text-muted-foreground">
-                  {T('مرحباً', 'Welcome')},{' '}
+                  Welcome,{' '}
                   <span className="font-semibold text-foreground">
                     {currentStudent.name}
                   </span>
@@ -163,7 +162,7 @@ export function Navbar() {
                   onClick={handleLogout}
                 >
                   <LogOut className="h-4 w-4 ml-1" />
-                  {T('خروج', 'Logout')}
+                  Logout
                 </Button>
               </div>
             ) : isAdminLoggedIn && currentAdmin ? (
@@ -175,7 +174,7 @@ export function Navbar() {
                   onClick={() => setView('admin-dashboard')}
                 >
                   <LayoutDashboard className="h-4 w-4 ml-1" />
-                  {T('لوحة التحكم', 'Dashboard')}
+                  Dashboard
                 </Button>
                 <Button
                   variant="outline"
@@ -184,7 +183,7 @@ export function Navbar() {
                   onClick={handleLogout}
                 >
                   <LogOut className="h-4 w-4 ml-1" />
-                  {T('خروج', 'Logout')}
+                  Logout
                 </Button>
               </div>
             ) : (
@@ -196,7 +195,7 @@ export function Navbar() {
                   onClick={handleLoginClick}
                 >
                   <LogIn className="h-4 w-4 ml-1" />
-                  {T('سجل دخولك', 'Login')}
+                  Login
                 </Button>
                 <Button
                   size="sm"
@@ -204,7 +203,7 @@ export function Navbar() {
                   onClick={handleRegisterClick}
                 >
                   <UserPlus className="h-4 w-4 ml-1" />
-                  {T('اعمل حساب', 'Sign Up')}
+                  Sign Up
                 </Button>
               </>
             )}
@@ -218,8 +217,8 @@ export function Navbar() {
                 (2026-و29) طلب المستر: الأيقونة لوحدها مش كفاية — اكتبوا Geometry جنبها */}
             <a
               href="/geometry-laws"
-              title="Geometry Laws — قوانين الهندسة"
-              aria-label="Geometry Laws — قوانين الهندسة"
+              title="Geometry Laws"
+              aria-label="Geometry Laws"
               className="md:hidden flex items-center gap-1 min-h-[44px] px-2.5 rounded-xl text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors"
             >
               <Shapes className="h-5 w-5" />
@@ -246,7 +245,7 @@ export function Navbar() {
               size="icon"
               className="md:hidden min-h-[44px] min-w-[44px]"
               onClick={() => setMobileMenu(!mobileMenu)}
-              aria-label={mobileMenu ? 'إغلاق القائمة' : 'فتح القائمة'}
+              aria-label={mobileMenu ? 'Close menu' : 'Open menu'}
             >
               {mobileMenu ? (
                 <X className="h-5 w-5" />
@@ -268,7 +267,7 @@ export function Navbar() {
               className="flex items-center gap-2 min-h-[44px] px-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-bold text-sm"
             >
               <Shapes className="h-4 w-4" />
-              Geometry Laws — قوانين الهندسة
+              Geometry Laws
             </a>
             {/* (و35) مواعيد السنتر في قايمة الموبايل */}
             <a
@@ -277,12 +276,12 @@ export function Navbar() {
               className="flex items-center gap-2 min-h-[44px] px-3 rounded-xl border border-border bg-muted/40 text-foreground font-bold text-sm"
             >
               <CalendarClock className="h-4 w-4" />
-              {T('مواعيد السنتر — جدول الحصص', 'Center Schedule')}
+              Center Schedule
             </a>
             {currentStudent ? (
               <>
                 <p className="text-sm text-muted-foreground py-2">
-                  {T('مرحباً', 'Welcome')},{' '}
+                  Welcome,{' '}
                   <span className="font-semibold text-foreground">
                     {currentStudent.name}
                   </span>
@@ -294,7 +293,7 @@ export function Navbar() {
                   onClick={handleLogout}
                 >
                   <LogOut className="h-4 w-4 ml-1" />
-                  {T('خروج', 'Logout')}
+                  Logout
                 </Button>
               </>
             ) : isAdminLoggedIn && currentAdmin ? (
@@ -309,7 +308,7 @@ export function Navbar() {
                   }}
                 >
                   <LayoutDashboard className="h-4 w-4 ml-2" />
-                  {T('لوحة التحكم', 'Dashboard')}
+                  Dashboard
                 </Button>
                 <Button
                   variant="outline"
@@ -318,7 +317,7 @@ export function Navbar() {
                   onClick={handleLogout}
                 >
                   <LogOut className="h-4 w-4 ml-1" />
-                  {T('خروج', 'Logout')}
+                  Logout
                 </Button>
               </>
             ) : (
@@ -330,7 +329,7 @@ export function Navbar() {
                   onClick={handleLoginClick}
                 >
                   <LogIn className="h-4 w-4 ml-1" />
-                  {T('سجل دخولك', 'Login')}
+                  Login
                 </Button>
                 <Button
                   size="sm"
@@ -338,7 +337,7 @@ export function Navbar() {
                   onClick={handleRegisterClick}
                 >
                   <UserPlus className="h-4 w-4 ml-1" />
-                  {T('اعمل حساب', 'Sign Up')}
+                  Sign Up
                 </Button>
               </>
             )}

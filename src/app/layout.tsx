@@ -19,7 +19,7 @@ const geistMono = Geist_Mono({
 });
 
 export var metadata: Metadata = {
-  title: "The Scholar in Math | مستر أحمد شعبان",
+  title: "Zicola In Math | M. Ahmed Shaban",
   description:
     "منصة The Scholar in Math — مستر أحمد شعبان: منصة رياضيات متكاملة. تبسيط الرياضيات، واجبات أسبوعية، امتحانات منتظمة، ومتابعة مستمرة للتقدم.",
 };

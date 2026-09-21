@@ -149,22 +149,58 @@ export default function HomePage() {
   const showWhatsApp = currentView === 'landing' || currentView === 'auth-login' || currentView === 'auth-register'
 
   // Full-page loading screen
+  // (و72) شاشة تحميل مستقلة تمامًا عن هوية maths-genius الذهبية القديمة —
+  // كحلي عميق + سحابة بيضاء أنيقة وتطلع منها قبعة ذهبية + «M. Ahmed Shaban»
   if (!appReady) {
     return (
-      <div className="fixed inset-0 z-[9999] bg-background flex flex-col items-center justify-center gap-6">
-        <div className="relative">
-          <div className="absolute -inset-6 rounded-full bg-[#C49A38]/10 blur-xl" />
-          <div className="relative w-20 h-20 rounded-2xl bg-muted border border-[#C49A38]/30 flex items-center justify-center">
-            <GraduationCap className="h-10 w-10 text-[#8B6914] dark:text-[#E5BE5A]" />
-          </div>
+      <div className="fixed inset-0 z-[9999] overflow-hidden flex flex-col items-center justify-center gap-6 bg-[radial-gradient(120%_120%_at_50%_0%,#1a3a74_0%,#10234b_45%,#081226_100%)]">
+        {/* Soft white/blue glow dots */}
+        <div className="absolute top-[16%] left-[18%] h-2 w-2 rounded-full bg-white/80 animate-pulse" style={{ boxShadow: '0 0 14px rgba(255,255,255,0.85)' }} />
+        <div className="absolute top-[24%] right-[14%] h-1.5 w-1.5 rounded-full bg-[#8fb7ff]/80 animate-pulse" style={{ boxShadow: '0 0 12px rgba(143,183,255,0.9)', animationDelay: '0.6s' }} />
+        <div className="absolute bottom-[22%] left-[24%] h-1.5 w-1.5 rounded-full bg-white/60 animate-pulse" style={{ boxShadow: '0 0 10px rgba(255,255,255,0.7)', animationDelay: '1.1s' }} />
+        <div className="absolute bottom-[28%] right-[22%] h-2 w-2 rounded-full bg-[#E5BE5A]/70 animate-pulse" style={{ boxShadow: '0 0 14px rgba(229,190,90,0.75)', animationDelay: '0.3s' }} />
+        <div className="absolute top-[42%] left-[8%] h-1 w-1 rounded-full bg-white/50 animate-pulse" style={{ boxShadow: '0 0 8px rgba(255,255,255,0.6)', animationDelay: '1.5s' }} />
+        <div className="absolute top-[38%] right-[9%] h-1 w-1 rounded-full bg-[#8fb7ff]/70 animate-pulse" style={{ boxShadow: '0 0 8px rgba(143,183,255,0.7)', animationDelay: '0.9s' }} />
+
+        {/* White cloud with a small gold GraduationCap rising from its top */}
+        <div className="relative" aria-hidden="true">
+          <GraduationCap className="absolute -top-7 left-1/2 -translate-x-1/2 h-8 w-8 text-[#E5BE5A] animate-pulse drop-shadow-[0_0_14px_rgba(229,190,90,0.6)]" />
+          <svg width="190" height="104" viewBox="0 0 200 110" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-[0_10px_28px_rgba(0,0,0,0.5)]">
+            <defs>
+              <linearGradient id="splashCloudGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#ffffff" />
+                <stop offset="100%" stopColor="#dfe8f8" />
+              </linearGradient>
+              <filter id="splashCloudShadowBlur" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="5" />
+              </filter>
+            </defs>
+            {/* soft blur shadow under the cloud */}
+            <ellipse cx="100" cy="98" rx="82" ry="9" fill="#04102a" opacity="0.5" filter="url(#splashCloudShadowBlur)" />
+            {/* layered puffs */}
+            <g fill="url(#splashCloudGrad)">
+              <ellipse cx="100" cy="74" rx="80" ry="25" />
+              <circle cx="54" cy="60" r="21" />
+              <circle cx="100" cy="46" r="27" />
+              <circle cx="146" cy="60" r="21" />
+            </g>
+            <g fill="#cdd9ef" opacity="0.45">
+              <ellipse cx="72" cy="84" rx="26" ry="9" />
+              <ellipse cx="130" cy="86" rx="28" ry="9" />
+            </g>
+          </svg>
         </div>
+
         <div className="text-center space-y-3">
-          <h1 className="text-2xl font-bold text-foreground tracking-wide">
-            <span className="text-[#8B6914] dark:text-[#E5BE5A]">Math</span> Genius
+          <h1 dir="ltr" className="text-3xl font-bold text-white tracking-wide drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)]">
+            M. Ahmed Shaban
           </h1>
-          <div className="flex items-center gap-3 justify-center">
-            <Loader2 className="h-4 w-4 animate-spin text-[#C49A38]" />
-            <p className="text-muted-foreground text-sm">جاري التحميل...</p>
+          <p className="text-[#E5BE5A] text-sm font-semibold uppercase tracking-[0.25em]">
+            Zicola In Math
+          </p>
+          <div className="flex items-center gap-2.5 justify-center pt-1">
+            <Loader2 className="h-4 w-4 animate-spin text-white/70" />
+            <p className="text-white/60 text-sm">جاري التحميل...</p>
           </div>
         </div>
       </div>

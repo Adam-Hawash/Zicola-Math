@@ -4,11 +4,12 @@ import { db, safeWrite } from '@/lib/db'
 
 var DEFAULTS = {
   // === Navbar ===
-  navbar_brand: 'The Scholar in Math',
+  /* (و72) الهوية الجديدة للنافبار: Zicola In Math — في الاتجاهين */
+  navbar_brand: 'Zicola In Math',
   navbar_subtitle: 'مستر أحمد شعبان',
   /* (و71) النسخ الإنجليزية لكل نصوص الأدمن — الطالب لما يحول الإنجليزي
      يشوفها، والمستر يعدلها من لوحة التحكم (كل خانة عربي تحتها خانة إنجليزي) */
-  navbar_brand_en: 'The Scholar in Math',
+  navbar_brand_en: 'Zicola In Math',
   navbar_subtitle_en: 'Mr. Ahmed Shaaban',
 
   // === Hero Section ===
@@ -18,7 +19,8 @@ var DEFAULTS = {
      «by مستر أحمد شعبان» — طلب المستر حرفيًا */
   hero_title_line1: 'The Scholar',
   hero_title_line2: 'by مستر أحمد شعبان',
-  hero_title_line2_en: 'by Mr. Ahmed Shaaban',
+  /* (و72) التهجئة الرسمية الجديدة: Shaban (من غير c) */
+  hero_title_line2_en: 'by Mr. Ahmed Shaban',
   /* (و70) صورة الهيرو = مستر طالع من السحابة — الصورة الرسمية **الكاملة** (و71)
      من غير أي قص: المستر طالع من سحابة وإسمه تحتها (the-scholar-full) */
   instructor_photo: '/images/the-scholar-full.png',
@@ -195,6 +197,12 @@ export async function GET() {
       var c = configs[i]
       map[c.key] = c.value
     }
+    /* (و72) القيم الخام المخزنة قبل ترميمات البراند — بنحتاجها عشان
+       نطبّق ترميم الهوية الجديدة في آخر الخطوات (تحت) من غير ما
+       الترميمات القديمة (اللي بتنقل أي Zicola إلى The Scholar) تلغّيها */
+    var rawNavbarBrand = typeof map['navbar_brand'] === 'string' ? map['navbar_brand'] : ''
+    var rawNavbarBrandEn = typeof map['navbar_brand_en'] === 'string' ? map['navbar_brand_en'] : ''
+    var rawHeroTitle2En = typeof map['hero_title_line2_en'] === 'string' ? map['hero_title_line2_en'] : ''
     // اسم المنصة الصحيح: The Scholar in Math (من غير s) — لو قاعدة البيانات لسه فيها
     // الاسم القديم من نسخة قديمة بنصلحه على القراءة، والترحيل في ensure-schema
     // بصلحه نهائيًا في قاعدة البيانات
@@ -272,6 +280,39 @@ export async function GET() {
       if (v.indexOf('Mr. Sherif ElSayed') !== -1 || v.indexOf('مستر شريف السيد') !== -1 || v.indexOf('نصائح مستر أحمد شعبان') !== -1 || v.indexOf('Mr. Wael El-Khadiry') !== -1 || v.indexOf('مستر أحمد شعبان') !== -1) {
         map[cfgKeys[k]] = v.split('Mr. Sherif ElSayed').join('The Scholar in Math').split('مستر شريف السيد').join('مستر أحمد شعبان').split('نصائح مستر أحمد شعبان').join('نصائح مستر أحمد شعبان').split('Mr. Wael El-Khadiry').join('The Scholar in Math').split('مستر أحمد شعبان').join('مستر أحمد شعبان')
       }
+    }
+    /* (و72) الهوية الجديدة للنافبار: «Zicola In Math» + تهجئة الاسم Shaban —
+       آخر خطوة بعد كل ترميمات The Scholar القديمة (اللي كانت بتترجم أي
+       Zicola إلى The Scholar في brandKeys فوق):
+       - أي قيمة مخزنة فيها Zicola In Math بترجع زي ما هي (الترميم القديم كان بيغيرها)
+       - أي قيمة مخزنة = The Scholar in Math بالظبط بتتحول Zicola In Math
+         وبتتكتب نهائيًا في قاعدة البيانات (write-through)
+       - hero_title_line2_en القديمة (Shaaban) بتتهجأ Shaban بنفس النمط */
+    var brandFixups: string[][] = []
+    if (rawNavbarBrand.indexOf('Zicola In Math') !== -1) {
+      map['navbar_brand'] = 'Zicola In Math'
+    } else if (rawNavbarBrand === 'The Scholar in Math') {
+      map['navbar_brand'] = 'Zicola In Math'
+      brandFixups.push(['navbar_brand', 'Zicola In Math'])
+    }
+    if (rawNavbarBrandEn.indexOf('Zicola In Math') !== -1) {
+      map['navbar_brand_en'] = 'Zicola In Math'
+    } else if (rawNavbarBrandEn === 'The Scholar in Math') {
+      map['navbar_brand_en'] = 'Zicola In Math'
+      brandFixups.push(['navbar_brand_en', 'Zicola In Math'])
+    }
+    if (rawHeroTitle2En === 'by Mr. Ahmed Shaaban') {
+      map['hero_title_line2_en'] = 'by Mr. Ahmed Shaban'
+      brandFixups.push(['hero_title_line2_en', 'by Mr. Ahmed Shaban'])
+    }
+    for (var f = 0; f < brandFixups.length; f++) {
+      (function (fk: string, fv: string) {
+        db.siteConfig.upsert({
+          where: { key: fk },
+          update: { value: fv, updatedAt: new Date() },
+          create: { key: fk, value: fv },
+        }).catch(function () {})
+      })(brandFixups[f][0], brandFixups[f][1])
     }
     return NextResponse.json(map)
   } catch (error) {
