@@ -162,7 +162,7 @@ export default function TipsSection() {
             {pickConfig(cfg, 'tips_title', lang, 'نصائح للمستر', "Teacher's Tips")}
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto text-sm sm:text-base">
-            {pickConfig(cfg, 'tips_subtitle', lang, 'نصائح ذهبية من مستر أحمد شعبان للتفوّق في الرياضيات', 'Golden advice from Mr. Ahmed Shaaban to excel in mathematics')}
+            {pickConfig(cfg, 'tips_subtitle', lang, 'نصائح ذهبية من مستر أحمد شعبان للتفوّق في الرياضيات', 'Golden advice from Mr. Ahmed Shaban to excel in mathematics')}
           </p>
         </div>
 

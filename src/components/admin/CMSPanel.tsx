@@ -46,6 +46,7 @@ var TEXT_SECTIONS: SectionDef[] = [
       { key: 'hero_title_line1', label: 'عنوان البطل سطر 1', type: 'text' },
       { key: 'hero_title_line2', label: 'عنوان البطل سطر 2', type: 'text' },
       { key: 'hero_subtitle', label: 'نص البطل | Hero Subtitle', type: 'textarea' },
+      { key: 'hero_cta_text', label: 'نص زرار البطل | Hero CTA', type: 'text' },
       { key: 'hero_stat1_value', label: 'إحصائية 1 القيمة', type: 'text' },
       { key: 'hero_stat1_label', label: 'إحصائية 1 التسمية', type: 'text' },
       { key: 'hero_stat2_value', label: 'إحصائية 2 القيمة', type: 'text' },

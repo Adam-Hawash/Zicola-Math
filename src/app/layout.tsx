@@ -19,9 +19,9 @@ const geistMono = Geist_Mono({
 });
 
 export var metadata: Metadata = {
-  title: "Zicola In Math | M. Ahmed Shaban",
+  title: "Zicola In Math | Mr. Ahmed Shaban",
   description:
-    "منصة The Scholar in Math — مستر أحمد شعبان: منصة رياضيات متكاملة. تبسيط الرياضيات، واجبات أسبوعية، امتحانات منتظمة، ومتابعة مستمرة للتقدم.",
+    "منصة Zicola In Math — مستر أحمد شعبان: منصة رياضيات متكاملة. تبسيط الرياضيات، واجبات أسبوعية، امتحانات منتظمة، ومتابعة مستمرة للتقدم.",
 };
 
 export default async function RootLayout({
@@ -47,7 +47,11 @@ export default async function RootLayout({
   }
 
   // (و70) Favicon = صورة المستر الرسمية (favicon_url من الكونفيج — الافتراضي الصورة الجديدة)
+  // (و73) نفس ترميم الـ API: أي favicon_url قديمة (logo.svg) أو فاضية = صورة المستر
   var faviconUrl = initialConfig.favicon_url || "/images/the-scholar-favicon.png";
+  if (typeof faviconUrl !== "string" || faviconUrl === "" || faviconUrl.indexOf("logo.svg") !== -1) {
+    faviconUrl = "/images/the-scholar-favicon.png";
+  }
 
   return (
     <html lang="ar" dir="rtl" suppressHydrationWarning>

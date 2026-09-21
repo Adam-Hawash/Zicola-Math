@@ -26,11 +26,43 @@ import {
   CalendarClock,
 } from 'lucide-react'
 import { toast } from 'sonner'
-/* (و64) زراير الثيم + اللغة الموحدة في كل المنصة */
-import { PlatformToggles } from '@/components/platform-toggles'
+/* (و64) زرار الثيم الموحد (و73: زرار اللغة القديم اتشال من هنا وبقى حبة EN | عربي زي منصة د. شيماء) */
+import { ThemeToggle } from '@/components/platform-toggles'
 /* (و72) النافبار كله إنجليزي ثابت مهما كانت اللغة — والموقع نفسه بيفضل ثنائي */
 import { useLangStore, pickConfig } from '@/lib/i18n'
 /* (و70) زرار «أوائل الطلبة» اتشال من النافبار بطلب المستر (حاجات الطلاب) */
+
+/* (و73) سويتش اللغة بشكل حبة (pill) — نفس تصميم منصة د. شيماء بالظبط —
+   EN | عربي — بيقرأ/يكتب ستور اللغة الموحد (useLangStore) فيقلّب النصوص
+   واتجاه الصفحة (rtl/ltr) والاختيار محفوظ في localStorage زي باقي المنصة */
+function LangPillToggle() {
+  var lang = useLangStore(function (s) { return s.lang })
+  var setLang = useLangStore(function (s) { return s.setLang })
+  return (
+    <div
+      className="inline-flex items-center rounded-full border border-border bg-muted/60 p-0.5 text-[11px] font-bold"
+      role="group"
+      aria-label="Language / اللغة"
+    >
+      <button
+        type="button"
+        onClick={function () { setLang('en') }}
+        aria-pressed={lang === 'en'}
+        className={'rounded-full px-2.5 py-1 transition-colors cursor-pointer ' + (lang === 'en' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
+      >
+        EN
+      </button>
+      <button
+        type="button"
+        onClick={function () { setLang('ar') }}
+        aria-pressed={lang === 'ar'}
+        className={'rounded-full px-2.5 py-1 transition-colors cursor-pointer ' + (lang === 'ar' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
+      >
+        عربي
+      </button>
+    </div>
+  )
+}
 
 export function Navbar() {
   const [mobileMenu, setMobileMenu] = useState(false)
@@ -207,6 +239,9 @@ export function Navbar() {
                 </Button>
               </>
             )}
+            {/* (و73) سويتش اللغة الحبة — ظاهر في كل الحالات (زائر/طالب/أدمن)
+                جنب أزرار الدخول في الديسكتوب زي منصة د. شيماء */}
+            <LangPillToggle />
           </nav>
 
           {/* YouTube + Theme Toggle + Mobile Menu Button */}
@@ -236,8 +271,8 @@ export function Navbar() {
               </a>
             )}
 
-            {/* (و64) زراير الثيم + اللغة — موحدة في كل المنصة */}
-            <PlatformToggles />
+            {/* (و64) زرار الثيم — (و73) اللغة بقت الحبة الجديدة فوق في شريط اللينكات */}
+            <ThemeToggle />
 
             {/* Mobile Hamburger */}
             <Button
@@ -341,6 +376,11 @@ export function Navbar() {
                 </Button>
               </>
             )}
+
+            {/* (و73) سويتش اللغة الحبة في قايمة الموبايل — ظاهر للكل (زائر/طالب/أدمن) */}
+            <div className="flex justify-center pt-1">
+              <LangPillToggle />
+            </div>
           </div>
         )}
       </header>

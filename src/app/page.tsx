@@ -8,7 +8,17 @@ import { StudentPaymentView } from '@/components/landing/StudentPaymentView'
 import { LoginView, RegisterView } from '@/components/landing/AuthPages'
 import dynamic from 'next/dynamic'
 import { useEffect, useState, useRef } from 'react'
-import { GraduationCap, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
+
+/* ===== (و73) قطع البازل الأربع لشاشة التحميل — كل قطعة مربع 100×100
+   بسنّ (knob) بارزة وفجوة (socket) غاطسة عشان تتشبك مع بعضها في مربع 2×2.
+   الألوان: سماوي/عنبري/زمردي/وردي — هوية جديدة مختلفة عن الكحلي+الدهبي القديم.
+   رسمة واحدة لكل قطعة بإحداثيات مطلقة جوه viewBox ‏200×200 (المربع المجمّع)،
+   وترتيب الرسم (BR→BL→TR→TL) بيخلي السنون تظهر فوق الفجوات = شكل تشابك حقيقي */
+var PZ_BR = 'M100,100 H136 C128,100 128,114 150,114 C172,114 172,100 164,100 H200 V200 H100 V164 C100,172 114,172 114,150 C114,128 100,128 100,136 V100 Z'
+var PZ_BL = 'M0,100 H36 C28,100 28,114 50,114 C72,114 72,100 64,100 H100 V136 C100,128 114,128 114,150 C114,172 100,172 100,164 V200 H0 Z'
+var PZ_TR = 'M100,0 H200 V100 H164 C172,100 172,114 150,114 C128,114 128,100 136,100 H100 V64 C100,72 114,72 114,50 C114,28 100,28 100,36 V0 Z'
+var PZ_TL = 'M0,0 H100 V36 C100,28 114,28 114,50 C114,72 100,72 100,64 V100 H64 C72,100 72,114 50,114 C28,114 28,100 36,100 H0 Z'
 
 const HeroSection = dynamic(() => import('@/components/landing/HeroSection'), {
   loading: () => <div className="min-h-[70vh] bg-background" />,
@@ -149,53 +159,50 @@ export default function HomePage() {
   const showWhatsApp = currentView === 'landing' || currentView === 'auth-login' || currentView === 'auth-register'
 
   // Full-page loading screen
-  // (و72) شاشة تحميل مستقلة تمامًا عن هوية maths-genius الذهبية القديمة —
-  // كحلي عميق + سحابة بيضاء أنيقة وتطلع منها قبعة ذهبية + «M. Ahmed Shaban»
+  // (و73) شاشة تحميل جديدة بطلب المستر: قطع بيزك (بازل) ملوّنة بتطير وتدور من
+  // الاتجاهات الأربعة وتتجمّع في مربع 2×2 وبتتنفس بهدوء — بدل السحابة البيضاء
+  // والقبعة الدهبية. الخلفية كحلي عميق بنفس الاندفاع الفاخر والنصوص:
+  // «Mr. Ahmed Shaban» + «ZICOLA IN MATH» (بلون سماوي بدل الدهبي) + سبينر
   if (!appReady) {
     return (
-      <div className="fixed inset-0 z-[9999] overflow-hidden flex flex-col items-center justify-center gap-6 bg-[radial-gradient(120%_120%_at_50%_0%,#1a3a74_0%,#10234b_45%,#081226_100%)]">
-        {/* Soft white/blue glow dots */}
+      <div className="fixed inset-0 z-[9999] overflow-hidden flex flex-col items-center justify-center gap-7 bg-[radial-gradient(120%_120%_at_50%_0%,#173f6e_0%,#0f2a55_45%,#071527_100%)]">
+        {/* Glow dots — أبيض/أزرق + لمسات بألوان البازل الأربعة */}
         <div className="absolute top-[16%] left-[18%] h-2 w-2 rounded-full bg-white/80 animate-pulse" style={{ boxShadow: '0 0 14px rgba(255,255,255,0.85)' }} />
-        <div className="absolute top-[24%] right-[14%] h-1.5 w-1.5 rounded-full bg-[#8fb7ff]/80 animate-pulse" style={{ boxShadow: '0 0 12px rgba(143,183,255,0.9)', animationDelay: '0.6s' }} />
+        <div className="absolute top-[24%] right-[14%] h-1.5 w-1.5 rounded-full bg-[#38bdf8]/80 animate-pulse" style={{ boxShadow: '0 0 12px rgba(56,189,248,0.9)', animationDelay: '0.6s' }} />
         <div className="absolute bottom-[22%] left-[24%] h-1.5 w-1.5 rounded-full bg-white/60 animate-pulse" style={{ boxShadow: '0 0 10px rgba(255,255,255,0.7)', animationDelay: '1.1s' }} />
-        <div className="absolute bottom-[28%] right-[22%] h-2 w-2 rounded-full bg-[#E5BE5A]/70 animate-pulse" style={{ boxShadow: '0 0 14px rgba(229,190,90,0.75)', animationDelay: '0.3s' }} />
-        <div className="absolute top-[42%] left-[8%] h-1 w-1 rounded-full bg-white/50 animate-pulse" style={{ boxShadow: '0 0 8px rgba(255,255,255,0.6)', animationDelay: '1.5s' }} />
-        <div className="absolute top-[38%] right-[9%] h-1 w-1 rounded-full bg-[#8fb7ff]/70 animate-pulse" style={{ boxShadow: '0 0 8px rgba(143,183,255,0.7)', animationDelay: '0.9s' }} />
+        <div className="absolute bottom-[28%] right-[22%] h-2 w-2 rounded-full bg-[#fbbf24]/70 animate-pulse" style={{ boxShadow: '0 0 14px rgba(251,191,36,0.75)', animationDelay: '0.3s' }} />
+        <div className="absolute top-[42%] left-[8%] h-1 w-1 rounded-full bg-[#34d399]/70 animate-pulse" style={{ boxShadow: '0 0 8px rgba(52,211,153,0.7)', animationDelay: '1.5s' }} />
+        <div className="absolute top-[38%] right-[9%] h-1 w-1 rounded-full bg-[#fb7185]/70 animate-pulse" style={{ boxShadow: '0 0 8px rgba(251,113,133,0.7)', animationDelay: '0.9s' }} />
 
-        {/* White cloud with a small gold GraduationCap rising from its top */}
+        {/* Puzzle pieces — بتطير من الاتجاهات الأربعة وتتجمّع (keyframes في globals.css) */}
         <div className="relative" aria-hidden="true">
-          <GraduationCap className="absolute -top-7 left-1/2 -translate-x-1/2 h-8 w-8 text-[#E5BE5A] animate-pulse drop-shadow-[0_0_14px_rgba(229,190,90,0.6)]" />
-          <svg width="190" height="104" viewBox="0 0 200 110" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-[0_10px_28px_rgba(0,0,0,0.5)]">
-            <defs>
-              <linearGradient id="splashCloudGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#ffffff" />
-                <stop offset="100%" stopColor="#dfe8f8" />
-              </linearGradient>
-              <filter id="splashCloudShadowBlur" x="-50%" y="-50%" width="200%" height="200%">
-                <feGaussianBlur stdDeviation="5" />
-              </filter>
-            </defs>
-            {/* soft blur shadow under the cloud */}
-            <ellipse cx="100" cy="98" rx="82" ry="9" fill="#04102a" opacity="0.5" filter="url(#splashCloudShadowBlur)" />
-            {/* layered puffs */}
-            <g fill="url(#splashCloudGrad)">
-              <ellipse cx="100" cy="74" rx="80" ry="25" />
-              <circle cx="54" cy="60" r="21" />
-              <circle cx="100" cy="46" r="27" />
-              <circle cx="146" cy="60" r="21" />
+          <div className="absolute -inset-12 rounded-full bg-[#38bdf8]/15 blur-2xl animate-pulse" />
+          <svg
+            viewBox="0 0 200 200"
+            className="relative w-[180px] h-[180px] sm:w-[200px] sm:h-[200px] pz-asm drop-shadow-[0_16px_36px_rgba(2,8,23,0.55)]"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            {/* ترتيب الرسم مقصود: اللي بيجرهم آخر واحد عشان السنّ تظهر فوق الفجوات */}
+            <g className="pz-piece pz-piece-4">
+              <path d={PZ_BR} fill="#fb7185" stroke="#0b1c3d" strokeWidth="5" strokeLinejoin="round" />
             </g>
-            <g fill="#cdd9ef" opacity="0.45">
-              <ellipse cx="72" cy="84" rx="26" ry="9" />
-              <ellipse cx="130" cy="86" rx="28" ry="9" />
+            <g className="pz-piece pz-piece-3">
+              <path d={PZ_BL} fill="#34d399" stroke="#0b1c3d" strokeWidth="5" strokeLinejoin="round" />
+            </g>
+            <g className="pz-piece pz-piece-2">
+              <path d={PZ_TR} fill="#fbbf24" stroke="#0b1c3d" strokeWidth="5" strokeLinejoin="round" />
+            </g>
+            <g className="pz-piece pz-piece-1">
+              <path d={PZ_TL} fill="#38bdf8" stroke="#0b1c3d" strokeWidth="5" strokeLinejoin="round" />
             </g>
           </svg>
         </div>
 
         <div className="text-center space-y-3">
           <h1 dir="ltr" className="text-3xl font-bold text-white tracking-wide drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)]">
-            M. Ahmed Shaban
+            Mr. Ahmed Shaban
           </h1>
-          <p className="text-[#E5BE5A] text-sm font-semibold uppercase tracking-[0.25em]">
+          <p className="text-[#38bdf8] text-sm font-semibold uppercase tracking-[0.25em]">
             Zicola In Math
           </p>
           <div className="flex items-center gap-2.5 justify-center pt-1">

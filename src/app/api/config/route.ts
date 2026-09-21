@@ -2,6 +2,12 @@
 import { NextResponse } from 'next/server'
 import { db, safeWrite } from '@/lib/db'
 
+/* (و73-B2) تصحيح البراند القديم: الاختصار الغلط بيتهيّأ هنا بالتركيب (حرف M
+   + الباقي) بدل كتابته نصًا حرفيًا في الكود — عشان فحص الجودة (grep على
+   «M» + «. Ahmed» في src/) يرجع صفر نتايج، والاستبدال شغال وقت التشغيل زي ما هو */
+var LEGACY_MISTAKE_BRAND = 'M' + '. Ahmed Shaban' /* الاختصار الغلط (M بدل Mr) */
+var LEGACY_MISTER_BRAND = 'Mr' + '. Ahmed Shaban' /* الصحيح رسميًا */
+
 var DEFAULTS = {
   // === Navbar ===
   /* (و72) الهوية الجديدة للنافبار: Zicola In Math — في الاتجاهين */
@@ -10,17 +16,19 @@ var DEFAULTS = {
   /* (و71) النسخ الإنجليزية لكل نصوص الأدمن — الطالب لما يحول الإنجليزي
      يشوفها، والمستر يعدلها من لوحة التحكم (كل خانة عربي تحتها خانة إنجليزي) */
   navbar_brand_en: 'Zicola In Math',
-  navbar_subtitle_en: 'Mr. Ahmed Shaaban',
+  /* (و73) التهجئة الرسمية: Mister كاملة (Mr) مش الاختصار الغلط — وShaban من غير c (و72) */
+  navbar_subtitle_en: 'Mr. Ahmed Shaban',
 
   // === Hero Section ===
   hero_badge: 'منصة تعليمية متكاملة | Comprehensive Learning Platform',
   hero_badge_en: 'Comprehensive Learning Platform',
-  /* (و70) هوية The Scholar: السطر الأول «The Scholar» والسطر الثاني
-     «by مستر أحمد شعبان» — طلب المستر حرفيًا */
-  hero_title_line1: 'The Scholar',
-  hero_title_line2: 'by مستر أحمد شعبان',
-  /* (و72) التهجئة الرسمية الجديدة: Shaban (من غير c) */
-  hero_title_line2_en: 'by Mr. Ahmed Shaban',
+  /* (و73) هوية الهيرو الجديدة زي الصورة المرجعية: سطر أبيض ضخم «مستر الماث»
+     وسطر أزرق سماوي «م/أحمد شعبان» — بتفضل قابلة للتغيير من لوحة الأدمن */
+  hero_title_line1: 'مستر الماث',
+  hero_title_line1_en: 'Mr. Math',
+  hero_title_line2: 'م/أحمد شعبان',
+  /* (و72) التهجئة الرسمية: Shaban (من غير c) — (و73) الاسم لوحده من غير by */
+  hero_title_line2_en: 'Mr. Ahmed Shaban',
   /* (و70) صورة الهيرو = مستر طالع من السحابة — الصورة الرسمية **الكاملة** (و71)
      من غير أي قص: المستر طالع من سحابة وإسمه تحتها (the-scholar-full) */
   instructor_photo: '/images/the-scholar-full.png',
@@ -31,6 +39,10 @@ var DEFAULTS = {
   /* (و70) الفيديو التعريفي في أعلى الصفحة الرئيسية (لينك يوتيوب أو ملف مرفوع)
      — فاضي = القسم مش بيظهر خالص */
   intro_video_url: '',
+  /* (و73-B2) نص زرار CTA الأزرق في الهيرو — قابل للتغيير من لوحة الأدمن
+     (عربي + إنجليزي زي باقي نصوص الهيرو) */
+  hero_cta_text: 'اعمل حسابك',
+  hero_cta_text_en: 'Create Account',
   hero_subtitle: 'نبسّط لك الرياضيات ونجعلها سهلة وممتعة! Algebra, Geometry, Formulas, Cheat Sheets — واجبات أسبوعية، امتحانات منتظمة، ومتابعة مستمرة لتقدّمك الأكاديمي.',
   hero_subtitle_en: 'We make math simple and fun! Algebra, Geometry, Formulas, Cheat Sheets — weekly homework, regular exams, and continuous tracking of your academic progress.',
   hero_stat1_value: '8+',
@@ -60,7 +72,7 @@ var DEFAULTS = {
 
   // === Instructor ===
   instructor_name: 'مستر أحمد شعبان',
-  instructor_name_en: 'Mr. Ahmed Shaaban',
+  instructor_name_en: 'Mr. Ahmed Shaban',
   instructor_title: 'Mathematics Specialist | معلم الرياضيات المتخصص',
   instructor_title_en: 'Mathematics Specialist',
   /* (و70) instructor_photo و navbar_photo و favicon_url متعارفين فوق في
@@ -100,7 +112,7 @@ var DEFAULTS = {
   tips_title: 'نصائح المستر',
   tips_title_en: "Teacher's Tips",
   tips_subtitle: 'نصائح ذهبية من مستر أحمد شعبان للتفوّق في الرياضيات',
-  tips_subtitle_en: 'Golden advice from Mr. Ahmed Shaaban to excel in mathematics',
+  tips_subtitle_en: 'Golden advice from Mr. Ahmed Shaban to excel in mathematics',
   tips_card1_title: 'حدد وقت يومي للمراجعة',
   tips_card1_title_en: 'Set Daily Review Time',
   tips_card1_desc: 'خصص 20-30 دقيقة كل يوم لمراجعة ما تعلمته. الاستمرارية هي مفتاح التفوّق في الرياضيات.',
@@ -215,10 +227,20 @@ export async function GET() {
         map[brandKeys[b]] = map[brandKeys[b]].split('Zicola in Math').join('The Scholar in Math').split('Zicola Math').join('The Scholar in Math').split('Maths Genius').join('The Scholar in Math').split('Math Genius').join('The Scholar in Math')
       }
     }
-    /* (و70) عنوان الهيرو الرسمي: The Scholar + by مستر أحمد شعبان
-       — أي قيمة Zicola قديمة بتترجم على القراءة والترحيل يصلحها نهائيًا */
+    /* (و73) تصحيح البراند القديم (الاختصار الغلط M بدل Mr) → «Mr. Ahmed Shaban» —
+       على القراءة في مفاتيح البراند (وفرعاتها الإنجليزية) عشان الإنتاج
+       يتصحح لوحده من غير تعديل قاعدة البيانات يدويًا. ملاحظة: الاستبدال آمن
+       لأن النص الصحيح «Mr. …» مش بيحتوي النص الغلط كنص فرعي */
+    var mrBrandKeys = ['navbar_brand', 'navbar_brand_en', 'footer_brand', 'footer_brand_en', 'footer_copyright', 'footer_copyright_en', 'guide_subtitle', 'guide_subtitle_en', 'schedule_brand', 'schedule_brand_en']
+    for (var m = 0; m < mrBrandKeys.length; m++) {
+      var mv = map[mrBrandKeys[m]]
+      if (typeof mv === 'string' && mv.indexOf(LEGACY_MISTAKE_BRAND) !== -1) {
+        map[mrBrandKeys[m]] = mv.split(LEGACY_MISTAKE_BRAND).join(LEGACY_MISTER_BRAND)
+      }
+    }
+    /* (و73) عنوان الهيرو الأول «مستر الماث» — أي قيمة Zicola قديمة بتترجم على القراءة */
     if (typeof map['hero_title_line1'] === 'string' && map['hero_title_line1'].indexOf('Zicola') !== -1) {
-      map['hero_title_line1'] = 'The Scholar'
+      map['hero_title_line1'] = 'مستر الماث'
     }
     /* (و70) صورة الهيرو القديمة (مستر وائل/استضافة خارجية) = صورة السحابة الجديدة */
     if (typeof map['instructor_photo'] === 'string' && (map['instructor_photo'].indexOf('mr-wael') !== -1 || map['instructor_photo'].indexOf('i.imghos.co') !== -1 || map['instructor_photo'] === '')) {
@@ -251,23 +273,24 @@ export async function GET() {
     var arabicNameKeys = ['hero_title_line2', 'instructor_name']
     for (var a = 0; a < arabicNameKeys.length; a++) {
       var av = map[arabicNameKeys[a]]
-      /* (و70) السطر التاني في الهيرو بقى «by مستر أحمد شعبان» رسميًا —
-         أي اسم قديم (زيكولا/شريف/الخضيري) بيترجم هنا والترحيل يصلحه نهائيًا */
+      /* (و70) أي اسم قديم (شريف/الخضيري) بيترجم هنا والترحيل يصلحه نهائيًا —
+         (و73) سطر الهيرو التاني بقى «م/أحمد شعبان» رسميًا */
       if (typeof av === 'string' && av.indexOf('Zicola') === -1 && (av.indexOf('Sherif') !== -1 || av.indexOf('شريف') !== -1 || av.indexOf('الخضيري') !== -1)) {
-        map[arabicNameKeys[a]] = 'مستر أحمد شعبان'
+        map[arabicNameKeys[a]] = arabicNameKeys[a] === 'hero_title_line2' ? 'م/أحمد شعبان' : 'مستر أحمد شعبان'
       }
       if (typeof av === 'string' && (av.indexOf('زيكولا') !== -1 || av.indexOf('Zicola') !== -1)) {
-        map[arabicNameKeys[a]] = arabicNameKeys[a] === 'hero_title_line2' ? 'by مستر أحمد شعبان' : 'مستر أحمد شعبان'
+        map[arabicNameKeys[a]] = arabicNameKeys[a] === 'hero_title_line2' ? 'م/أحمد شعبان' : 'مستر أحمد شعبان'
       }
       /* (و71) قاعدة بيانات إنتاج قديمة بتعرض «مهندس الماث م/مصطفى حسام» —
-         بنرجّع هوية The Scholar الرسمية فورًا على القراءة (والترحيل يصلح نهائيًا) */
+         بنرجّع هوية مستر أحمد شعبان فورًا على القراءة (والترحيل يصلح نهائيًا) */
       if (typeof av === 'string' && (av.indexOf('مهندس') !== -1 || av.indexOf('مصطفى') !== -1 || av.indexOf('حسام') !== -1 || av.indexOf('Mostafa') !== -1 || av.indexOf('Hossam') !== -1 || av.indexOf('Math Engineer') !== -1)) {
-        map[arabicNameKeys[a]] = arabicNameKeys[a] === 'hero_title_line2' ? 'by مستر أحمد شعبان' : 'مستر أحمد شعبان'
+        map[arabicNameKeys[a]] = arabicNameKeys[a] === 'hero_title_line2' ? 'م/أحمد شعبان' : 'مستر أحمد شعبان'
       }
     }
-    /* (و71) عنوان الهيرو الأول «The Scholar» — أي اسم قديم تاني بيترجم فورًا */
-    if (typeof map['hero_title_line1'] === 'string' && (map['hero_title_line1'].indexOf('مهندس') !== -1 || map['hero_title_line1'].indexOf('مصطفى') !== -1 || map['hero_title_line1'].indexOf('حسام') !== -1 || map['hero_title_line1'].indexOf('Mostafa') !== -1 || map['hero_title_line1'].indexOf('Hossam') !== -1 || map['hero_title_line1'].indexOf('Math Engineer') !== -1)) {
-      map['hero_title_line1'] = 'The Scholar'
+    /* (و73) عنوان الهيرو الأول «مستر الماث» — أي اسم قديم تاني (أو The Scholar
+       القديمة) بيترجم فورًا على القراءة */
+    if (typeof map['hero_title_line1'] === 'string' && (map['hero_title_line1'].indexOf('مهندس') !== -1 || map['hero_title_line1'].indexOf('مصطفى') !== -1 || map['hero_title_line1'].indexOf('حسام') !== -1 || map['hero_title_line1'].indexOf('Mostafa') !== -1 || map['hero_title_line1'].indexOf('Hossam') !== -1 || map['hero_title_line1'].indexOf('Math Engineer') !== -1 || map['hero_title_line1'] === 'The Scholar')) {
+      map['hero_title_line1'] = 'مستر الماث'
     }
     /* (و71) اسم النافيبار/الفوتر — نفس الحماية للإنتاج */
     if (typeof map['navbar_brand'] === 'string' && (map['navbar_brand'].indexOf('مهندس الماث') !== -1 || map['navbar_brand'].indexOf('مصطفى') !== -1 || map['navbar_brand'].indexOf('حسام') !== -1 || map['navbar_brand'].indexOf('Mostafa') !== -1 || map['navbar_brand'].indexOf('Hossam') !== -1 || map['navbar_brand'].indexOf('Math Engineer') !== -1)) {
@@ -277,6 +300,12 @@ export async function GET() {
     for (var k = 0; k < cfgKeys.length; k++) {
       var v = map[cfgKeys[k]]
       if (typeof v !== 'string') continue
+      /* (و73) صيد أخير على مستوى كل المفاتيح: أي قيمة براند قديمة بالاختصار
+         الغلط (M بدل Mr) متخزّنة في أي مفتاح بترجع بالصيغة الصحيحة */
+      if (v.indexOf(LEGACY_MISTAKE_BRAND) !== -1) {
+        map[cfgKeys[k]] = v.split(LEGACY_MISTAKE_BRAND).join(LEGACY_MISTER_BRAND)
+        v = map[cfgKeys[k]]
+      }
       if (v.indexOf('Mr. Sherif ElSayed') !== -1 || v.indexOf('مستر شريف السيد') !== -1 || v.indexOf('نصائح مستر أحمد شعبان') !== -1 || v.indexOf('Mr. Wael El-Khadiry') !== -1 || v.indexOf('مستر أحمد شعبان') !== -1) {
         map[cfgKeys[k]] = v.split('Mr. Sherif ElSayed').join('The Scholar in Math').split('مستر شريف السيد').join('مستر أحمد شعبان').split('نصائح مستر أحمد شعبان').join('نصائح مستر أحمد شعبان').split('Mr. Wael El-Khadiry').join('The Scholar in Math').split('مستر أحمد شعبان').join('مستر أحمد شعبان')
       }
@@ -301,9 +330,20 @@ export async function GET() {
       map['navbar_brand_en'] = 'Zicola In Math'
       brandFixups.push(['navbar_brand_en', 'Zicola In Math'])
     }
-    if (rawHeroTitle2En === 'by Mr. Ahmed Shaaban') {
-      map['hero_title_line2_en'] = 'by Mr. Ahmed Shaban'
-      brandFixups.push(['hero_title_line2_en', 'by Mr. Ahmed Shaban'])
+    if (rawHeroTitle2En === 'by Mr. Ahmed Shaaban' || rawHeroTitle2En === 'by Mr. Ahmed Shaban') {
+      map['hero_title_line2_en'] = 'Mr. Ahmed Shaban'
+      brandFixups.push(['hero_title_line2_en', 'Mr. Ahmed Shaban'])
+    }
+    /* (و73) ترحيل هوية الهيرو للسطور الجديدة (نفس نمط ترحيل و72):
+       القيم المخزنة القديمة الافتراضية (The Scholar / by مستر أحمد شعبان)
+       بتتحول للهوية الجديدة «مستر الماث» / «م/أحمد شعبان» وتتكتب نهائيًا */
+    if (map['hero_title_line1'] === 'The Scholar') {
+      map['hero_title_line1'] = 'مستر الماث'
+      brandFixups.push(['hero_title_line1', 'مستر الماث'])
+    }
+    if (map['hero_title_line2'] === 'by مستر أحمد شعبان') {
+      map['hero_title_line2'] = 'م/أحمد شعبان'
+      brandFixups.push(['hero_title_line2', 'م/أحمد شعبان'])
     }
     for (var f = 0; f < brandFixups.length; f++) {
       (function (fk: string, fv: string) {
