@@ -1,6 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, safeWrite } from '@/lib/db'
 
 export async function GET(
   _request: NextRequest,
@@ -133,14 +133,38 @@ export async function DELETE(
       return NextResponse.json({ error: 'Student not found' }, { status: 404 })
     }
 
-    /* (2026-و56) تسليمات الواجبات ملهاش علاقة cascade بالطالب في البريزما —
-       من غير السطر ده مسح الطالب بيسيب تسليمات «شبح» تظهر عند المستر
-       في نتايج أي واجب حقيقي سلّمه الطالب قبل ما حسابه يتمسح.
-       (نتايج الامتحانات بتتمسح لوحدها — عندها cascade في السكيما) */
-    try {
-      await db.$executeRawUnsafe('DELETE FROM HomeworkResult WHERE studentId = ?', id)
-    } catch (e) {
-      console.error('HomeworkResult cleanup on student delete:', e)
+    /* (81-c) حذف متسلسل كامل — السبب الجذري لتضخم قاعدة البيانات: مسح الطالب
+       كان بيسيب كل صفوفه «يتيمة» للأبد، لأن الفورين كي مش مفروض على داتابيز
+       الإنتاج (اتعملت بـ raw SQL — فالـ onDelete: Cascade في البريزما مش
+       شغال فعليًا). كل جدول مفاتيحه studentId بيتمسح هنا قبل الطالب نفسه،
+       كل واحد في try/catch لوحده فمفيش جدول ناقص يمنع باقي التنضيف،
+       والطالب بيتحذف في الآخر مهما حصل. (2026-و56) HomeworkResult كان
+       بيتمسح لوحده قبل كده — بقى جزء من القايمة دي. */
+    var studentCascadeTables = [
+      'StudentActivity', 'ExamResult', 'HomeworkResult', 'VideoProgress',
+      'VideoAccess', 'Notification', 'PlayTicket', 'Payment', 'Complaint',
+      'Discussion', 'PointsLedger',
+    ]
+    for (var sc = 0; sc < studentCascadeTables.length; sc++) {
+      var scTable = studentCascadeTables[sc]
+      try {
+        await safeWrite(function () {
+          return db.$executeRawUnsafe('DELETE FROM ' + scTable + ' WHERE studentId = ?', id)
+        })
+      } catch (e) {
+        console.error('Student cascade cleanup error (' + scTable + '):', e)
+      }
+    }
+    /* (81-c) ولي الأمر: روابط الأبناء بتاعة أب الطالب ← روابط الطالب ←
+       حساب ولي الأمر نفسه (ParentStudent جدول raw SQL من lib/parent-students) */
+    try { await db.$executeRawUnsafe('DELETE FROM ParentStudent WHERE parentId IN (SELECT id FROM Parent WHERE studentId = ?)', id) } catch (e) {
+      console.error('Student cascade ParentStudent (by parent) error:', e)
+    }
+    try { await db.$executeRawUnsafe('DELETE FROM ParentStudent WHERE studentId = ?', id) } catch (e) {
+      console.error('Student cascade ParentStudent error:', e)
+    }
+    try { await db.$executeRawUnsafe('DELETE FROM Parent WHERE studentId = ?', id) } catch (e) {
+      console.error('Student cascade Parent error:', e)
     }
 
     await db.student.delete({ where: { id } })

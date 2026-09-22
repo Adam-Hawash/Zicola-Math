@@ -100,6 +100,19 @@ export async function DELETE(
       await db.videoAccess.deleteMany({ where: { videoId: id } });
       await db.videoProgress.deleteMany({ where: { videoId: id } });
     } catch (e) {}
+    /* (81-c) حذف متسلسل — جداول مفاتيحها videoId ملهاش فورين كي على داتابيز
+       الإنتاج (raw SQL) فكانت بتفضل يتيمة للأبد بعد مسح الفيديو:
+       جدولة المجموعات + تذاكر التشغيل بتاعة الفيديو ده */
+    try {
+      await db.$executeRawUnsafe('DELETE FROM VideoGroupSchedule WHERE videoId = ?', id);
+    } catch (e) {
+      console.error("Video cascade VideoGroupSchedule error:", e);
+    }
+    try {
+      await db.$executeRawUnsafe('DELETE FROM PlayTicket WHERE videoId = ?', id);
+    } catch (e) {
+      console.error("Video cascade PlayTicket error:", e);
+    }
     await db.video.delete({ where: { id } });
     return NextResponse.json({ success: true, message: "تم حذف الفيديو بنجاح" });
   } catch (error: any) {
