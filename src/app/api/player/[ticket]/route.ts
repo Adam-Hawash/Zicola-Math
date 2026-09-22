@@ -345,14 +345,15 @@ const PLAYER_PAGE = `<!doctype html>
   .wmQr.s-lg .qr{width:clamp(34px,4vw,52px);height:clamp(34px,4vw,52px)}
   .wmQr.s-lg .nm{font-size:clamp(9px,1.1vw,13px)}
   .wmQr.s-lg .ph{font-size:clamp(8px,.95vw,11px)}
-  /* شيب اسم الطالب + رقمه (بيترسم ديناميكيًا لكل طالب — {اسم} • {رقم}) */
+  /* شيب اسم الطالب + رقمه (MG-5 — اسم ثنائي فوق وتحتيه الرقم، سطرين واضحين) */
   .wmNm .in{display:inline-block;background:rgba(0,0,0,.62);border:1px solid rgba(255,255,255,.4);color:#fff;
     border-radius:9px;padding:3px 9px;direction:rtl;white-space:nowrap;
-    font-weight:800;unicode-bidi:plaintext;letter-spacing:0;box-shadow:0 2px 10px rgba(0,0,0,.45)}
+    font-weight:800;unicode-bidi:plaintext;letter-spacing:0;box-shadow:0 2px 10px rgba(0,0,0,.45);text-align:center}
   .wmNm.s-sm .in{font-size:clamp(8px,1vw,11px)}
   .wmNm.s-md .in{font-size:clamp(11px,1.4vw,15px)}
   .wmNm.s-lg .in{font-size:clamp(14px,1.9vw,20px)}
-  .wmNm .ph{direction:ltr;unicode-bidi:plaintext;font-weight:700;opacity:.85}
+  .wmNm .nm{display:block}
+  .wmNm .ph{display:block;direction:ltr;unicode-bidi:plaintext;font-weight:700;opacity:.85;font-size:.82em;margin-top:1px}
   /* لوجو المنصة في نص الفيديو — نص أبيض بظل قوي يبان على أي مشهد */
   .wmLogo{position:absolute;z-index:40;pointer-events:none;transform:translate(-50%,-50%);
     font-weight:900;direction:ltr;white-space:nowrap;user-select:none;text-align:center;
@@ -628,11 +629,12 @@ var PC = (function () {
   var items = [];
   try {
     var arr = Array.isArray(c.nameItems) ? c.nameItems : [];
-    for (var i = 0; i < arr.length && items.length < 6; i++) {
+    /* (MG-5) الحد بقى 10 عناصر + كل عنصر له محتوى (اسم بس / رقم بس / الاتنين) */
+    for (var i = 0; i < arr.length && items.length < 10; i++) {
       var it = arr[i]; if (!it || typeof it !== 'object') continue;
       var no = op(it.opacity, 0.55, 0.05, 0.85);
       if (upgrade) no = Math.max(no, 0.55);
-      items.push({ id: String(it.id || ('nm-' + i)), x: num(it.x, 50, 0, 100), y: num(it.y, 10, 0, 100), size: size(it.size, 'md'), opacity: no, blink: blink(it.blink, { on: false, show: 15, hide: 15 }) });
+      items.push({ id: String(it.id || ('nm-' + i)), x: num(it.x, 50, 0, 100), y: num(it.y, 10, 0, 100), size: size(it.size, 'md'), opacity: no, content: (it.content === 'name' || it.content === 'number') ? it.content : 'both', blink: blink(it.blink, { on: false, show: 15, hide: 15 }) });
     }
   } catch (e) { items = []; }
   return {
@@ -658,10 +660,20 @@ function applyPlayerChrome(){
 }
 applyPlayerChrome();
 
+/* (MG-5) الاسم الثنائي — أول كلمتين بس (الرباعي ممنوع — طلب حرفي) */
+function wmShortName(){
+  var p = String(wmName||'').split(/\s+/).filter(Boolean);
+  return p.slice(0,2).join(' ');
+}
 function wmCardHtml(){
+  /* (MG-5) الاسم الثنائي فوق وتحتيه الرقم — من غير «•» ومن غير الاسم الرباعي */
+  var shortNm = wmShortName();
   var qr = CFG.wm.qr ? '<img class="qr" src="' + CFG.wm.qr + '" alt="">' : '';
-  return '<div class="in">' + qr + '<span class="nm">' + esc(wmName || wmPhone) + '</span>' +
-    ((wmName && wmPhone) ? '<span class="sep">•</span><span class="ph">' + esc(wmPhone) + '</span>' : '') + '</div>';
+  var lines = '';
+  if (shortNm) lines += '<span class="nm">' + esc(shortNm) + '</span>';
+  if (wmPhone) lines += '<span class="ph">' + esc(wmPhone) + '</span>';
+  if (!lines) lines = '<span class="nm">' + esc(wmName || wmPhone) + '</span>';
+  return '<div class="in">' + qr + lines + '</div>';
 }
 /* موضع أي عنصر ووترمارك من الكونفج: مركزه على x%/y% + شفافيته
    (MG-3) + تسجيله في محرك الظهور/الاختفاء لو عليه دورة blink */
@@ -706,32 +718,35 @@ function buildWm(){
     var tl = document.createElement('div'); tl.className = 'wmCard wmQr s-' + PC.qrTL.size; tl.innerHTML = ch; placeWm(tl, PC.qrTL); layer.appendChild(tl);
     var br = document.createElement('div'); br.className = 'wmCard wmQr s-' + PC.qrBR.size; br.innerHTML = ch; placeWm(br, PC.qrBR); layer.appendChild(br);
   }
-  /* 3) عناصر الاسم + الرقم (بتتبعت لكل طالب — من غير طالب مفيش حاجة تترسم) */
+  /* 3) عناصر اسم/رقم — (MG-5) كل عنصر له محتوى: both = اسم ثنائي فوق وتحته الرقم
+     (سطرين واضحين) | name = اسم بس | number = رقم بس — والاسم دايمًا ثنائي */
   if(hasStudent && PC.nameItems.length){
-    var label = esc(wmName) + (wmName && wmPhone ? ' <span class="ph">• ' + esc(wmPhone) + '</span>' : '');
+    var shortNm2 = wmShortName();
     for(var i = 0; i < PC.nameItems.length; i++){
       var it = PC.nameItems[i];
       var nm = document.createElement('div'); nm.className = 'wmNm s-' + it.size;
-      nm.innerHTML = '<span class="in">' + label + '</span>';
+      var lines2 = '';
+      if (it.content !== 'number' && shortNm2) lines2 += '<span class="nm">' + esc(shortNm2) + '</span>';
+      if (it.content !== 'name' && wmPhone) lines2 += '<span class="ph">' + esc(wmPhone) + '</span>';
+      if (!lines2) lines2 = '<span class="nm">' + esc(shortNm2 || wmPhone || wmName) + '</span>';
+      nm.innerHTML = '<span class="in">' + lines2 + '</span>';
       placeWm(nm, it); layer.appendChild(nm);
     }
   }
-  /* 4) لوجو المنصة في النص — (MG-4) الشكل الجديد «زي الأول»:
-     name = اسم الطالب الثنائي وتحتيه رقم تليفونه (سطرين — الافتراضي)
-     both = Zicola In Math فوق + الاسم تحتيه + الرقم تحتيه
-     brand = «Zicola In Math» بس */
+  /* 4) لوجو المنصة في النص — (MG-5) الشكل المطلوب حرفيًا:
+     name = **اسم الطالب الثنائي كبير وتحتيه الرقم مباشرة** (واضح — سطرين بس)
+     both = اسم المنصة فوق + الاسم الثنائي + الرقم
+     brand = اسم المنصة بس */
   if(PC.centerLogo.on){
     var lg = document.createElement('div'); lg.className = 'wmLogo s-' + PC.centerLogo.size;
     var lgContent = PC.centerLogo.content || 'name';
-    var lgTwo = (function(){ var p = String(wmName||'').split(/\s+/).filter(Boolean); return p.slice(0,2).join(' '); })();
-    var lgSub = (lgTwo ? '<span class="sub">' + esc(lgTwo) + '</span>' : '') +
-                (wmPhone ? '<span class="sub ph">' + esc(wmPhone) + '</span>' : '');
+    var lgTwo = wmShortName();
     if(lgContent !== 'brand' && (lgTwo || wmPhone)){
-      if(lgContent === 'name'){
-        lg.innerHTML = '<span class="in">' + esc(lgTwo || wmPhone) + '</span>' + lgSub;
-      } else {
-        lg.innerHTML = '<span class="over">Zicola In Math</span><span class="in">' + esc(lgTwo || wmPhone) + '</span>' + lgSub;
-      }
+      var lgInner = '';
+      if(lgContent === 'both') lgInner += '<span class="over">Zicola In Math</span>';
+      lgInner += '<span class="in">' + esc(lgTwo || wmPhone) + '</span>';
+      if (lgTwo && wmPhone) lgInner += '<span class="sub ph">' + esc(wmPhone) + '</span>';
+      lg.innerHTML = lgInner;
     } else {
       lg.textContent = 'Zicola In Math';
     }
