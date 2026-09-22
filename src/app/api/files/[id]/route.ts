@@ -46,7 +46,20 @@ export async function GET(
       const adminId = searchParams.get('adminId') || ''
       const tokenOk = token ? verifyVideoToken(token, id, reqId) : false
       const adminOk = adminId ? await isAdmin(adminId) : false
-      if (!tokenOk && !adminOk) {
+      /* (2026-و84) الفيديو التعريفي عام — طلب المستر: «أضيف فيديو تعريفي
+         من غير مضطر [حد] يعمل أي تسجيل دخول». ملف الفيديو اللي مختار
+         حاليًا في SiteConfig كـ intro_video_url بيتسمح ليه القراءة
+         للزوار — أول ما المستر يغير الفيديو القديم يرجع محمي تلقائيًا
+         لأن الفحص بيبص على القيمة الحالية في كل طلب */
+      var isIntroPublic = false
+      try {
+        var introRows: any[] = await db.$queryRawUnsafe(
+          "SELECT value FROM SiteConfig WHERE key = 'intro_video_url' LIMIT 1"
+        )
+        var introVal = introRows && introRows[0] ? String(introRows[0].value || '') : ''
+        isIntroPublic = !!introVal && introVal.indexOf(id) !== -1
+      } catch (e) { /* جدول ناقص — نكمل بالحماية العادية */ }
+      if (!tokenOk && !adminOk && !isIntroPublic) {
         return NextResponse.json(
           { error: 'غير مسموح — الفيديو بيتشغل من داخل المنصة بس' },
           { status: 403 }

@@ -138,11 +138,11 @@ export function Navbar() {
             </a>
           </div>
         )}
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-          {/* Brand - Right side (RTL start) */}
+        <div className="mx-auto flex h-14 sm:h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
+          {/* Brand - Right side (RTL start) — shrink-0 عشان الصورة ما تتضغطش */}
           <button
             onClick={handleGoHome}
-            className="flex items-center gap-2 transition-opacity hover:opacity-80 cursor-pointer"
+            className="flex items-center gap-2 transition-opacity hover:opacity-80 cursor-pointer shrink-0"
           >
             {instructorPhoto ? (
               <img
@@ -151,7 +151,7 @@ export function Navbar() {
                 width={36}
                 height={36}
                 loading="eager"
-                className="h-9 w-9 rounded-lg object-cover border border-primary/30"
+                className="h-9 w-9 rounded-xl object-cover border border-primary/40 shadow-sm"
               />
             ) : (
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
@@ -252,10 +252,10 @@ export function Navbar() {
               href="/geometry-laws"
               title="Geometry Laws"
               aria-label="Geometry Laws"
-              className="md:hidden flex items-center gap-1 min-h-[44px] px-2.5 rounded-xl text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors"
+              className="md:hidden flex items-center gap-1 min-h-[36px] px-2 rounded-lg text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors"
             >
-              <Shapes className="h-5 w-5" />
-              <span dir="ltr" className="text-xs font-bold">Geometry</span>
+              <Shapes className="h-4 w-4" />
+              <span dir="ltr" className="text-[11px] font-bold">Geometry</span>
             </a>
             {youtubeLink && (
               <a
@@ -275,7 +275,7 @@ export function Navbar() {
             <Button
               variant="ghost"
               size="icon"
-              className="md:hidden min-h-[44px] min-w-[44px]"
+              className="md:hidden h-9 w-9 min-h-[36px] min-w-[36px]"
               onClick={() => setMobileMenu(!mobileMenu)}
               aria-label={mobileMenu ? 'Close menu' : 'Open menu'}
             >
