@@ -187,10 +187,11 @@ var SCHEMA_FIXES = [
   'UPDATE ExamResult SET score = 0 WHERE score IS NULL',
   'UPDATE ExamResult SET maxScore = 100 WHERE maxScore IS NULL',
   'UPDATE Payment SET amount = 0 WHERE amount IS NULL',
-  // ===== (و78) اسم المطوّر الصحيح «Adham Hawash» — القيم المخزنة قديمًا
-  // كانت فيها اللقب الغلط «Adam Hawash» (من غير h) والمستر طلب توحيد
-  // الكلمة في كل المنصات. idempotent: القيم الصح مفيهاش Adam فمش هتتلمس.
-  "UPDATE SiteConfig SET value = REPLACE(value, 'Adam Hawash', 'Adham Hawash') WHERE (key LIKE '%made_by%' OR key LIKE '%developer_label%') AND value LIKE '%Adam Hawash%'",
+  // ===== (10-b) اسم المطوّر الصحيح «Adam Hawash» (Adam من غير h) — بطلب صاحب
+  // المنصة حرفيًا. ترميم و78 القديمة كانت بترجّعه «Adham Hawash» — اتعكس هنا:
+  // القيم المخزنة اللي فيها Adham بتتصحح Adam. idempotent: القيم الصح
+  // مفيهاش Adham فمش هتتلمس.
+  "UPDATE SiteConfig SET value = REPLACE(value, 'Adham Hawash', 'Adam Hawash') WHERE (key LIKE '%made_by%' OR key LIKE '%developer_label%') AND value LIKE '%Adham Hawash%'",
 ]
 
 /* ============================================================

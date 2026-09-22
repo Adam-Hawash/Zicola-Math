@@ -4,6 +4,9 @@
     عاوز الكلام يترجم وتظهر للأولوية للإنجليزي»
    - زر واحد في كل المنصة بيقلّب النصوص + اتجاه الصفحة (rtl/ltr)
    - الاختيار محفوظ في localStorage (mg_lang) وبيرجع مع أول تحميل
+   (10-b) الافتراضي بقى الإنجليزي (EN/LTR) بطلب صاحب المنصة:
+   المنصة بتفتح إنجليزي أول مرة والزائر يقلّب عربي من الزر —
+   والاختيار محفوظ زي ما هو في mg_lang
    ============================================================ */
 'use client'
 
@@ -21,12 +24,13 @@ function applyToDocument(l: Lang) {
 }
 
 export function readStoredLang(): Lang {
-  if (typeof window === 'undefined') return 'ar'
+  /* (10-b) مفيش حاجة محفوظة = الإنجليزي هو الافتراضي (والسيرفر برضه) */
+  if (typeof window === 'undefined') return 'en'
   try {
     var v = window.localStorage.getItem(LANG_KEY)
     if (v === 'en' || v === 'ar') return v
   } catch (e) { /* صامت */ }
-  return 'ar'
+  return 'en'
 }
 
 interface LangStore {
@@ -36,7 +40,9 @@ interface LangStore {
 
 export var useLangStore = create<LangStore>(function () {
   return {
-    lang: 'ar',
+    /* (10-b) الستور بيبدأ إنجليزي — نفس افتراضي readStoredLang عشان
+       أول رسم (والـ SSR) يكونوا إنجليزي LTR قبل ما LangBoot يقرأ المحفوظ */
+    lang: 'en',
     setLang: function (l) {
       try { window.localStorage.setItem(LANG_KEY, l) } catch (e) { /* صامت */ }
       applyToDocument(l)
@@ -69,6 +75,12 @@ export function currentLang(): Lang {
 export function LangBoot() {
   useEffect(function () {
     var l = readStoredLang()
+    /* (10-b) نخزّن الافتراضي «en» أول مرة عشان الاختيار يفضل ثابت محفوظ
+       من أول زيارة (اللي مختار عربي عنده قيمة ar أصلاً فمش بتتلمس) */
+    try {
+      var stored = window.localStorage.getItem(LANG_KEY)
+      if (stored !== 'ar' && stored !== 'en') window.localStorage.setItem(LANG_KEY, l)
+    } catch (e) { /* صامت */ }
     applyToDocument(l)
     useLangStore.setState({ lang: l })
   }, [])

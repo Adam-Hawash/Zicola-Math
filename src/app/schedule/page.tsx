@@ -8,7 +8,7 @@ import { CalendarClock, Clock, GraduationCap, ArrowRight, BookOpen, Loader2 } fr
 /* (و64) زراير الثيم + اللغة الموحدة في كل المنصة */
 import { PlatformToggles } from '@/components/platform-toggles'
 /* (و71) ترجمة حسب لغة الزائر */
-import { useLangStore, pickConfig } from '@/lib/i18n'
+import { useLangStore, pickConfig, useT } from '@/lib/i18n'
 import Link from 'next/link'
 
 interface ScheduleSlot {
@@ -66,17 +66,9 @@ const DEFAULT_SCHEDULE: DaySchedule[] = [
   },
 ]
 
-const DAY_COLORS: Record<string, string> = {
-  'السبت': 'from-amber-500 to-orange-500',
-  'الأحد': 'from-rose-500 to-pink-500',
-  'الإثنين': 'from-blue-500 to-cyan-500',
-  'الثلاثاء': 'from-emerald-500 to-teal-500',
-  'الأربعاء': 'from-violet-500 to-purple-500',
-  'الخميس': 'from-fuchsia-500 to-pink-500',
-}
-
-// Arabic pluralization for "حصة"
-function slotCountLabel(count: number): string {
+// Arabic pluralization for "حصة" — (10-b) بالإنجليزي sessions
+function slotCountLabel(count: number, lang: string): string {
+  if (lang === 'en') return count === 1 ? '1 session' : count + ' sessions'
   if (count === 1) return 'حصة واحدة'
   if (count === 2) return 'حصتين'
   if (count >= 3 && count <= 10) return count + ' حصص'
@@ -86,6 +78,10 @@ function slotCountLabel(count: number): string {
 export default function SchedulePage() {
   const { siteConfig, setSiteConfig, configLoaded } = useAppStore()
   const [loading, setLoading] = useState(true)
+  /* (10-b) الاتجاه بيتبع اللغة — الإنجليزي افتراضي LTR والعربي RTL */
+  var lang = useLangStore(function (s) { return s.lang })
+  var T = useT()
+  var pageDir = lang === 'en' ? 'ltr' : 'rtl'
 
   useEffect(() => {
     if (!configLoaded) {
@@ -104,7 +100,6 @@ export default function SchedulePage() {
 
   // Parse schedule from siteConfig.schedule_data (JSON string) or use default
   // (و71) العناوين حسب لغة الزائر — الأدمن يكتب عربي/إنجليزي
-  var lang = useLangStore(function (s) { return s.lang })
   let schedule: DaySchedule[] = DEFAULT_SCHEDULE
   let scheduleTitle = pickConfig(siteConfig, 'schedule_title', lang, 'مواعيد السنتر', 'Center Schedule')
   let scheduleSubtitle = pickConfig(siteConfig, 'schedule_subtitle', lang, 'جدول مواعيد الحصص الأسبوعية لكل الصفوف الدراسية — اختر اليوم المناسب لك وتابع موعد حصتك', 'Weekly class schedule for all grades — pick the day that suits you and catch your class on time')
@@ -136,14 +131,14 @@ export default function SchedulePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background" dir="rtl">
+      <div className="min-h-screen flex items-center justify-center bg-background" dir={pageDir}>
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-background" dir="rtl">
+    <div className="min-h-screen bg-background" dir={pageDir}>
       {/* Header */}
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="mx-auto max-w-5xl px-4 sm:px-6 py-4 flex items-center justify-between">
@@ -164,7 +159,7 @@ export default function SchedulePage() {
             <Link href="/">
               <Button variant="outline" size="sm" className="min-h-[44px]">
                 <ArrowRight className="h-4 w-4 ml-1" />
-                العودة للرئيسية
+                {T('العودة للرئيسية', 'Back to Home')}
               </Button>
             </Link>
           </div>
@@ -186,23 +181,24 @@ export default function SchedulePage() {
           </p>
         </div>
 
-        {/* Schedule Grid */}
+        {/* Schedule Grid — (10-b) كروت خفيفة بحواف ناعمة بطلب صاحب المنصة:
+            rounded-xl + حد رفيع border-border + خلفية هادية (bg-card + هيدر
+            bg-muted/30) + padding مريح — من غير جريدينت ولا ظلال تقيلة */}
         <div className="grid gap-5 md:grid-cols-2">
           {schedule.map((daySchedule, dayIdx) => {
-            const gradient = DAY_COLORS[daySchedule.day] || 'from-primary to-primary'
             const count = daySchedule.slots.length
             return (
               <Card
                 key={dayIdx}
-                className="overflow-hidden border-border/50 hover:shadow-lg transition-shadow"
+                className="overflow-hidden rounded-xl border border-border bg-card py-0 gap-0 shadow-none hover:bg-muted/10 transition-colors"
               >
-                {/* Day header with gradient */}
-                <div className={`bg-gradient-to-l ${gradient} px-5 py-3 flex items-center justify-between`}>
-                  <h3 className="text-white font-bold text-lg">
+                {/* Day header — خفيف: خلفية هادية وحد سفلي رفيع (بدون جريدينت) */}
+                <div className="flex items-center justify-between gap-3 border-b border-border/60 bg-muted/30 px-4 py-3">
+                  <h3 className="text-base font-bold text-foreground">
                     {daySchedule.day}
                   </h3>
-                  <span className="text-white/90 text-xs font-medium bg-white/20 px-2.5 py-0.5 rounded-full">
-                    {slotCountLabel(count)}
+                  <span className="text-xs font-medium text-muted-foreground border border-border/50 bg-background px-2.5 py-0.5 rounded-full">
+                    {slotCountLabel(count, lang)}
                   </span>
                 </div>
 
@@ -212,7 +208,7 @@ export default function SchedulePage() {
                     {daySchedule.slots.map((slot, idx) => (
                       <div
                         key={idx}
-                        className="flex items-center gap-4 px-5 py-4 hover:bg-muted/40 transition-colors"
+                        className="flex items-center gap-4 px-4 py-3 hover:bg-muted/30 transition-colors"
                       >
                         {/* Time */}
                         <div className="flex items-center gap-2 shrink-0 min-w-[110px]">

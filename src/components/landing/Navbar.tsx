@@ -132,7 +132,8 @@ export function Navbar() {
               className="flex items-center justify-center py-2 text-[13px] font-medium md:text-[15px] text-muted-foreground hover:text-foreground hover:underline underline-offset-2 transition-colors"
             >
               <span dir="ltr">
-                {cfg.footer_made_by_label || 'Developed by Adham Hawash'}
+                {/* (10-b) توقيع المطور الرسمي «Adam Hawash» (من غير h) بطلب صاحب المنصة */}
+                {cfg.footer_made_by_label || 'Developed by Adam Hawash'}
               </span>
             </a>
           </div>

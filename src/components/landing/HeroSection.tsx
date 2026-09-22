@@ -261,18 +261,19 @@ export default function HeroSection() {
               </Button>
             </div>
 
-            {/* مواعيد السنتر — لينك هادي من غير زر كبير (عشان الهيرو يفضل نضيف زي المرجع) */}
+            {/* مواعيد السنتر — كارت خفيف بحواف ناعمة (10-b) بدل النص المجرّد:
+                rounded-xl + حد رفيع شفاف + خلفية خفيفة — من غير ظل تقيل */}
             <div className="flex justify-center lg:justify-start">
               <a
                 href="/schedule"
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-white/60 hover:text-[#7cc0ff] transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-white/70 hover:text-[#7cc0ff] hover:bg-white/10 hover:border-white/25 transition-colors"
               >
                 <CalendarClock className="h-4 w-4" />
                 {T('مواعيد السنتر', 'Center Schedule')}
               </a>
             </div>
 
-            {/* Hero Developer / Adham Hawash branding */}
+            {/* Hero Developer / Adam Hawash branding */}
             <div className="pt-2 flex flex-col items-center lg:items-start gap-1">
               <a
                 href={cfg.hero_developer_url || 'https://prime-developer-portfolio-11.vercel.app'}
@@ -289,7 +290,8 @@ export default function HeroSection() {
                 rel="noopener noreferrer"
                 className="text-xs text-white/40 font-light tracking-wider hover:text-[#7cc0ff] transition-colors"
               >
-                {cfg.footer_made_by_label || 'Developed by Adham Hawash'}
+                {/* (10-b) توقيع المطور الرسمي «Adam Hawash» (من غير h) بطلب صاحب المنصة */}
+                {cfg.footer_made_by_label || 'Developed by Adam Hawash'}
               </a>
             </div>
           </motion.div>

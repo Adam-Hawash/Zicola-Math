@@ -375,7 +375,7 @@ export function RegisterView() {
         <div className="text-center mb-6">
           <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-primary/10 mb-3"><Users className="h-7 w-7 text-primary" /></div>
           <h1 className="text-2xl font-bold text-foreground mb-1">{T('اعمل حساب جديد', 'Create Account')}</h1>
-          <p className="text-sm text-muted-foreground">سجل بياناتك وابدأ رحلتك معنا</p>
+          <p className="text-sm text-muted-foreground">{T('سجل بياناتك وابدأ رحلتك معنا', 'Register your details and start your journey with us')}</p>
         </div>
         <div className="relative rounded-2xl p-[2px] bg-gradient-to-br from-gold-400 via-gold-600 to-gold-400">
           <Card className="rounded-2xl border-0 shadow-lg">
@@ -383,44 +383,44 @@ export function RegisterView() {
               <div className="space-y-4">
                 {/* (2026-و37) نوع الحساب: طالب أو ولي أمر — طلب المستر */}
                 <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-muted">
-                  <button type="button" className="min-h-[40px] rounded-lg bg-primary text-primary-foreground text-sm font-bold cursor-pointer" aria-current="true">حساب طالب</button>
-                  <button type="button" onClick={function () { setView('parent-register') }} className="min-h-[40px] rounded-lg text-sm font-bold text-muted-foreground hover:text-foreground transition-colors cursor-pointer">حساب ولي أمر</button>
+                  <button type="button" className="min-h-[40px] rounded-lg bg-primary text-primary-foreground text-sm font-bold cursor-pointer" aria-current="true">{T('حساب طالب', 'Student Account')}</button>
+                  <button type="button" onClick={function () { setView('parent-register') }} className="min-h-[40px] rounded-lg text-sm font-bold text-muted-foreground hover:text-foreground transition-colors cursor-pointer">{T('حساب ولي أمر', 'Parent Account')}</button>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-foreground mb-2">اسم الطالب الرباعي</p>
+                  <p className="text-sm font-semibold text-foreground mb-2">{T('اسم الطالب الرباعي', 'Student Full Name')}</p>
                   <div className="grid grid-cols-2 gap-2">
-                    <NameField value={name1} onChange={setName1} placeholder="الاسم الأول" id="reg-name1" error={errors.name1} />
-                    <NameField value={name2} onChange={setName2} placeholder="الاسم الثاني" id="reg-name2" error={errors.name2} />
-                    <NameField value={name3} onChange={setName3} placeholder="الاسم الثالث" id="reg-name3" error={errors.name3} />
-                    <NameField value={name4} onChange={setName4} placeholder="الاسم الرابع" id="reg-name4" error={errors.name4} />
+                    <NameField value={name1} onChange={setName1} placeholder={T('الاسم الأول', 'First name')} id="reg-name1" error={errors.name1} />
+                    <NameField value={name2} onChange={setName2} placeholder={T('الاسم الثاني', 'Second name')} id="reg-name2" error={errors.name2} />
+                    <NameField value={name3} onChange={setName3} placeholder={T('الاسم الثالث', 'Third name')} id="reg-name3" error={errors.name3} />
+                    <NameField value={name4} onChange={setName4} placeholder={T('الاسم الرابع', 'Fourth name')} id="reg-name4" error={errors.name4} />
                   </div>
                 </div>
-                <PhoneField value={phone} onChange={setPhone} placeholder="رقم هاتف الطالب" id="reg-phone" error={errors.phone} />
+                <PhoneField value={phone} onChange={setPhone} placeholder={T('رقم هاتف الطالب', 'Student phone number')} id="reg-phone" error={errors.phone} />
                 <div className="grid grid-cols-2 gap-2">
-                  <PasswordField value={password} onChange={setPassword} placeholder="كلمة المرور" id="reg-password" error={errors.password} />
-                  <PasswordField value={password2} onChange={setPassword2} placeholder="تأكيد كلمة المرور" id="reg-password2" error={errors.password2} />
+                  <PasswordField value={password} onChange={setPassword} placeholder={T('كلمة المرور', 'Password')} id="reg-password" error={errors.password} />
+                  <PasswordField value={password2} onChange={setPassword2} placeholder={T('تأكيد كلمة المرور', 'Confirm password')} id="reg-password2" error={errors.password2} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="reg-grade" className="text-foreground">الصف الدراسي <span className="text-destructive">*</span></Label>
+                  <Label htmlFor="reg-grade" className="text-foreground">{T('الصف الدراسي', 'Grade Level')} <span className="text-destructive">*</span></Label>
                   <div className="relative">
                     <GraduationCap className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <select id="reg-grade" value={grade} onChange={function (e) { setGrade(e.target.value) }} className={'flex h-11 w-full rounded-md border border-input bg-transparent pr-10 pl-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring min-h-[44px] appearance-none cursor-pointer' + (errors.grade ? ' border-destructive' : '')}>
-                      <option value="">اختر الصف الدراسي</option>
+                      <option value="">{T('اختر الصف الدراسي', 'Select your grade')}</option>
                       {gradesFromConfig(store.siteConfig).map(function (g) { return <option key={g.ar} value={g.ar}>{(g.emoji ? g.emoji + ' ' : '') + g.ar}</option> })}
                     </select>
                   </div>
                   {errors.grade && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors.grade}</p>}
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-foreground mb-2">اسم ولي الأمر</p>
+                  <p className="text-sm font-semibold text-foreground mb-2">{T('اسم ولي الأمر', 'Parent Name')}</p>
                   <div className="grid grid-cols-2 gap-2">
-                    <NameField value={parentName1} onChange={setParentName1} placeholder="الاسم الأول" id="reg-pname1" error={errors.parentName1} />
-                    <NameField value={parentName2} onChange={setParentName2} placeholder="الاسم الثاني" id="reg-pname2" error={errors.parentName2} />
+                    <NameField value={parentName1} onChange={setParentName1} placeholder={T('الاسم الأول', 'First name')} id="reg-pname1" error={errors.parentName1} />
+                    <NameField value={parentName2} onChange={setParentName2} placeholder={T('الاسم الثاني', 'Second name')} id="reg-pname2" error={errors.parentName2} />
                   </div>
                 </div>
-                <PhoneField value={parentPhone} onChange={setParentPhone} placeholder="رقم هاتف ولي الأمر" id="reg-parent-phone" error={errors.parentPhone} />
-                <Button className="w-full min-h-[44px] font-semibold" onClick={handleRegister} disabled={loading}>{loading ? (<><Loader2 className="h-4 w-4 ml-2 animate-spin" />جاري التسجيل...</>) : 'اعمل الحساب'}</Button>
-                <p className="text-center text-sm text-muted-foreground">عندك حساب؟ <button onClick={function () { setView('auth-login') }} className="text-primary font-medium hover:underline cursor-pointer">سجل دخولك</button></p>
+                <PhoneField value={parentPhone} onChange={setParentPhone} placeholder={T('رقم هاتف ولي الأمر', 'Parent phone number')} id="reg-parent-phone" error={errors.parentPhone} />
+                <Button className="w-full min-h-[44px] font-semibold" onClick={handleRegister} disabled={loading}>{loading ? (<><Loader2 className="h-4 w-4 ml-2 animate-spin" />{T('جاري التسجيل...', 'Registering...')}</>) : T('اعمل الحساب', 'Create Account')}</Button>
+                <p className="text-center text-sm text-muted-foreground">{T('عندك حساب؟', 'Have an account?')} <button onClick={function () { setView('auth-login') }} className="text-primary font-medium hover:underline cursor-pointer">{T('سجل دخولك', 'Log in')}</button></p>
               </div>
             </CardContent>
           </Card>
