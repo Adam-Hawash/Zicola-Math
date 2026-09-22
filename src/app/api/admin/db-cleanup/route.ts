@@ -119,6 +119,24 @@ export async function POST(request: NextRequest) {
       results.push(row)
     }
 
+    // ===== (2026-و86) ملفات حلول واجبات أقدم من أسبوع — طلب المستر «تفضية
+    // المساحات»: ملفات الطلاب المرفوعة بتراكم سريعًا فبتعيش أسبوع للمذاكرة
+    // والتقييم وبعدها بتنضف تلقائيًا من auto-clean، والقاعدة دي للمخزون
+    // القديم من الأدمن. الدرجات (HomeworkResult) مش بتتلمس خالص.
+    try {
+      var hwCut = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+      var hwCount = await db.media.count({ where: { category: 'homework-answers', createdAt: { lt: hwCut } } })
+      var hwDeleted = 0
+      if (!dryRun && hwCount > 0) {
+        var hwRes = await db.media.deleteMany({ where: { category: 'homework-answers', createdAt: { lt: hwCut } } })
+        hwDeleted = hwRes.count || 0
+      }
+      results.push({ table: 'Media (حلول واجبات أقدم من أسبوع)', found: hwCount, deleted: hwDeleted })
+    } catch (e: unknown) {
+      var hwErr = e as any
+      results.push({ table: 'Media (حلول واجبات أقدم من أسبوع)', found: 0, deleted: 0, error: String(hwErr && hwErr.message ? hwErr.message : hwErr).slice(0, 160) })
+    }
+
     var vacuumResult: { ok: boolean; error?: string } | null = null
     if (vacuum) {
       try {
