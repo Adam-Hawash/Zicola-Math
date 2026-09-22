@@ -123,51 +123,12 @@ var SCHEMA_FIXES = [
   'UPDATE Student SET creationDeviceFp = \'\' WHERE creationDeviceFp IS NULL',
   'UPDATE Student SET deviceTraits = \'\' WHERE deviceTraits IS NULL',
   'UPDATE Student SET deviceType = \'\' WHERE deviceType IS NULL',
-  // ===== تصحيح اسم المنصة (براند Zicola) لمرة واحدة =====
-  // القيم المخزنة في قاعدة البيانات من نسخ قديمة — بنصححها مرة واحدة (idempotent)
-  "UPDATE SiteConfig SET value = REPLACE(REPLACE(value, 'Maths Genius', 'Zicola In Math'), 'Math Genius', 'Zicola In Math') WHERE key IN ('navbar_brand', 'hero_title_line1', 'footer_brand', 'footer_copyright', 'guide_subtitle') AND (value LIKE '%Math Genius%' OR value LIKE '%Maths Genius%')",
-  // ===== تصحيح اسم المستر (الاسم الرسمي للبراند: **مستر أحمد شعبان**) =====
-  // أي قيمة مخزنة فيها اسم غلط من ترحيل قديم
-  // بتتصحح مرة واحدة هنا (idempotent) + على القراءة في /api/config
-  "UPDATE SiteConfig SET value = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(value, 'Mr. Sherif ElSayed', 'Zicola In Math'), 'مستر شريف السيد', 'مستر أحمد شعبان'), 'نصائح مستر أحمد شعبان', 'نصائح مستر أحمد شعبان'), 'Mr. Wael El-Khadiry', 'Zicola In Math'), 'مستر وائل الخضيري', 'مستر أحمد شعبان') WHERE value LIKE '%Sherif ElSayed%' OR value LIKE '%شريف السيد%' OR (value LIKE '%مستر شريف%' AND key LIKE 'tips_%') OR value LIKE '%Mr. Wael El-Khadiry%' OR value LIKE '%الخضيري%'",
-  // النافيبار بالعربي: مستر أحمد شعبان — من غير العصاية (|) ومن غير الإنجليزي (طلب المستر)
-  "UPDATE SiteConfig SET value = 'مستر أحمد شعبان' WHERE key = 'navbar_subtitle' AND (value LIKE '%خضير%' OR value LIKE '%Khadir%' OR value LIKE '%Khodair%' OR value LIKE '%Khudair%' OR value LIKE '%Khodier%' OR value LIKE '%El-Kh%' OR value LIKE '%Sherif%' OR value LIKE '%شريف%' OR value LIKE '%|%')",
-  "UPDATE SiteConfig SET value = 'مستر أحمد شعبان' WHERE key IN ('hero_title_line2', 'instructor_name') AND (value LIKE '%Sherif%' OR value LIKE '%شريف%' OR value LIKE '%الخضيري%')",
-  // ===== (2026-و31) صورة المعلم = الأساسية والبديلة (طلب المستر حرفيًا: «صورة المعلم
-  // تكون هي الأساسية والبديلة، ما تحطش حاجة من دماغك») =====
-  // روابط الصور القديمة (i.imghos.co) كانت متخزنة في الكاش عند الطلاب بصورة مش
-  // بتاعة المستر — بتتحول لملف محلي جديد خالص (mr-wael-photo.webp) يكسر الكاش،
-  // فيبقى الأساسي (قاعدة البيانات) والبديل (الفولباك في الكود) نفس الصورة بالظبط.
-  // مرة واحدة فقط (idempotent): لو الأدمن رفع صورة تانية بعدين مش هتتلمس.
-  "UPDATE SiteConfig SET value = '/images/mr-wael-photo.webp' WHERE key IN ('instructor_photo', 'site_logo', 'favicon_url') AND (value LIKE '%i.imghos.co%' OR value LIKE '%instructor.webp%')",
-  // ===== (و70) هوية The Scholar — طلب المستر حرفيًا: الاسم في النافيبار
-  // «Zicola In Math» والهيرو «The Scholar by مستر أحمد شعبان» + صورة
-  // المستر طالع من السحابة في الهيرو + صورته الرسمية في النافيبار.
-  // idempotent: القيم الجديدة مفيهاش Zicola فمش هتتلمس تاني.
-  "UPDATE SiteConfig SET value = REPLACE(REPLACE(value, 'Zicola in Math', 'Zicola In Math'), 'Zicola Math', 'Zicola In Math') WHERE key IN ('navbar_brand', 'footer_brand', 'footer_copyright', 'guide_subtitle', 'schedule_brand') AND value LIKE '%Zicola%'",
-  "UPDATE SiteConfig SET value = 'The Scholar' WHERE key = 'hero_title_line1' AND value LIKE '%Zicola%'",
-  "UPDATE SiteConfig SET value = 'by مستر أحمد شعبان' WHERE key = 'hero_title_line2' AND (value LIKE '%زيكولا%' OR value LIKE '%Zicola%')",
-  "UPDATE SiteConfig SET value = 'مستر أحمد شعبان' WHERE key IN ('navbar_subtitle', 'instructor_name') AND (value LIKE '%زيكولا%' OR value LIKE '%Zicola%')",
-  // صورة الهيرو = مستر طالع من السحابة (الصورة الرسمية الجديدة) — بتستبدل صورة
-  // mr-wael القديمة الوارثة من نسخة Maths-Genius + أي رابط خارجي قديم
-  "UPDATE SiteConfig SET value = '/images/the-scholar-hero.png' WHERE key = 'instructor_photo' AND (value LIKE '%mr-wael%' OR value LIKE '%i.imghos.co%' OR value = '')",
-  // صورة النافيبار الرسمية + الفيفيكون (مفاتيح جديدة أو قيم قديمة وارثة)
-  "UPDATE SiteConfig SET value = '/images/the-scholar-nav.png' WHERE key = 'navbar_photo' AND (value LIKE '%mr-wael%' OR value = '')",
-  "UPDATE SiteConfig SET value = '/images/the-scholar-favicon.png' WHERE key = 'favicon_url' AND (value LIKE '%mr-wael%' OR value LIKE '%logo.svg%' OR value = '')",
-  // ===== (و71) تصحيح هوية قاعدة بيانات إنتاج قديمة بتظهر للطلاب «مهندس الماث
-  // م/مصطفى حسام» بدل The Scholar — المستر شاف المنصة المعروضة بالاسم الغلط
-  // والصورة الغلط (الشاب المقتطع من مرجع تاني). بنصلح كل مفاتيح الهوية نهائيًا
-  // في قاعدة البيانات + على القراءة في /api/config. idempotent.
-  "UPDATE SiteConfig SET value = 'Zicola In Math' WHERE key IN ('navbar_brand', 'footer_brand', 'guide_subtitle', 'schedule_brand') AND (value LIKE '%مهندس الماث%' OR value LIKE '%مصطفى%' OR value LIKE '%حسام%' OR value LIKE '%Mostafa%' OR value LIKE '%Hossam%' OR value LIKE '%Math Engineer%')",
-  "UPDATE SiteConfig SET value = 'The Scholar' WHERE key = 'hero_title_line1' AND (value LIKE '%مهندس%' OR value LIKE '%مصطفى%' OR value LIKE '%حسام%' OR value LIKE '%Mostafa%' OR value LIKE '%Hossam%' OR value LIKE '%Math Engineer%' OR value LIKE '%Zicola%')",
-  "UPDATE SiteConfig SET value = 'by مستر أحمد شعبان' WHERE key = 'hero_title_line2' AND (value LIKE '%مهندس الماث%' OR value LIKE '%مصطفى%' OR value LIKE '%حسام%' OR value LIKE '%Mostafa%' OR value LIKE '%Hossam%' OR value LIKE '%زيكولا%' OR value LIKE '%Zicola%')",
-  "UPDATE SiteConfig SET value = 'مستر أحمد شعبان' WHERE key IN ('navbar_subtitle', 'instructor_name') AND (value LIKE '%مهندس الماث%' OR value LIKE '%مصطفى%' OR value LIKE '%حسام%' OR value LIKE '%Mostafa%' OR value LIKE '%Hossam%' OR value LIKE '%زيكولا%' OR value LIKE '%Zicola%')",
-  // صورة الهيرو: الصورة القديمة (الشاب من مرجع تاني) والروابط الخارجية القديمة
-  // = صورة المستر الرسمية **كاملة** (the-scholar-full) اللي هتظهر في إطار
-  // فخم وهو طالع من السحابة — من غير أي قص (طلب المستر حرفيًا)
-  "UPDATE SiteConfig SET value = '/images/the-scholar-full.png' WHERE key = 'instructor_photo' AND (value LIKE '%the-scholar-hero%' OR value LIKE '%mr-wael%' OR value LIKE '%i.imghos.co%' OR value LIKE '%mostafa%' OR value LIKE '%hossam%' OR value = '')",
-  "UPDATE SiteConfig SET value = '/images/the-scholar-nav.png' WHERE key = 'navbar_photo' AND (value LIKE '%i.imghos.co%' OR value LIKE '%mostafa%' OR value LIKE '%hossam%' OR value = '')",
-  "UPDATE SiteConfig SET value = '/images/the-scholar-favicon.png' WHERE key = 'favicon_url' AND (value LIKE '%i.imghos.co%' OR value LIKE '%logo.svg%' OR value = '')",
+  // ===== (و80) شيل ترحيلات القيم الإجبارية على SiteConfig (براند/أسماء/صور/فيفيكون) =====
+  // كانت بتفرض نصوصًا وصورًا محددة في مفاتيح الهوية كل ما بصمة السكيما تتغير (كل نشر)
+  // فبتلغي أي تعديل يعمله الأدمن من لوحة التحكم — وده سبب «التغييرات بترجع بعد
+  // الـ reload». كل التصحيحات دي (Maths Genius→Zicola، أسماء المستر، صور الهيرو/النافيبار/الفيفيكون)
+  // اتنفذت فعلًا على قاعدة الإنتاج من النشرات السابقة فمش محتاجين نكررها —
+  // والقراءة في /api/config بقت ترجع قيم الداتابيز زي ما هي من غير أي تعديل.
   // ===== (و71) رابعة وخمسة ابتدائي — طلب المستر: «تضيف لي الصف الرابع
   // الابتدائي اسمه رابعة ابتدائي بالانجليزي Grade 4 وبعديه خمسة ابتدائي
   // Grade 5» — لو grades_data مش موجودة خالص بنكتب الافتراضي بسبعة صفوف،

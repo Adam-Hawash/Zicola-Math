@@ -2,12 +2,6 @@
 import { NextResponse } from 'next/server'
 import { db, safeWrite } from '@/lib/db'
 
-/* (و73-B2) تصحيح البراند القديم: الاختصار الغلط بيتهيّأ هنا بالتركيب (حرف M
-   + الباقي) بدل كتابته نصًا حرفيًا في الكود — عشان فحص الجودة (grep على
-   «M» + «. Ahmed» في src/) يرجع صفر نتايج، والاستبدال شغال وقت التشغيل زي ما هو */
-var LEGACY_MISTAKE_BRAND = 'M' + '. Ahmed Shaban' /* الاختصار الغلط (M بدل Mr) */
-var LEGACY_MISTER_BRAND = 'Mr' + '. Ahmed Shaban' /* الصحيح رسميًا */
-
 var DEFAULTS = {
   // === Navbar ===
   /* (و72) الهوية الجديدة للنافبار: Zicola In Math — في الاتجاهين */
@@ -211,167 +205,15 @@ export async function GET() {
       var c = configs[i]
       map[c.key] = c.value
     }
-    /* (و72) القيم الخام المخزنة قبل ترميمات البراند — بنحتاجها عشان
-       نطبّق ترميم الهوية الجديدة في آخر الخطوات (تحت) من غير ما
-       الترميمات القديمة (اللي بتنقل أي Zicola إلى The Scholar) تلغّيها */
-    var rawNavbarBrand = typeof map['navbar_brand'] === 'string' ? map['navbar_brand'] : ''
-    var rawNavbarBrandEn = typeof map['navbar_brand_en'] === 'string' ? map['navbar_brand_en'] : ''
-    var rawHeroTitle2En = typeof map['hero_title_line2_en'] === 'string' ? map['hero_title_line2_en'] : ''
-    // اسم المنصة الصحيح: Zicola In Math (من غير s) — لو قاعدة البيانات لسه فيها
-    // الاسم القديم من نسخة قديمة بنصلحه على القراءة، والترحيل في ensure-schema
-    // بصلحه نهائيًا في قاعدة البيانات
-    var brandKeys = ['navbar_brand', 'footer_brand', 'footer_copyright', 'guide_subtitle', 'schedule_brand']
-    for (var b = 0; b < brandKeys.length; b++) {
-      /* (و73) أي قيمة مخزنة قديمة (Zicola Math / Zicola in Math / Maths Genius
-         / Zicola In Math) بتتصحح فورًا على القراءة إلى «Zicola In Math»
-         — الاسم اللي طلبه المستر صراحةً — والترحيل في ensure-schema بصلحها نهائيًا */
-      if (typeof map[brandKeys[b]] === 'string' && (map[brandKeys[b]].indexOf('Zicola') !== -1 || map[brandKeys[b]].indexOf('Math Genius') !== -1 || map[brandKeys[b]].indexOf('Maths Genius') !== -1)) {
-        map[brandKeys[b]] = map[brandKeys[b]].split('Zicola in Math').join('Zicola In Math').split('Zicola Math').join('Zicola In Math').split('Maths Genius').join('Zicola In Math').split('Math Genius').join('Zicola In Math').split('Zicola In Math').join('Zicola In Math')
-      }
-    }
-    /* (و73) تصحيح البراند القديم (الاختصار الغلط M بدل Mr) → «Mr. Ahmed Shaban» —
-       على القراءة في مفاتيح البراند (وفرعاتها الإنجليزية) عشان الإنتاج
-       يتصحح لوحده من غير تعديل قاعدة البيانات يدويًا. ملاحظة: الاستبدال آمن
-       لأن النص الصحيح «Mr. …» مش بيحتوي النص الغلط كنص فرعي */
-    var mrBrandKeys = ['navbar_brand', 'navbar_brand_en', 'footer_brand', 'footer_brand_en', 'footer_copyright', 'footer_copyright_en', 'guide_subtitle', 'guide_subtitle_en', 'schedule_brand', 'schedule_brand_en']
-    for (var m = 0; m < mrBrandKeys.length; m++) {
-      var mv = map[mrBrandKeys[m]]
-      if (typeof mv === 'string' && mv.indexOf(LEGACY_MISTAKE_BRAND) !== -1) {
-        map[mrBrandKeys[m]] = mv.split(LEGACY_MISTAKE_BRAND).join(LEGACY_MISTER_BRAND)
-      }
-    }
-    /* (10-b) اسم المطوّر الصحيح «Adam Hawash» (Adam من غير h) — بطلب صاحب المنصة
-       حرفيًا: أي قيمة مخزنة قديمة فيها «Adham Hawash» (من ترميم و78 القديمة)
-       بتتصحح على القراءة فورًا — عكس الترميم القديمة بالظبط — والترحيل في
-       ensure-schema بصلّحها نهائيًا في قاعدة البيانات — توحيد الفوتر في كل المنصات */
-    var devNameKeys = ['footer_made_by_label', 'footer_made_by_label_en', 'hero_developer_label', 'hero_developer_label_en']
-    for (var d = 0; d < devNameKeys.length; d++) {
-      var dv = map[devNameKeys[d]]
-      if (typeof dv === 'string' && dv.indexOf('Adham Hawash') !== -1) {
-        map[devNameKeys[d]] = dv.split('Adham Hawash').join('Adam Hawash')
-      }
-    }
-    /* (و73) وصف الهيرو القديم المخلوط بكلمات إنجليزية → النص العربي النضيف
-       (القيمة الجديدة في DEFAULTS) — على القراءة عشان الإنتاج يتصحح لوحده */
-    if (typeof map['hero_subtitle'] === 'string' && map['hero_subtitle'].indexOf('Algebra, Geometry, Formulas') !== -1) {
-      map['hero_subtitle'] = DEFAULTS.hero_subtitle
-    }
-    /* (و73) عنوان الهيرو الأول «مستر الماث» — أي قيمة Zicola قديمة بتترجم على القراءة */
-    if (typeof map['hero_title_line1'] === 'string' && map['hero_title_line1'].indexOf('Zicola') !== -1) {
-      map['hero_title_line1'] = 'مستر الماث'
-    }
-    /* (و70) صورة الهيرو القديمة (مستر وائل/استضافة خارجية) = صورة السحابة الجديدة */
-    if (typeof map['instructor_photo'] === 'string' && (map['instructor_photo'].indexOf('mr-wael') !== -1 || map['instructor_photo'].indexOf('i.imghos.co') !== -1 || map['instructor_photo'] === '')) {
-      map['instructor_photo'] = '/images/the-scholar-full.png'
-    }
-    /* (و71) صورة الهيرو القديمة (the-scholar-hero — كانت مقتطعة من مرجع تاني
-       فيها شخص غلط) = الصورة الرسمية الكاملة للسيد المستر من غير قص */
-    if (typeof map['instructor_photo'] === 'string' && (map['instructor_photo'].indexOf('the-scholar-hero') !== -1 || map['instructor_photo'].indexOf('mostafa') !== -1 || map['instructor_photo'].indexOf('hossam') !== -1)) {
-      map['instructor_photo'] = '/images/the-scholar-full.png'
-    }
-    /* (و70) صورة النافيبار + الفيفيكون: أي قيمة فاضية أو قديمة = الصور الرسمية الجديدة */
-    if (typeof map['navbar_photo'] === 'string' && (map['navbar_photo'].indexOf('mr-wael') !== -1 || map['navbar_photo'] === '')) {
-      map['navbar_photo'] = '/images/the-scholar-nav.png'
-    }
-    if (typeof map['favicon_url'] === 'string' && (map['favicon_url'].indexOf('mr-wael') !== -1 || map['favicon_url'].indexOf('logo.svg') !== -1 || map['favicon_url'] === '')) {
-      map['favicon_url'] = '/images/the-scholar-favicon.png'
-    }
-    // اسم المستر في النافيبار: **مستر أحمد شعبان** بالعربي — من غير علامة
-    // العصاية (|) ومن غير الإنجليزي (طلب المستر: شيل العصاية واكتب بس
-    // مستر أحمد شعبان) — أي قيمة مخزنة قديمة بتتصحح على القراءة هنا،
-    // والترحيل في ensure-schema بصلحه نهائيًا
-    var navSub = map['navbar_subtitle']
-    if (typeof navSub === 'string' && navSub !== 'مستر أحمد شعبان' && (navSub.indexOf('زيكولا') !== -1 || navSub.indexOf('Zicola') !== -1 || navSub.indexOf('خضير') !== -1 || navSub.indexOf('Khadir') !== -1 || navSub.indexOf('Khodair') !== -1 || navSub.indexOf('Khudair') !== -1 || navSub.indexOf('Khodier') !== -1 || navSub.indexOf('El-Kh') !== -1 || navSub.indexOf('Sherif') !== -1 || navSub.indexOf('شريف') !== -1 || navSub.indexOf('Mr') !== -1)) {
-      map['navbar_subtitle'] = 'مستر أحمد شعبان'
-    }
-    // اسم المستر العربي الصحيح للمنصة دي: **مستر أحمد شعبان** (الاسم الرسمي
-    // بطلب المستر حرفيًا) — أي قيمة قديمة مخزنة (مستر شريف أو تهجئة غلط
-    // 'الخضيري') بتتصحح على القراءة هنا، والترحيل في ensure-schema
-    // بصلحه نهائيًا في قاعدة البيانات
-    var arabicNameKeys = ['hero_title_line2', 'instructor_name']
-    for (var a = 0; a < arabicNameKeys.length; a++) {
-      var av = map[arabicNameKeys[a]]
-      /* (و70) أي اسم قديم (شريف/الخضيري) بيترجم هنا والترحيل يصلحه نهائيًا —
-         (و73) سطر الهيرو التاني بقى «م/أحمد شعبان» رسميًا */
-      if (typeof av === 'string' && av.indexOf('Zicola') === -1 && (av.indexOf('Sherif') !== -1 || av.indexOf('شريف') !== -1 || av.indexOf('الخضيري') !== -1)) {
-        map[arabicNameKeys[a]] = arabicNameKeys[a] === 'hero_title_line2' ? 'م/أحمد شعبان' : 'مستر أحمد شعبان'
-      }
-      if (typeof av === 'string' && (av.indexOf('زيكولا') !== -1 || av.indexOf('Zicola') !== -1)) {
-        map[arabicNameKeys[a]] = arabicNameKeys[a] === 'hero_title_line2' ? 'م/أحمد شعبان' : 'مستر أحمد شعبان'
-      }
-      /* (و71) قاعدة بيانات إنتاج قديمة بتعرض «مهندس الماث م/مصطفى حسام» —
-         بنرجّع هوية مستر أحمد شعبان فورًا على القراءة (والترحيل يصلح نهائيًا) */
-      if (typeof av === 'string' && (av.indexOf('مهندس') !== -1 || av.indexOf('مصطفى') !== -1 || av.indexOf('حسام') !== -1 || av.indexOf('Mostafa') !== -1 || av.indexOf('Hossam') !== -1 || av.indexOf('Math Engineer') !== -1)) {
-        map[arabicNameKeys[a]] = arabicNameKeys[a] === 'hero_title_line2' ? 'م/أحمد شعبان' : 'مستر أحمد شعبان'
-      }
-    }
-    /* (و73) عنوان الهيرو الأول «مستر الماث» — أي اسم قديم تاني (أو The Scholar
-       القديمة) بيترجم فورًا على القراءة */
-    if (typeof map['hero_title_line1'] === 'string' && (map['hero_title_line1'].indexOf('مهندس') !== -1 || map['hero_title_line1'].indexOf('مصطفى') !== -1 || map['hero_title_line1'].indexOf('حسام') !== -1 || map['hero_title_line1'].indexOf('Mostafa') !== -1 || map['hero_title_line1'].indexOf('Hossam') !== -1 || map['hero_title_line1'].indexOf('Math Engineer') !== -1 || map['hero_title_line1'] === 'The Scholar')) {
-      map['hero_title_line1'] = 'مستر الماث'
-    }
-    /* (و71) اسم النافيبار/الفوتر — نفس الحماية للإنتاج */
-    if (typeof map['navbar_brand'] === 'string' && (map['navbar_brand'].indexOf('مهندس الماث') !== -1 || map['navbar_brand'].indexOf('مصطفى') !== -1 || map['navbar_brand'].indexOf('حسام') !== -1 || map['navbar_brand'].indexOf('Mostafa') !== -1 || map['navbar_brand'].indexOf('Hossam') !== -1 || map['navbar_brand'].indexOf('Math Engineer') !== -1)) {
-      map['navbar_brand'] = 'Zicola In Math'
-    }
-    var cfgKeys = Object.keys(map)
-    for (var k = 0; k < cfgKeys.length; k++) {
-      var v = map[cfgKeys[k]]
-      if (typeof v !== 'string') continue
-      /* (و73) صيد أخير على مستوى كل المفاتيح: أي قيمة براند قديمة بالاختصار
-         الغلط (M بدل Mr) متخزّنة في أي مفتاح بترجع بالصيغة الصحيحة */
-      if (v.indexOf(LEGACY_MISTAKE_BRAND) !== -1) {
-        map[cfgKeys[k]] = v.split(LEGACY_MISTAKE_BRAND).join(LEGACY_MISTER_BRAND)
-        v = map[cfgKeys[k]]
-      }
-      if (v.indexOf('Mr. Sherif ElSayed') !== -1 || v.indexOf('مستر شريف السيد') !== -1 || v.indexOf('نصائح مستر أحمد شعبان') !== -1 || v.indexOf('Mr. Wael El-Khadiry') !== -1 || v.indexOf('مستر أحمد شعبان') !== -1) {
-        map[cfgKeys[k]] = v.split('Mr. Sherif ElSayed').join('Zicola In Math').split('مستر شريف السيد').join('مستر أحمد شعبان').split('نصائح مستر أحمد شعبان').join('نصائح مستر أحمد شعبان').split('Mr. Wael El-Khadiry').join('Zicola In Math').split('Zicola In Math').join('Zicola In Math').split('مستر أحمد شعبان').join('مستر أحمد شعبان')
-      }
-    }
-    /* (و72) الهوية الجديدة للنافبار: «Zicola In Math» + تهجئة الاسم Shaban —
-       آخر خطوة بعد كل ترميمات The Scholar القديمة (اللي كانت بتترجم أي
-       Zicola إلى The Scholar في brandKeys فوق):
-       - أي قيمة مخزنة فيها Zicola In Math بترجع زي ما هي (الترميم القديم كان بيغيرها)
-       - أي قيمة مخزنة = Zicola In Math بالظبط بتتحول Zicola In Math
-         وبتتكتب نهائيًا في قاعدة البيانات (write-through)
-       - hero_title_line2_en القديمة (Shaaban) بتتهجأ Shaban بنفس النمط */
-    var brandFixups: string[][] = []
-    if (rawNavbarBrand.indexOf('Zicola In Math') !== -1) {
-      map['navbar_brand'] = 'Zicola In Math'
-    } else if (rawNavbarBrand === 'Zicola In Math') {
-      map['navbar_brand'] = 'Zicola In Math'
-      brandFixups.push(['navbar_brand', 'Zicola In Math'])
-    }
-    if (rawNavbarBrandEn.indexOf('Zicola In Math') !== -1) {
-      map['navbar_brand_en'] = 'Zicola In Math'
-    } else if (rawNavbarBrandEn === 'Zicola In Math') {
-      map['navbar_brand_en'] = 'Zicola In Math'
-      brandFixups.push(['navbar_brand_en', 'Zicola In Math'])
-    }
-    if (rawHeroTitle2En === 'by Mr. Ahmed Shaaban' || rawHeroTitle2En === 'by Mr. Ahmed Shaban') {
-      map['hero_title_line2_en'] = 'Mr. Ahmed Shaban'
-      brandFixups.push(['hero_title_line2_en', 'Mr. Ahmed Shaban'])
-    }
-    /* (و73) ترحيل هوية الهيرو للسطور الجديدة (نفس نمط ترحيل و72):
-       القيم المخزنة القديمة الافتراضية (The Scholar / by مستر أحمد شعبان)
-       بتتحول للهوية الجديدة «مستر الماث» / «م/أحمد شعبان» وتتكتب نهائيًا */
-    if (map['hero_title_line1'] === 'The Scholar') {
-      map['hero_title_line1'] = 'مستر الماث'
-      brandFixups.push(['hero_title_line1', 'مستر الماث'])
-    }
-    if (map['hero_title_line2'] === 'by مستر أحمد شعبان') {
-      map['hero_title_line2'] = 'م/أحمد شعبان'
-      brandFixups.push(['hero_title_line2', 'م/أحمد شعبان'])
-    }
-    for (var f = 0; f < brandFixups.length; f++) {
-      (function (fk: string, fv: string) {
-        db.siteConfig.upsert({
-          where: { key: fk },
-          update: { value: fv, updatedAt: new Date() },
-          create: { key: fk, value: fv },
-        }).catch(function () {})
-      })(brandFixups[f][0], brandFixups[f][1])
-    }
+    /* (و80) إصلاح جذري لعلة «عدّل حاجة في الأدمن وبعد الـ reload بترجع زي ما كانت»:
+     * القراءة هنا بقت **زي ما هي من قاعدة البيانات من غير أي تعديل أو تصحيح مفروض** —
+     * شيلنا كل طبقات الشفاء الذاتي وقت القراءة: ترميمات البراند (Zicola/Mr/Mister)،
+     * إجبار أسماء المستر والصور والفيفيكون، تصحيح Adham→Adam، والـ write-through
+     * اللي كان بيكتب في قاعدة البيانات من جوه GET نفسه. كل التصحيحات القديمة
+     * اتنفذت فعلًا على قاعدة الإنتاج في ترحيلات ensure-schema من النشرات السابقة
+     * فمش محتاجين نكررها هنا — التكرار على القراءة كان بيلغي أي تعديل يعمله
+     * الأدمن فورًا فيظهرله إن «التغييرات بترجع» رغم إنها متخزنة فعلًا.
+     * أي تعديل من الأدمن دلوقتي بيتخزن وبيترجع زي ما هو. */
     return NextResponse.json(map)
   } catch (error) {
     console.error('Config fetch error:', error)
