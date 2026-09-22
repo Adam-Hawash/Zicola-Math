@@ -254,7 +254,7 @@ export default function HeroSection() {
               <Button
                 variant="outline"
                 size="lg"
-                className="text-base px-8 py-6 min-h-[44px] rounded-xl border-white/25 bg-white/5 text-white hover:bg-white/10 hover:text-white transition-colors duration-200"
+                className="text-sm sm:text-base px-6 sm:px-8 py-3.5 sm:py-6 min-h-[44px] rounded-xl border-white/25 bg-white/5 text-white hover:bg-white/10 hover:text-white transition-colors duration-200"
                 onClick={() => setView('auth-login')}
               >
                 {T('عندك حساب؟ ادخل هنا', 'Have an account? Log in')}
