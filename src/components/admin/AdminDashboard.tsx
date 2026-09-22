@@ -240,6 +240,10 @@ export function AdminDashboard() {
   const [instapay, setInstapay] = useState('')
   const [fawry, setFawry] = useState('')
   const [paymentSaving, setPaymentSaving] = useState(false)
+  /* (81-c) تنظيف قاعدة البيانات — فحص/حذف الصفوف اليتيمة + ضغط الملف (VACUUM) */
+  const [dbCleanupBusy, setDbCleanupBusy] = useState<'' | 'check' | 'delete' | 'vacuum'>('')
+  const [dbCleanupResults, setDbCleanupResults] = useState<Array<{ table: string; found: number; deleted: number; error?: string }>>([])
+  const [dbCleanupVacuum, setDbCleanupVacuum] = useState<null | { ok: boolean; error?: string }>(null)
   // عداد الشكاوى الجديدة — بيدور كل دقيقة عشان المستر يشوف الشكاوى أول بأول
   const [newComplaints, setNewComplaints] = useState(0)
   useEffect(function () {
@@ -372,6 +376,51 @@ export function AdminDashboard() {
       }
     } catch { toast.error('خطأ في الاتصال') }
     setSettingsSaving(false)
+  }
+
+  /* (81-c) أداة تنظيف قاعدة البيانات — السبب الجذري للتضخم: مسح طالب/فيديو/
+     امتحان/واجب كان بيسيب كل صفوفه يتيمة للأبد (الفورين كي مش مفروض على
+     داتابيز الإنتاج). فحص بدون حذف الأول، والحذف بس بعد تأكيد صريح. */
+  const runDbCleanup = async (dryRun: boolean) => {
+    if (!dryRun) {
+      const sure = window.confirm('هيتمسح نهائيًا كل الصفوف اليتيمة: بيانات طلاب/فيديوهات/امتحانات/واجبات اتمسحت قبل كده + تذاكر التشغيل المنتهية. العملية دي مش بترجع للورا — متأكد؟')
+      if (!sure) return
+    }
+    setDbCleanupBusy(dryRun ? 'check' : 'delete')
+    try {
+      const res = await fetch('/api/admin/db-cleanup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ adminId: currentAdmin?.id || '', dryRun: dryRun }) })
+      const d = await res.json()
+      if (res.ok && d && d.ok) {
+        setDbCleanupResults(Array.isArray(d.results) ? d.results : [])
+        if (dryRun) {
+          const totalFound = (d.results || []).reduce(function (a: number, r: any) { return a + Number(r.found || 0) }, 0)
+          toast.success(totalFound > 0 ? ('الفحص خلص — لقينا ' + totalFound + ' صف يتيم. راجع التفاصيل في الكارت') : 'الفحص خلص — مفيش أي بيانات يتيمة 👍')
+        } else {
+          const totalDeleted = (d.results || []).reduce(function (a: number, r: any) { return a + Number(r.deleted || 0) }, 0)
+          toast.success('تم حذف ' + totalDeleted + ' صف يتيم نهائيًا')
+        }
+      } else {
+        toast.error((d && d.error) || 'فشل فحص قاعدة البيانات')
+      }
+    } catch { toast.error('حصل خطأ في الاتصال') }
+    setDbCleanupBusy('')
+  }
+  const runDbVacuum = async () => {
+    if (!window.confirm('ضغط قاعدة البيانات (VACUUM) بيحرر المساحة الفاضية جوه ملف الداتابيز — ممكن ياخد وقت ومش بيغير أي بيانات. متأكد؟')) return
+    setDbCleanupBusy('vacuum')
+    try {
+      const res = await fetch('/api/admin/db-cleanup?vacuum=1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ adminId: currentAdmin?.id || '', dryRun: true }) })
+      const d = await res.json()
+      if (res.ok && d && d.ok) {
+        const v = d.vacuum && typeof d.vacuum === 'object' ? d.vacuum : { ok: true }
+        setDbCleanupVacuum(v)
+        if (v.ok === false) toast.error('الضغط منجحش على الداتابيز دي — ' + (v.error || ''))
+        else toast.success('اتعمل ضغط قاعدة البيانات (VACUUM) — المساحة بتحرر على السيرفر')
+      } else {
+        toast.error((d && d.error) || 'فشل ضغط قاعدة البيانات')
+      }
+    } catch { toast.error('حصل خطأ في الاتصال') }
+    setDbCleanupBusy('')
   }
 
   return (
@@ -560,6 +609,48 @@ export function AdminDashboard() {
                     }} disabled={paymentSaving}>
                       {paymentSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
                     </Button>
+                  </div>
+                  {/* (81-c) تنظيف قاعدة البيانات — أداة الأدمن للصفوف اليتيمة + VACUUM */}
+                  <div className="border-t pt-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Wrench className="h-4 w-4 text-amber-600" />
+                      <p className="text-xs font-semibold text-muted-foreground">تنظيف قاعدة البيانات</p>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground leading-relaxed">
+                      مسح طالب/فيديو/امتحان/واجب كان بيسيب كل صفوفه «يتيمة» للأبد (تقدم المشاهدات، النتايج، الإشعارات، تذاكر التشغيل، حسابات وأولياء الأمور المرتبطين…) — وده السبب الرئيسي لتضخم قاعدة البيانات. <span className="font-bold text-amber-600">ابدأ بالفحص بدون حذف الأول.</span>
+                    </p>
+                    {dbCleanupResults.length > 0 && (
+                      <div className="rounded-lg border bg-muted/40 p-2 max-h-40 overflow-y-auto space-y-1">
+                        {dbCleanupResults.map(function (r, i) {
+                          return (
+                            <div key={i} className="flex items-center justify-between gap-2 text-[10px]">
+                              <span dir="ltr" className="font-mono shrink-0">{r.table}</span>
+                              <span className="text-muted-foreground text-left">
+                                {r.deleted > 0 ? <span className="font-bold text-red-600">اتمسح {r.deleted} من </span> : null}
+                                يتيم: <span className="font-bold text-foreground">{r.found}</span>
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                    {dbCleanupVacuum && (
+                      <p className="text-[10px] text-muted-foreground" dir="ltr">VACUUM: {dbCleanupVacuum.ok ? '✅ done' : '❌ ' + (dbCleanupVacuum.error || '')}</p>
+                    )}
+                    <div className="flex gap-2 flex-wrap">
+                      <Button size="sm" variant="outline" disabled={dbCleanupBusy !== ''} onClick={function () { runDbCleanup(true) }}>
+                        {dbCleanupBusy === 'check' ? <Loader2 className="h-3 w-3 animate-spin" /> : <Search className="h-3 w-3" />}
+                        فحص (بدون حذف)
+                      </Button>
+                      <Button size="sm" variant="destructive" disabled={dbCleanupBusy !== ''} onClick={function () { runDbCleanup(false) }}>
+                        {dbCleanupBusy === 'delete' ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                        حذف البيانات اليتيمة نهائيًا
+                      </Button>
+                      <Button size="sm" variant="outline" disabled={dbCleanupBusy !== ''} onClick={runDbVacuum}>
+                        {dbCleanupBusy === 'vacuum' ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                        ضغط قاعدة البيانات (VACUUM)
+                      </Button>
+                    </div>
                   </div>
                   <div className="flex gap-2 pt-2">
                     <Button onClick={saveSettings} disabled={settingsSaving || !settingsOldPass} className="flex-1">
