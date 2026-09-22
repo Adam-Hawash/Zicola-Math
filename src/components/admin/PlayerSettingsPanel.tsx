@@ -30,6 +30,7 @@ import {
   type WmSize,
   type WmBlink,
   type WmLogoContent,
+  type WmNameContent,
 } from '@/lib/player-config'
 import { DEFAULT_PARENT_TEMPLATE } from '@/lib/parent-message'
 
@@ -212,8 +213,19 @@ export function PlayerSettingsPanel() {
   }
 
   const selLabel = selected
-    ? selected.kind === 'qrTL' ? 'كارت QR فوق شمال' : selected.kind === 'qrBR' ? 'كارت QR تحت يمين' : selected.kind === 'logo' ? 'لوجو المنصة' : 'اسم ورقم'
+    ? selected.kind === 'qrTL' ? 'كارت QR فوق شمال' : selected.kind === 'qrBR' ? 'كارت QR تحت يمين' : selected.kind === 'logo' ? 'لوجو المنصة' : 'اسم/رقم الطالب'
     : null
+
+  /* (MG-5) محتوى عنصر اسم/رقم: الاتنين / اسم بس / رقم بس */
+  const selNameContent: WmNameContent = (() => {
+    if (!selected || selected.kind !== 'name') return 'both'
+    const it = cfg.nameItems.find((i) => i.id === selected.id)
+    return (it && it.content) || 'both'
+  })()
+  function setNameContent(c: WmNameContent) {
+    if (!selected || selected.kind !== 'name') return
+    setCfg((prev) => ({ ...prev, nameItems: prev.nameItems.map((it) => (it.id === selected.id ? { ...it, content: c } : it)) }))
+  }
 
   /* ===== الحفظ ===== */
   async function saveConfig(conf?: PlayerConfig) {
@@ -383,8 +395,18 @@ export function PlayerSettingsPanel() {
                 style={{ left: `${it.x}%`, top: `${it.y}%`, opacity: it.opacity }}
                 onPointerDown={(e) => onItemPointerDown(e, { kind: 'name', id: it.id })}
               >
-                <span className="inline-block rounded-lg border border-white/40 bg-black/62 px-2 py-0.5 text-white font-extrabold whitespace-nowrap shadow-lg" style={{ fontSize: it.size === 'sm' ? 9 : it.size === 'md' ? 12 : 16 }}>
-                  اسم الطالب <span className="opacity-85 font-bold">• 01xxxxxxxxx</span>
+                {/* (MG-5) المعاينة بنفس شكل المشغل: اسم ثنائي فوق وتحتيه الرقم — أو اسم بس / رقم بس */}
+                <span className="inline-block rounded-lg border border-white/40 bg-black/62 px-2 py-0.5 text-white font-extrabold whitespace-nowrap shadow-lg text-center" style={{ fontSize: it.size === 'sm' ? 9 : it.size === 'md' ? 12 : 16 }}>
+                  {it.content === 'number' ? (
+                    <span className="block" dir="ltr">01xxxxxxxxx</span>
+                  ) : it.content === 'name' ? (
+                    <span className="block">اسم الطالب</span>
+                  ) : (
+                    <>
+                      <span className="block">اسم الطالب</span>
+                      <span className="block opacity-85 font-bold" dir="ltr" style={{ fontSize: '0.82em', marginTop: 1 }}>01xxxxxxxxx</span>
+                    </>
+                  )}
                 </span>
               </div>
             ))}
@@ -408,16 +430,22 @@ export function PlayerSettingsPanel() {
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="outline" className="gap-1.5" onClick={() => {
               const id = 'nm-' + Date.now()
-              setCfg((p) => ({ ...p, nameItems: [...p.nameItems, { id, x: 50, y: p.nameItems.length ? clamp(12 + p.nameItems.length * 12, 0, 90) : 12, size: 'md', opacity: 0.55, blink: { on: false, show: 15, hide: 15 } }] }))
+              setCfg((p) => ({ ...p, nameItems: [...p.nameItems, { id, x: 50, y: p.nameItems.length ? clamp(12 + p.nameItems.length * 12, 0, 90) : 12, size: 'md', opacity: 0.6, content: 'both', blink: { on: false, show: 15, hide: 15 } }] }))
               setSelected({ kind: 'name', id })
-            }}><Plus className="h-3.5 w-3.5" />ضيف عنصر اسم ورقم</Button>
+            }}><Plus className="h-3.5 w-3.5" />ضيف ووتر مارك اسم/رقم</Button>
             {cfg.nameItems.length > 0 && selected && selected.kind === 'name' && (
               <Button size="sm" variant="outline" className="gap-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => {
                 setCfg((p) => ({ ...p, nameItems: p.nameItems.filter((i) => i.id !== selected.id) }))
                 setSelected(null)
               }}><Trash2 className="h-3.5 w-3.5" />امسح العنصر المختار</Button>
             )}
-            <span className="text-xs text-muted-foreground">عدد عناصر الاسم: {cfg.nameItems.length} / 6</span>
+            {/* (MG-5) طلب المستر الحرفي: «أقدر أحذفهم كلهم من صفحة الأدمن» */}
+            <Button size="sm" variant="outline" className="gap-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => {
+              setCfg((p) => ({ ...p, nameItems: [], qrTL: { ...p.qrTL, on: false }, qrBR: { ...p.qrBR, on: false }, centerLogo: { ...p.centerLogo, on: false } }))
+              setSelected(null)
+              toast.info('اتمسح كل العناصر — ضيف اللي عايزه واضغط حفظ')
+            }}><Trash2 className="h-3.5 w-3.5" />امسح كل العناصر</Button>
+            <span className="text-xs text-muted-foreground">عدد عناصر الاسم/الرقم: {cfg.nameItems.length} / 10</span>
           </div>
 
           {/* تحكم العنصر المختار */}
@@ -432,6 +460,15 @@ export function PlayerSettingsPanel() {
                     <Slider className="flex-1" value={[Math.round(selOpacity * 100)]} min={5} max={85} step={1} onValueChange={(v) => setOpacity(v[0] / 100)} />
                   </div>
                 </div>
+                {/* (MG-5) محتوى عنصر اسم/رقم — طلب المستر: «أضيف ووتر مارك رقم بس واسم بس وهكذا» */}
+                {selected.kind === 'name' && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-muted-foreground">محتوى العنصر:</span>
+                    {([['both', 'اسم ثنائي + رقم تحته'], ['name', 'اسم بس'], ['number', 'رقم بس']] as const).map(([k, lbl]) => (
+                      <Button key={k} type="button" size="sm" variant={selNameContent === k ? 'default' : 'outline'} className="h-7 px-2.5 text-xs" onClick={() => setNameContent(k)}>{lbl}</Button>
+                    ))}
+                  </div>
+                )}
                 {/* (MG-3) محتوى اللوجو الوسطاني */}
                 {selected.kind === 'logo' && (
                   <div className="flex flex-wrap items-center gap-2">

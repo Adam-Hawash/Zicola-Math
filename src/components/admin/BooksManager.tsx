@@ -46,6 +46,9 @@ export function BooksManager() {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [grade, setGrade] = useState('')
+  /* (2026-و79) تصنيف الكتاب: واجب / أسئلة / الاتنين — طلب المستر الحرفي:
+     «أقدر أحدد إن هل ده هيبقى واجب ولا أسئلة ولا الاثنين» */
+  const [usage, setUsage] = useState<'both' | 'homework' | 'questions'>('both')
   const [sourceUrl, setSourceUrl] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -86,6 +89,7 @@ export function BooksManager() {
           description: description.trim(),
           sourceUrl: sourceUrl.trim(),
           grade: grade,
+          usage: usage,
         }),
       })
       var data = await res.json()
@@ -135,6 +139,7 @@ export function BooksManager() {
           fileType: file.type || 'application/pdf',
           sizeBytes: file.size,
           grade: grade,
+          usage: usage,
         }),
       })
       var data = await res.json()
@@ -209,6 +214,17 @@ export function BooksManager() {
               </select>
             </div>
           </div>
+          {/* (2026-و79) الكتاب ده هيستخدم في إيه؟ — واجب / أسئلة / الاتنين */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">الكتاب ده هيستخدم في إيه؟</Label>
+              <select value={usage} onChange={function (e) { setUsage(e.target.value as 'both' | 'homework' | 'questions') }} className="w-full h-10 rounded-lg border border-input bg-transparent px-3 text-sm">
+                <option value="both">الواجبات والأسئلة (الاتنين)</option>
+                <option value="homework">الواجبات بس</option>
+                <option value="questions">الأسئلة بس</option>
+              </select>
+            </div>
+          </div>
           <div className="space-y-1.5">
             <Label className="text-xs font-medium">وصف مختصر (اختياري)</Label>
             <Input value={description} onChange={function (e) { setDescription(e.target.value) }} placeholder="مثال: شرح + مسائل الباب الأول" />
@@ -248,6 +264,17 @@ export function BooksManager() {
               <select value={grade} onChange={function (e) { setGrade(e.target.value) }} className="w-full h-10 rounded-lg border border-input bg-transparent px-3 text-sm">
                 <option value="">كل الصفوف</option>
                 {GRADES.map(function (g) { return <option key={g} value={g}>{g}</option> })}
+              </select>
+            </div>
+          </div>
+          {/* (2026-و79) الكتاب ده هيستخدم في إيه؟ — واجب / أسئلة / الاتنين */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">الكتاب ده هيستخدم في إيه؟</Label>
+              <select value={usage} onChange={function (e) { setUsage(e.target.value as 'both' | 'homework' | 'questions') }} className="w-full h-10 rounded-lg border border-input bg-transparent px-3 text-sm">
+                <option value="both">الواجبات والأسئلة (الاتنين)</option>
+                <option value="homework">الواجبات بس</option>
+                <option value="questions">الأسئلة بس</option>
               </select>
             </div>
           </div>
@@ -297,6 +324,10 @@ export function BooksManager() {
                     <p className="font-medium text-sm truncate">{b.title}</p>
                     <div className="flex items-center gap-2 flex-wrap text-[10px] text-muted-foreground">
                       {b.grade && <Badge variant="outline" className="text-[10px]">{b.grade}</Badge>}
+                      {/* (2026-و79) بادج تصنيف الكتاب */}
+                      {(b as any).usage === 'homework' && <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30">واجبات</Badge>}
+                      {(b as any).usage === 'questions' && <Badge variant="outline" className="text-[10px] bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/30">أسئلة</Badge>}
+                      {(!(b as any).usage || (b as any).usage === 'both') && <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30">واجبات + أسئلة</Badge>}
                       {isLinkBook
                         ? <Badge variant="outline" className="text-[10px] border-violet-400/60 text-violet-600 dark:text-violet-400" title={b.sourceUrl}>🔗 لينك خارجي</Badge>
                         : <span>{formatBookSize(b.sizeBytes)}</span>}

@@ -26,6 +26,10 @@ function ensureBookTable() {
       try {
         await db.$executeRawUnsafe("ALTER TABLE Book ADD COLUMN sourceUrl TEXT NOT NULL DEFAULT ''")
       } catch (e) {}
+      /* (2026-و79) تصنيف الكتاب: واجب / أسئلة / الاتنين — طلب المستر الحرفي */
+      try {
+        await db.$executeRawUnsafe("ALTER TABLE Book ADD COLUMN usage TEXT NOT NULL DEFAULT 'both'")
+      } catch (e) {}
     })()
   }
   return _bookTableReady
@@ -70,7 +74,10 @@ export async function POST(request: NextRequest) {
     }
     await ensureBookTable()
     const body = await request.json()
+    /* (2026-و79) usage: واجب (homework) / أسئلة (questions) / الاتنين (both) */
     const { title, description, filePath, fileName, fileType, sizeBytes, grade } = body || {}
+    var usageRaw = String((body && body.usage) || 'both')
+    var usage = usageRaw === 'homework' || usageRaw === 'questions' ? usageRaw : 'both'
 
     if (!title || !String(title).trim()) {
       return NextResponse.json({ error: 'العنوان مطلوب' }, { status: 400 })
@@ -95,6 +102,7 @@ export async function POST(request: NextRequest) {
             fileType: 'application/pdf',
             sizeBytes: 0,
             grade: String(grade || ''),
+            usage: usage,
           },
         })
       })
@@ -121,6 +129,7 @@ export async function POST(request: NextRequest) {
           fileType: String(fileType || 'application/pdf'),
           sizeBytes: sizeNum,
           grade: String(grade || ''),
+          usage: usage,
         },
       })
     })

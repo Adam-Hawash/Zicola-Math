@@ -1,6 +1,17 @@
 /* ============================================================
-   player-config — إعدادات شكل المشغل والووترمارك (MG-2 + MG-3 + MG-4)
+   player-config — إعدادات شكل المشغل والووترمارك (MG-2 + MG-3 + MG-4 + MG-5)
    ============================================================
+   (MG-5 — طلب المستر الحرفي 2026):
+   «عاوز إن أقدر أحذفهم كلهم من صفحة الأدمن وأضيفهم وأقدر أضيف ووتر مارك
+    رقم بس واسم بس وهكذا وأقدر أحركهم — واللي في النص دي تكون الاسم
+    الثنائي وتحتها الرقم»:
+   • عنصر اسم/رقم بقى له محتوى: both = اسم ثنائي فوق وتحته الرقم |
+     name = اسم بس | number = رقم بس — المستر بيختار لكل عنصر
+   • الحد الأعلى للعناصر بقى 10 بدل 6
+   • اللوجو الوسطاني (اسم ثنائي + رقم) بقى ظاهر على طول بالافتراضي
+     (من غير دورة اختفاء) — «تخليها باينة»
+   • زرار «امسح كل العناصر» في اللوحة يفضّي كل حاجة ويبدأ من نضيف
+   • ترقية تلقائية v:2 → v:3: العناصر القديمة بتاخد content=both
    (MG-4 — طلب المستر بعد ما شاف MG-3):
    • الشفافيات كلها اترفع لأن «الحاجات دي ميتة الشفافية بتاعتها بايظة»:
      QR 0.26 → 0.55 + اسم ورقم 0.3 → 0.55 + اللوجو الوسطاني 0.14 → 0.42
@@ -49,18 +60,22 @@ export interface WmQrItem {
   blink: WmBlink
 }
 
-/* عنصر اسم الطالب + رقمه (بيترسم ديناميكيًا لكل طالب) */
+/* عنصر اسم الطالب + رقمه (بيترسم ديناميكيًا لكل طالب)
+   (MG-5) content: both = اسم ثنائي فوق وتحته الرقم | name = اسم بس | number = رقم بس */
+export type WmNameContent = 'both' | 'name' | 'number'
+
 export interface WmNameItem {
   id: string
   x: number
   y: number
   size: WmSize
   opacity: number
+  content: WmNameContent
   blink: WmBlink
 }
 
 /* لوجو المنصة في نص الفيديو — محتواه قابل للتحكم (MG-3/MG-4):
-   brand = «Zicola In Math» بس | name = اسم الطالب الثنائي وتحتيه رقمه
+   brand = «Math Genius» بس | name = اسم الطالب الثنائي وتحتيه رقمه
    («زي الأول» — الافتراضي) | both = لوجو صغير فوق + اسم ورقم تحته */
 export type WmLogoContent = 'brand' | 'name' | 'both'
 
@@ -81,7 +96,7 @@ export interface WmYtMark {
 }
 
 export interface PlayerConfig {
-  v: 2 /* (MG-4) v2 = الشفافيات الجديدة — الكونفج الأقل بيتدرّع تلقائيًا */
+  v: 3 /* (MG-5) v3 = محتوى عنصر اسم/رقم — الكونفج الأقل بيتدرّع تلقائيًا */
   barHeightMobile: number /* px — 32..64 */
   barHeightDesktop: number /* px — 36..72 */
   topShieldHeight: number /* px — 40..96 (0 = المعادلة القديمة) */
@@ -122,11 +137,12 @@ export function clampBlink(v: any, fallback: WmBlink): WmBlink {
   }
 }
 
-/* الافتراضي المقترح لصاحب المنصة (QR فوق شمال وتحت يمين + اسم ورقم فوق
-   وتحت في النص + لوجو المنصة في النص مكتوب عليه اسم الطالب ورقمه —
-   اللوجو الوسطاني بيلتزم دورةMG القديمة: ظاهر 10 ثواني ومختفي 20 ثانية) */
+/* الافتراضي المقترح لصاحب المنصة (MG-5):
+   QR فوق شمال وتحت يمين + كارت اسم ثنائي/رقم فوق وتحت في النص
+   + **اللوجو الوسطاني = اسم الطالب الثنائي وتحتيه الرقم — ظاهر على طول**
+   (من غير دورة اختفاء — «تخليها باينة» طلب حرفي) */
 export const DEFAULT_PLAYER_CONFIG: PlayerConfig = {
-  v: 2,
+  v: 3,
   barHeightMobile: 40,
   barHeightDesktop: 46,
   topShieldHeight: 60,
@@ -134,25 +150,24 @@ export const DEFAULT_PLAYER_CONFIG: PlayerConfig = {
   qrTL: { on: true, x: 7, y: 6, size: 'md', opacity: 0.55, blink: { on: false, show: 15, hide: 15 } },
   qrBR: { on: true, x: 93, y: 84, size: 'md', opacity: 0.55, blink: { on: false, show: 15, hide: 15 } },
   nameItems: [
-    { id: 'nm-top', x: 50, y: 11, size: 'md', opacity: 0.55, blink: { on: false, show: 15, hide: 15 } },
-    { id: 'nm-bottom', x: 50, y: 80, size: 'md', opacity: 0.55, blink: { on: false, show: 15, hide: 15 } },
+    { id: 'nm-top', x: 50, y: 11, size: 'md', opacity: 0.6, content: 'both', blink: { on: false, show: 15, hide: 15 } },
+    { id: 'nm-bottom', x: 50, y: 80, size: 'md', opacity: 0.6, content: 'both', blink: { on: false, show: 15, hide: 15 } },
   ],
-  /* (MG-4) اللوجو الوسطاني: اسم الطالب الثنائي وتحتيه رقمه «زي الأول»
-     — واضح جدًا (0.42 بدل 0.14) وبيقفل دورته القديمة 10 ظاهر / 20 مخفي */
-  centerLogo: { on: true, x: 50, y: 44, size: 'lg', opacity: 0.42, content: 'name', blink: { on: true, show: 10, hide: 20 } },
+  /* (MG-5) اللوجو الوسطاني: اسم الطالب الثنائي وتحتيه رقمه — باين على طول */
+  centerLogo: { on: true, x: 50, y: 42, size: 'lg', opacity: 0.5, content: 'name', blink: { on: false, show: 10, hide: 20 } },
   ytMark: { on: true, size: 'lg' },
 }
 
 /* احتياط المشغل لو مفيش كونفج محفوظ = سلوك MG-1 بالظبط عشان مفيش حاجة تتبوظ */
 export const FALLBACK_PLAYER_CONFIG: PlayerConfig = {
-  v: 2,
+  v: 3,
   barHeightMobile: 36,
   barHeightDesktop: 40,
   topShieldHeight: 0,
   qrTL: { on: true, x: 6, y: 6, size: 'md', opacity: 0.55, blink: { on: false, show: 15, hide: 15 } },
   qrBR: { on: true, x: 94, y: 84, size: 'md', opacity: 0.55, blink: { on: false, show: 15, hide: 15 } },
   nameItems: [],
-  centerLogo: { on: false, x: 50, y: 46, size: 'lg', opacity: 0.42, content: 'name', blink: { on: false, show: 10, hide: 20 } },
+  centerLogo: { on: false, x: 50, y: 46, size: 'lg', opacity: 0.5, content: 'name', blink: { on: false, show: 10, hide: 20 } },
   ytMark: { on: true, size: 'lg' },
 }
 
@@ -164,11 +179,11 @@ export function sanitizePlayerConfig(raw: any): PlayerConfig {
   var d = DEFAULT_PLAYER_CONFIG
   var fb = FALLBACK_PLAYER_CONFIG
   var src = raw && typeof raw === 'object' ? raw : {}
-  /* نسخة الكونفج المحفوظ — أي حاجة أقل من 2 بتترقى للشفافيات الجديدة */
+  /* نسخة الكونفج المحفوظ — أقل من 2 = ترقية شفافيات، أقل من 3 = ترقية محتوى العناصر */
   var savedVer = Number(src.v) || 1
   var upgrade = savedVer < 2
   var out: PlayerConfig = {
-    v: 2,
+    v: 3,
     barHeightMobile: clampNum(src.barHeightMobile, 32, 64, d.barHeightMobile),
     barHeightDesktop: clampNum(src.barHeightDesktop, 36, 72, d.barHeightDesktop),
     topShieldHeight: clampNum(src.topShieldHeight, 0, 96, d.topShieldHeight),
@@ -179,7 +194,8 @@ export function sanitizePlayerConfig(raw: any): PlayerConfig {
     ytMark: sanitizeYtMark(src.ytMark, (raw && raw.__fallback ? fb : d).ytMark),
   }
   var items = Array.isArray(src.nameItems) ? src.nameItems : []
-  for (var i = 0; i < items.length && out.nameItems.length < 6; i++) {
+  /* (MG-5) الحد بقى 10 عناصر + كل عنصر له محتوى (اسم بس/رقم بس/الاتنين) */
+  for (var i = 0; i < items.length && out.nameItems.length < 10; i++) {
     var it = items[i]
     if (!it || typeof it !== 'object') continue
     var nmOp = clampOpacity(it.opacity, 0.05, 0.85, 0.55)
@@ -190,6 +206,7 @@ export function sanitizePlayerConfig(raw: any): PlayerConfig {
       y: clampNum(it.y, 0, 100, 10),
       size: clampSize(it.size, 'md'),
       opacity: nmOp,
+      content: it.content === 'name' || it.content === 'number' ? it.content : 'both',
       blink: clampBlink(it.blink, { on: false, show: 15, hide: 15 }),
     })
   }

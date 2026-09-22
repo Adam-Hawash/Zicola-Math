@@ -21,8 +21,11 @@ import { Button } from '@/components/ui/button'
 /* (و64) الترجمة الحقيقية عربي/إنجليزي */
 import { useT } from '@/lib/i18n'
 import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { useAppStore } from '@/stores/app-store'
-import { UserCheck, Loader2, RefreshCw, LogOut, BookOpenCheck, ClipboardList, AlertCircle, TrendingUp, MonitorPlay, ChevronDown } from 'lucide-react'
+import { UserCheck, Loader2, RefreshCw, LogOut, BookOpenCheck, ClipboardList, AlertCircle, TrendingUp, MonitorPlay, ChevronDown, UserPlus, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import FractionText, { hasMathMarkup } from '@/components/FractionText'
 import BidiText from '@/components/BidiText'
@@ -37,8 +40,18 @@ interface ResultRow {
   submittedAt: string
 }
 
+interface StudentLite {
+  id: string
+  name: string
+  grade: string
+  status: string
+  isPaidAccess: boolean
+}
+
 interface ParentResultsData {
   student: { id: string; name: string; grade: string; status: string; isPaidAccess: boolean } | null
+  /* (2026-و79) ولي الأمر بعدة أبناء — قايمة كل الأبناء المدموجين في الحساب */
+  students?: StudentLite[]
   homeworks: ResultRow[]
   exams: ResultRow[]
   /* (2026-و39) نسبة فيديوهات الابن — null لو مش متاحة */
@@ -127,7 +140,7 @@ function ResultList({ rows, icon, emptyMsg, type, answersOpen, openId, detailFor
                         <div key={qq.idx} className={'rounded-xl border p-3 space-y-1.5 ' + (qq.isCorrect ? 'border-emerald-300 bg-emerald-50/50 dark:border-emerald-900 dark:bg-emerald-950/20' : 'border-red-300 bg-red-50/50 dark:border-red-900 dark:bg-red-950/20')}>
                           <div className="flex items-start justify-between gap-2">
                             <p className="text-sm font-semibold text-foreground leading-relaxed break-words">{qq.idx + 1}. {qq.text ? (hasMathMarkup(qq.text) ? <FractionText text={qq.text} /> : qq.text) : '(سؤال من غير نص)'}</p>
-                            <Badge variant="secondary" className="text-[10px] shrink-0">{qq.kind === 'mcq' ? 'اختيارات' : 'مقالي'}</Badge>
+                            <Badge variant="secondary" className="text-[10px] shrink-0">{(qq.kind === 'writing' || (!qq.kind && (!qq.options || qq.options.length === 0))) ? 'مقالي' : 'اختيارات'}</Badge>
                           </div>
                           <p className="text-xs text-foreground whitespace-pre-wrap break-words" dir="auto">إجابته: {qq.studentAnswer ? (hasMathMarkup(qq.studentAnswer) ? <FractionText text={qq.studentAnswer} /> : qq.studentAnswer) : 'لم يتم الإجابة'}</p>
                           {qq.correctAnswer && (
@@ -187,6 +200,24 @@ export function ParentPortal() {
   var loadingDetailId = loadIdState[0]
   var setLoadingDetailId = loadIdState[1]
 
+  /* (2026-و79) ولي الأمر بعدة أبناء — الابن المختار + دايلوج إضافة طالب */
+  var selState = useState('')
+  var selectedStudentId = selState[0]
+  var setSelectedStudentId = selState[1]
+  var dlgState = useState(false)
+  var addOpen = dlgState[0]
+  var setAddOpen = dlgState[1]
+  var modeState = useState<'link' | 'create'>('link')
+  var addMode = modeState[0]
+  var setAddMode = modeState[1]
+  var f1 = useState(''); var fName = f1[0]; var setFName = f1[1]
+  var f2 = useState(''); var fPhone = f2[0]; var setFPhone = f2[1]
+  var f3 = useState(''); var fPwd = f3[0]; var setFPwd = f3[1]
+  var f4 = useState(''); var fGrade = f4[0]; var setFGrade = f4[1]
+  var addingState = useState(false)
+  var adding = addingState[0]
+  var setAdding = addingState[1]
+
   var toggleResultDetail = useCallback(async function (type: 'homework' | 'exam', row: ResultRow) {
     if (openResultId === row.id) { setOpenResultId(''); return }
     setOpenResultId(row.id)
@@ -194,7 +225,8 @@ export function ParentPortal() {
     setLoadingDetailId(row.id)
     try {
       var pid = currentParent && currentParent.id ? currentParent.id : ''
-      var res = await fetch('/api/parent/answers?parentId=' + encodeURIComponent(pid) + '&type=' + type + '&resultId=' + encodeURIComponent(row.id), { cache: 'no-store' })
+      var sid = selectedStudentId ? '&studentId=' + encodeURIComponent(selectedStudentId) : ''
+      var res = await fetch('/api/parent/answers?parentId=' + encodeURIComponent(pid) + '&type=' + type + '&resultId=' + encodeURIComponent(row.id) + sid, { cache: 'no-store' })
       var json = await res.json()
       if (res.ok) {
         setAnswerDetails(function (prev) {
@@ -213,13 +245,14 @@ export function ParentPortal() {
     }
     setLoadingDetailId('')
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openResultId, answerDetails, currentParent])
+  }, [openResultId, answerDetails, currentParent, selectedStudentId])
 
   var load = useCallback(async function () {
     if (!currentParent || !currentParent.id) return
     setLoading(true)
     try {
-      var res = await fetch('/api/parent/results?parentId=' + encodeURIComponent(currentParent.id), { cache: 'no-store' })
+      var sid = selectedStudentId ? '&studentId=' + encodeURIComponent(selectedStudentId) : ''
+      var res = await fetch('/api/parent/results?parentId=' + encodeURIComponent(currentParent.id) + sid, { cache: 'no-store' })
       var json = await res.json()
       if (res.ok) setResults(json)
       else toast.error(json.error || 'حصلت مشكلة في تحميل البيانات', { duration: 8000 })
@@ -228,7 +261,41 @@ export function ParentPortal() {
     }
     setLoading(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentParent && currentParent.id])
+  }, [currentParent && currentParent.id, selectedStudentId])
+
+  /* (2026-و79) إضافة طالب — ربط حساب موجود أو إنشاء حساب جديد — والحساب واحد بيفضل مدموج بكل الأبناء */
+  var addStudent = useCallback(async function () {
+    if (!currentParent || !currentParent.id) return
+    setAdding(true)
+    try {
+      var res = await fetch('/api/parents/add-student', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          parentId: currentParent.id,
+          mode: addMode,
+          studentName: fName,
+          studentPhone: fPhone,
+          studentPassword: fPwd,
+          grade: fGrade,
+        }),
+      })
+      var json = await res.json()
+      if (res.ok && json.ok) {
+        toast.success(addMode === 'create' ? 'اتعمل حساب ' + (json.added && json.added.name) + ' واتربط بحسابك — في انتظار موافقة المستر' : 'اتضاف ' + (json.added && json.added.name) + ' لحسابك')
+        setAddOpen(false)
+        setFName(''); setFPhone(''); setFPwd(''); setFGrade('')
+        if (json.added && json.added.id) setSelectedStudentId(String(json.added.id))
+        else load()
+      } else {
+        toast.error((json && json.error) || 'حصلت مشكلة في إضافة الطالب', { duration: 8000 })
+      }
+    } catch (e) {
+      toast.error('حدث خطأ في الاتصال')
+    }
+    setAdding(false)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentParent && currentParent.id, addMode, fName, fPhone, fPwd, fGrade])
 
   useEffect(function () {
     if (!currentParent) {
@@ -241,6 +308,7 @@ export function ParentPortal() {
   if (!currentParent) return null
 
   var student = results ? results.student : (currentParent.student || null)
+  var students = (results && results.students) || []
   var homeworks = results ? results.homeworks : []
   var exams = results ? results.exams : []
   var hwAvg = homeworks.length > 0
@@ -285,6 +353,25 @@ export function ParentPortal() {
         {student ? (
           <Card className="border-primary/20">
             <CardContent className="p-5">
+              {/* (2026-و79) مبدّل الأبناء — لو ولي الأمر عنده أكتر من ابن */}
+              {students.length > 1 && (
+                <div className="flex items-center gap-2 flex-wrap mb-4 pb-4 border-b">
+                  <Users className="h-4 w-4 text-primary shrink-0" />
+                  {students.map(function (s: StudentLite) {
+                    var active = student && s.id === student.id
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={function () { setSelectedStudentId(s.id); setOpenResultId('') }}
+                        className={'rounded-full px-3 py-1.5 text-xs font-bold border transition-colors ' + (active ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted/40 border-border hover:bg-muted')}
+                      >
+                        {s.name}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
               <div className="flex flex-wrap items-center gap-3">
                 <div className="min-w-0 flex-1">
                   <p className="text-[11px] text-muted-foreground mb-0.5">{T('الطالب', 'Student')}</p>
@@ -301,6 +388,11 @@ export function ParentPortal() {
                   <p className="text-xs text-muted-foreground">{student.grade}</p>
                 </div>
                 <div className="flex flex-col items-end gap-1.5">
+                  {/* (2026-و79) زرار إضافة طالب — طلب المستر: «يدوس إضافة طالب ويحط بيانات الطالب الثاني» */}
+                  <Button size="sm" variant="outline" className="h-9 gap-1.5" onClick={function () { setAddMode('link'); setAddOpen(true) }}>
+                    <UserPlus className="h-4 w-4" />
+                    {T('إضافة طالب', 'Add Student')}
+                  </Button>
                   {student.status === 'pending' && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 px-3 py-1 text-xs font-bold">
                       <AlertCircle className="h-3.5 w-3.5" /> حساب ابنك في انتظار موافقة المستر
@@ -418,6 +510,53 @@ export function ParentPortal() {
           </p>
         )}
       </div>
+
+      {/* (2026-و79) دايلوج إضافة طالب — ربط حساب موجود أو حساب جديد */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><UserPlus className="h-4.5 w-4.5 text-primary" />إضافة طالب لحسابك</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Button type="button" size="sm" variant={addMode === 'link' ? 'default' : 'outline'} className="flex-1 h-9" onClick={function () { setAddMode('link') }}>ربط حساب موجود</Button>
+              <Button type="button" size="sm" variant={addMode === 'create' ? 'default' : 'outline'} className="flex-1 h-9" onClick={function () { setAddMode('create') }}>حساب جديد لابنك</Button>
+            </div>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label className="text-xs">اسم الطالب {addMode === 'link' ? '(زي ما هو متسجل بالظبط)' : ''}</Label>
+                <Input value={fName} onChange={function (e) { setFName(e.target.value) }} placeholder="مثال: أحمد محمد علي" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">رقم تليفون الطالب</Label>
+                <Input value={fPhone} onChange={function (e) { setFPhone(e.target.value) }} placeholder="01xxxxxxxxx" dir="ltr" inputMode="numeric" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">{addMode === 'link' ? 'باسورد الطالب في المنصة' : 'باسورد جديد للطالب'}</Label>
+                <Input value={fPwd} onChange={function (e) { setFPwd(e.target.value) }} type="password" dir="ltr" />
+              </div>
+              {addMode === 'create' && (
+                <div className="space-y-1">
+                  <Label className="text-xs">الصف الدراسي</Label>
+                  <Input value={fGrade} onChange={function (e) { setFGrade(e.target.value) }} placeholder="مثال: تالتة إعدادي" />
+                </div>
+              )}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              {addMode === 'link'
+                ? 'هربط حساب ابنك الموجود بحسابك كولي أمر — لازم الرقم والاسم والباسورد تطابق حسابه، ورقم تليفونك يكون هو المسجل عليه كولي أمر.'
+                : 'هنعمل حساب جديد لابنك بحالة «في انتظار موافقة المستر» — وبعد الموافقة هيبان في حسابك فورًا.'}
+            </p>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={function () { setAddOpen(false) }} disabled={adding}>إلغاء</Button>
+              <Button onClick={addStudent} disabled={adding || !fName.trim() || !fPhone.trim() || !fPwd.trim()}>
+                {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+                إضافة
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

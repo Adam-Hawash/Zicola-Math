@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { resolveQuestionsForStudent } from '@/lib/exam-models'
 import { normalizeCorrectKey } from '@/lib/correct-key'
+import { resolveParentStudent } from '@/lib/parent-students'
 
 /* (2026-و38) شفاء ذاتي لجدول Parent — نفس حماية مسارات التسجيل والدخول والنتايج */
 var parentDdlDone: Promise<void> | null = null
@@ -68,6 +69,8 @@ export async function GET(request: NextRequest) {
     var parentId = sp.get('parentId') || ''
     var type = String(sp.get('type') || '')
     var resultId = String(sp.get('resultId') || '')
+    /* (2026-و79) ولي الأمر بعدة أبناء — الابن المطلوب من الـ query */
+    var studentIdParam = sp.get('studentId') || ''
     if (!parentId || (type !== 'homework' && type !== 'exam') || !resultId) {
       return NextResponse.json({ error: 'طلب ناقص' }, { status: 400 })
     }
@@ -79,8 +82,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'جلسة ولي الأمر منتهية — سجل دخول تاني' }, { status: 401 })
     }
 
-    var student: any = null
-    try { student = await db.student.findUnique({ where: { id: parent.studentId } }) } catch (sErr) {}
+    /* (2026-و79) الابن المختار لازم يكون من أبناء ولي الأمر فعلًا */
+    var resolved = await resolveParentStudent(parent, studentIdParam)
+    var student: any = resolved.selected
     if (!student) {
       return NextResponse.json({ error: 'حساب ابنك مش موجود في المنصة حاليًا' }, { status: 404 })
     }
