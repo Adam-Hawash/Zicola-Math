@@ -56,9 +56,11 @@ export function Footer() {
   var portfolioUrl = cfg.hero_developer_url || FALLBACK_PORTFOLIO_URL
   var primeUrl = cfg.prime_developer_url || FALLBACK_PORTFOLIO_URL
   var heroDevLabel = cfg.hero_developer_label || 'Hero Developer'
-  var madeByLabel = cfg.footer_made_by_label || 'Developed by Adham Hawash'
+  /* (10-b) توقيع الفوتر الرسمي بالظبط «Developed by Adam Hawash» — Adam من غير h
+     بطلب صاحب المنصة (وكانت في ترميم قديمة بترجّعه Adham — اتلغت) */
+  var madeByLabel = cfg.footer_made_by_label || 'Developed by Adam Hawash'
   var brandName = pickConfig(cfg, 'footer_brand', lang, 'Zicola In Math', 'Zicola In Math')
-  var copyrightText = pickConfig(cfg, 'footer_copyright', lang, 'جميع الحقوق محفوظة لـ أدهم حواش', 'All rights reserved to Adham Hawash')
+  var copyrightText = pickConfig(cfg, 'footer_copyright', lang, 'جميع الحقوق محفوظة لـ أدهم حواش', 'All rights reserved to Adam Hawash')
 
   var fb = cfg.social_facebook || ''
   var wa = cfg.social_whatsapp_channel || ''
@@ -141,15 +143,16 @@ export function Footer() {
           </a>
         </div>
         
-        {/* Powered by Prime Developer + Developed by Adham Hawash */}
+        {/* (10-b) سطر التوقيع بخط أكبر وواضح في الموبايل والديسكتوب
+            (طلب صاحب المنصة) — نفس السطر زي ما هو بس أكبر وتقيل */}
         <div className="mt-6 pt-4 border-t border-border/40 text-center">
-          <p className="text-xs text-foreground flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1">
+          <p className="text-sm sm:text-base font-bold text-foreground flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1">
             <span>Powered by</span>
             <a
               href={primeUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-bold text-[#C49A38] hover:underline underline-offset-2 transition-colors"
+              className="text-[#C49A38] hover:underline underline-offset-2 transition-colors"
             >
               Prime Developer
             </a>
@@ -158,7 +161,7 @@ export function Footer() {
               href={portfolioUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-semibold text-muted-foreground hover:text-primary hover:underline underline-offset-2 transition-colors"
+              className="text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors"
             >
               {madeByLabel}
             </a>

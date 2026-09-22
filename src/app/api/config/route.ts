@@ -56,7 +56,9 @@ var DEFAULTS = {
   hero_stat3_label_en: 'Progress Tracking',
   hero_developer_url: 'https://prime-developer-portfolio-11.vercel.app',
   hero_developer_label: 'Hero Developer',
-  footer_made_by_label: 'Developed by Adham Hawash',
+  /* (10-b) توقيع المطور الرسمي بالظبط «Developed by Adam Hawash» — Adam من غير h
+     بطلب صاحب المنصة (الترميم القديمة و78 كانت بترجّعه Adham — اتعكس تحت) */
+  footer_made_by_label: 'Developed by Adam Hawash',
   prime_developer_url: 'https://prime-developer-portfolio-11.vercel.app',
 
   // === Schedule Page ===
@@ -181,7 +183,7 @@ var DEFAULTS = {
   footer_brand: 'Zicola In Math',
   footer_brand_en: 'Zicola In Math',
   footer_copyright: 'جميع الحقوق محفوظة لـ أدهم حواش',
-  footer_copyright_en: 'All rights reserved to Adham Hawash',
+  footer_copyright_en: 'All rights reserved to Adam Hawash',
 
   // === Favicon ===
   favicon_url: '',
@@ -238,14 +240,15 @@ export async function GET() {
         map[mrBrandKeys[m]] = mv.split(LEGACY_MISTAKE_BRAND).join(LEGACY_MISTER_BRAND)
       }
     }
-    /* (و78) اسم المطوّر الصحيح «Adham Hawash» — أي قيمة مخزنة قديمة فيها اللقب
-       الغلط «Adam Hawash» بتتصحح على القراءة فورًا (والترحيل في ensure-schema
-       بصلّحها نهائيًا في قاعدة البيانات) — توحيد الفوتر في كل المنصات */
+    /* (10-b) اسم المطوّر الصحيح «Adam Hawash» (Adam من غير h) — بطلب صاحب المنصة
+       حرفيًا: أي قيمة مخزنة قديمة فيها «Adham Hawash» (من ترميم و78 القديمة)
+       بتتصحح على القراءة فورًا — عكس الترميم القديمة بالظبط — والترحيل في
+       ensure-schema بصلّحها نهائيًا في قاعدة البيانات — توحيد الفوتر في كل المنصات */
     var devNameKeys = ['footer_made_by_label', 'footer_made_by_label_en', 'hero_developer_label', 'hero_developer_label_en']
     for (var d = 0; d < devNameKeys.length; d++) {
       var dv = map[devNameKeys[d]]
-      if (typeof dv === 'string' && dv.indexOf('Adam Hawash') !== -1) {
-        map[devNameKeys[d]] = dv.split('Adam Hawash').join('Adham Hawash')
+      if (typeof dv === 'string' && dv.indexOf('Adham Hawash') !== -1) {
+        map[devNameKeys[d]] = dv.split('Adham Hawash').join('Adam Hawash')
       }
     }
     /* (و73) وصف الهيرو القديم المخلوط بكلمات إنجليزية → النص العربي النضيف
