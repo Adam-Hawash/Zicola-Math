@@ -45,6 +45,8 @@ function buildTargets(): CleanupTarget[] {
     { table: 'PlayTicket', where: "videoId != '' AND videoId NOT IN (SELECT id FROM Video)" },
     { table: 'Payment', where: STUDENT_ORPHAN },
     { table: 'Complaint', where: STUDENT_ORPHAN },
+    /* (2026-و84) الشكوى بعد حلها تتمسح من صفحة الأدمن — بتلم المخزون القديم */
+    { table: 'Complaint', where: "status = 'resolved'" },
     { table: 'Discussion', where: STUDENT_ORPHAN },
     { table: 'PointsLedger', where: STUDENT_ORPHAN }, // جدول raw SQL من lib/points-ledger
     // ===== صفوف مفاتيحها videoId / groupId =====
