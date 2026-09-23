@@ -44,6 +44,10 @@ export var SCHEMA_TABLES = [
   // (و70) قسم التحديات — فيديو المستر + حلول الطلاب بترتيب الزمن (طلب المستر حرفيًا)
   'CREATE TABLE IF NOT EXISTS Challenge (id TEXT PRIMARY KEY, title TEXT NOT NULL, description TEXT DEFAULT \'\', videoUrl TEXT DEFAULT \'\', videoType TEXT DEFAULT \'youtube\', active INTEGER NOT NULL DEFAULT 0, createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)',
   'CREATE TABLE IF NOT EXISTS ChallengeSolution (id TEXT PRIMARY KEY, challengeId TEXT NOT NULL, studentName TEXT NOT NULL, phone TEXT DEFAULT \'\', content TEXT NOT NULL, createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (challengeId) REFERENCES Challenge(id) ON DELETE CASCADE)',
+  /* (2026-و89) اشتراكات Web Push لولي الأمر — الإشعار الخارجي بقى إشعار براوزر حقيقي
+     (مش واتساب — طلب المستر) — كل صف = جهاز مشترك لرقم ولي أمر مطبّع */
+  'CREATE TABLE IF NOT EXISTS ParentPushSubscription (id TEXT PRIMARY KEY, parentId TEXT NOT NULL DEFAULT \'\', endpoint TEXT NOT NULL UNIQUE, p256dh TEXT NOT NULL DEFAULT \'\', auth TEXT NOT NULL DEFAULT \'\', userAgent TEXT NOT NULL DEFAULT \'\', createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)',
+  'CREATE INDEX IF NOT EXISTS idx_pps_parent ON ParentPushSubscription(parentId)',
 ]
 
 var SCHEMA_COLUMNS = [
@@ -202,7 +206,11 @@ export var CORE_TABLES = ['Admin', 'Student', 'StudentActivity', 'Video', 'Homew
 /* (و45) مفتاح البصمة اتبدّل رابع — عمود GalleryImage.thumbnail (صورة مصغرة
  * لفيديوهات المعرض) دخل SCHEMA_TABLES + SCHEMA_COLUMNS — نفس الدرس الموثق:
  * من غير البَمب العمود مش هيتضاف على Turso أول ريكوست بعد النشر. */
-var SCHEMA_HASH_KEY = 'schema_heal_hash_v3_w71'
+/* (و89) مفتاح البصمة اتبدّل — جدول ParentPushSubscription (اشتراكات
+ * إشعارات Web Push لولي الأمر) دخل SCHEMA_TABLES — نفس الدرس الموثق
+ * و38/و40/و43/و44/و45: من غير تغيير المفتاح الجدول مش هيتعمل على
+ * قواعد Turso الموجودة أول ريكوست بعد النشر. */
+var SCHEMA_HASH_KEY = 'schema_heal_hash_v2_w89'
 
 /* ============================================================
  * 2026-و23 — **إصلاح بطء المنصة** (طلب المستر: «المنصة بطيئة، تسجيل
