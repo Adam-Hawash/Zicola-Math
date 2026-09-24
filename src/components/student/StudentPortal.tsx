@@ -18,8 +18,6 @@ import Image from 'next/image'
 import { toast } from 'sonner'
 import type { Video as VideoType, Homework, Exam, Announcement, Discussion, ExamResult } from '@/stores/app-store'
 import { MathKeyboard } from '@/components/student/MathKeyboard'
-/* (2026-و95) لودر رموز الرياضيات الموحد */
-import { PlatformLoader } from '@/components/PlatformLoader'
 import { SecurePlayerModal } from '@/components/student/SecurePlayerModal'
 import { StudentComplaints } from '@/components/student/StudentComplaints'
 import { BooksTab } from '@/components/student/BooksTab'
@@ -295,8 +293,14 @@ function StudentPortalInner() {
   // Dashboard overview before entering full portal
   if (!showFullPortal) {
     if (loading) {
-      /* (2026-و95) لودر رموز الرياضيات الموحد في بوابة الطالب */
-      return <PlatformLoader variant="inline" label="جاري تحميل بياناتك..." />
+      /* (2026-و96) شاشة تحميل دخول الطالب بطلب المستر: سبنر دوّار عادي
+         وتحته في سطر صغير «بنحمل بياناتك...» — مختلفة عن باقي المنصات */
+      return (
+        <div className="flex flex-col items-center justify-center gap-4 py-24" role="status" aria-live="polite">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">بنحمل بياناتك...</p>
+        </div>
+      )
     }
 
     const initialData = dashboardData
