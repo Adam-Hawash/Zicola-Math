@@ -8,6 +8,7 @@ import { StudentPaymentView } from '@/components/landing/StudentPaymentView'
 import { LoginView, RegisterView } from '@/components/landing/AuthPages'
 import dynamic from 'next/dynamic'
 import { useEffect, useState, useRef } from 'react'
+import { PlatformLoader } from '@/components/PlatformLoader'
 
 const HeroSection = dynamic(() => import('@/components/landing/HeroSection'), {
   loading: () => <div className="min-h-[70vh] bg-background" />,
@@ -181,23 +182,9 @@ export default function HomePage() {
   const showWhatsApp = currentView === 'landing' || currentView === 'auth-login' || currentView === 'auth-register'
 
   // Full-page loading screen
-  // (و75) شاشة تحميل بسيطة بطلب المستر الحرفي: «صفحة التحميل خليها عادية
-  // تكتب لي فيها جاري التحميل بس» — نفس الخلفية الكحلية المتدرجة + سبينر
-  // بسيط (دائرة دوارة border-spin) + سطر البراند + «جاري التحميل...»
-  // — بدون بازل وبدون قطع (أنيميشن pz-* اتنضفت من globals.css)
+  // (2026-و95) لودر رموز الرياضيات الموحد
   if (!appReady) {
-    return (
-      <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-6 bg-[linear-gradient(180deg,#14355f_0%,#0e2a52_45%,#081a33_100%)]">
-        {/* سبينر بسيط — دائرة دوارة */}
-        <div className="h-12 w-12 rounded-full border-[3px] border-white/15 border-t-[#38bdf8] animate-spin" role="status" aria-label="جاري التحميل" />
-        <div className="text-center space-y-2 px-6">
-          <p dir="ltr" className="text-sm font-semibold uppercase tracking-[0.2em] text-[#38bdf8]">
-            Zicola In Math | Mr. Ahmed Shaban
-          </p>
-          <p className="text-white/75 text-base">جاري التحميل...</p>
-        </div>
-      </div>
-    )
+    return <PlatformLoader variant="full" />
   }
 
   return (
