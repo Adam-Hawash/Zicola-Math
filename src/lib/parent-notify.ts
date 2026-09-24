@@ -97,21 +97,60 @@ export const PARENT_PUSH_SUBMIT_HOMEWORK_TITLE = '📥 تسليم جديد — Z
 export const PARENT_PUSH_SUBMIT_EXAM_BODY = 'الطالب/ة {student} سلّم امتحان «{title}» — التصحيح جاري وإشعار الدرجة جاي'
 export const PARENT_PUSH_SUBMIT_HOMEWORK_BODY = 'الطالب/ة {student} سلّم واجب «{title}» — التصحيح جاري وإشعار الدرجة جاي'
 
+/* ============================================================
+   (2026-و97) أيقونة الإشعار الخارجي بطلب المستر: «كل إشعار بصورة
+   الفافيكون بتاعة المنصة» — بنقرا favicon_url من إعدادات المنصة
+   (نفس الصورة اللي جنب لينك الموقع) — ولو مش متاحة أو SVG
+   (متعتمش في إشعارات النظام) بنرجّع لشعار المنصة ثم للأيقونة
+   الافتراضية. الكاش لكل process — أي تعديل لوجو بيتطبق بعد أول
+   إرسال جديد.
+   ============================================================ */
+function isValidNotifIcon(p: string): boolean {
+  if (!p) return false
+  if (/\.svg(\?.*)?$/i.test(p)) return false /* الـ SVG مش بيتعرض في إشعارات الموبايل */
+  return /\.(png|jpe?g|webp|gif)(\?.*)?$/i.test(p)
+}
+
+var _pushIcon = ''
+export async function resolveParentPushIcon(): Promise<string> {
+  if (_pushIcon) return _pushIcon
+  try {
+    var rowsIcon: any = await db.$queryRawUnsafe("SELECT key, value FROM SiteConfig WHERE key IN ('favicon_url','site_logo')")
+    rowsIcon = rowsIcon || []
+    var vIcon = ''
+    for (var ri = 0; ri < rowsIcon.length; ri++) {
+      if (String(rowsIcon[ri] && rowsIcon[ri].key) === 'favicon_url') { vIcon = String((rowsIcon[ri] && rowsIcon[ri].value) || ''); break }
+    }
+    if (!isValidNotifIcon(vIcon)) {
+      vIcon = ''
+      for (var rj = 0; rj < rowsIcon.length; rj++) {
+        if (String(rowsIcon[rj] && rowsIcon[rj].key) === 'site_logo') { vIcon = String((rowsIcon[rj] && rowsIcon[rj].value) || ''); break }
+      }
+    }
+    if (isValidNotifIcon(vIcon)) _pushIcon = vIcon
+  } catch (e) {}
+  if (!_pushIcon) _pushIcon = '/push-icon.png'
+  return _pushIcon
+}
+
 /* (2026-و96) ملامة قالب إشعار الاستلام الفوري — tag مختلف
    (parent-exam-sub / parent-homework-sub) عشان إشعار الاستلام
    وإشعار الدرجة يظهروا مع بعض في شريط الموبايل مبيستبدلوش بعض */
-export function buildParentSubmitPushPayload(kind: 'exam' | 'homework', studentName: string, title: string): { title: string; body: string; url: string; tag: string; icon: string } {
+export async function buildParentSubmitPushPayload(kind: 'exam' | 'homework', studentName: string, title: string): Promise<{ title: string; body: string; url: string; tag: string; icon: string }> {
   var t = kind === 'exam' ? PARENT_PUSH_SUBMIT_EXAM_TITLE : PARENT_PUSH_SUBMIT_HOMEWORK_TITLE
   var b = kind === 'exam' ? PARENT_PUSH_SUBMIT_EXAM_BODY : PARENT_PUSH_SUBMIT_HOMEWORK_BODY
   var body = String(b)
     .split('{student}').join(String(studentName || 'الطالب'))
     .split('{title}').join(String(title || ''))
+  /* (2026-و97) أيقونة الإشعار = فافيكون المنصة بطلب المستر */
+  var icon = '/push-icon.png'
+  try { icon = await resolveParentPushIcon() } catch (e) {}
   return {
     title: String(t),
     body: body,
     url: '/#parent-login',
     tag: 'parent-' + kind + '-sub',
-    icon: '/push-icon.png',
+    icon: icon,
   }
 }
 
@@ -119,7 +158,7 @@ export function buildParentSubmitPushPayload(kind: 'exam' | 'homework', studentN
    (و91+و96) tag ثابت لكل نوع (parent-exam / parent-homework) —
    إشعارات نفس النوع بتستبدل بعضها (مانع السبام)، وإشعار الاستلام
    ليه tag تاني فبيظهر جنبه مش مكانه */
-export function buildParentPushPayload(kind: 'exam' | 'homework', studentName: string, title: string, score: number, maxScore: number): { title: string; body: string; url: string; tag: string; icon: string } {
+export async function buildParentPushPayload(kind: 'exam' | 'homework', studentName: string, title: string, score: number, maxScore: number): Promise<{ title: string; body: string; url: string; tag: string; icon: string }> {
   var s = Number(score) || 0
   var m = Number(maxScore) || 0
   var pct = m > 0 ? Math.round((s / m) * 100) : 0
@@ -131,12 +170,15 @@ export function buildParentPushPayload(kind: 'exam' | 'homework', studentName: s
     .split('{score}').join(String(s))
     .split('{max}').join(String(m))
     .split('{percent}').join(String(pct))
+  /* (2026-و97) أيقونة الإشعار = فافيكون المنصة بطلب المستر */
+  var icon = '/push-icon.png'
+  try { icon = await resolveParentPushIcon() } catch (e) {}
   return {
     title: String(t),
     body: body,
     url: '/#parent-login', /* ضغطة الإشعار بتفتح شاشة دخول ولي الأمر */
     tag: 'parent-' + kind,
-    icon: '/push-icon.png',
+    icon: icon,
   }
 }
 
@@ -285,7 +327,7 @@ export async function notifyParentsOfResult(opts: { studentId: string; kind: 'ex
     if (!targets.length) return /* مفيش رقم ولي أمر مسجل — مفيش إشعار (مش مشكلة) */
 
     var message = buildParentMessage(opts.kind, studentName, opts.title, opts.score, opts.maxScore)
-    var payload = buildParentPushPayload(opts.kind, studentName, opts.title, opts.score, opts.maxScore)
+    var payload = await buildParentPushPayload(opts.kind, studentName, opts.title, opts.score, opts.maxScore)
     await dispatchParentNotice(targets, studentName, message, payload)
   } catch (e) {
     console.error('[parent-notify] failed (ignored):', e)
@@ -314,7 +356,7 @@ export async function notifyParentsOfSubmission(opts: { studentId: string; kind:
     if (!targets.length) return
 
     var message = buildParentSubmitMessage(opts.kind, studentName, opts.title)
-    var payload = buildParentSubmitPushPayload(opts.kind, studentName, opts.title)
+    var payload = await buildParentSubmitPushPayload(opts.kind, studentName, opts.title)
     await dispatchParentNotice(targets, studentName, message, payload)
   } catch (e) {
     console.error('[parent-notify] submission notify failed (ignored):', e)
