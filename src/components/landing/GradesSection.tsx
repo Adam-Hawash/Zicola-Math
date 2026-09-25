@@ -4,10 +4,13 @@ import { Card, CardContent } from '@/components/ui/card'
 import { useAppStore, gradesFromConfig } from '@/stores/app-store'
 import { toast } from 'sonner'
 /* (و71) ترجمة عناوين القسم حسب لغة الزائر */
-import { useT } from '@/lib/i18n'
+import { useT, useLangStore } from '@/lib/i18n'
 
 export function GradesSection() {
   var T = useT()
+  /* (و98) لغة الزائر — الإنجليزي الأول في الوضع الإنجليزي والعربي الأول في العربي
+     (طلب المستر: «في الحالتين كنت بتخلي العربي ظاهر الأول في الصفوف الدراسية») */
+  var lang = useLangStore(function (s) { return s.lang })
   var siteConfig = useAppStore(function (s) { return s.siteConfig })
   var cfg = siteConfig
   // (24-b) القايمة بقت ديناميكية من لوحة الأدمن — والإيموجي هو اللي
@@ -46,11 +49,12 @@ export function GradesSection() {
                     </span>
                   </div>
                   <div className="space-y-0.5">
+                    {/* (و98) الاسم الرئيسي بلغة الزائر والتاني تحته */}
                     <h3 className="font-semibold text-sm leading-tight">
-                      {grade.ar}
+                      {lang === 'en' ? grade.en : grade.ar}
                     </h3>
-                    <p className="text-[11px] text-muted-foreground font-medium tracking-wide" dir="ltr">
-                      {grade.en}
+                    <p className="text-[11px] text-muted-foreground font-medium tracking-wide" dir={lang === 'en' ? 'rtl' : 'ltr'}>
+                      {lang === 'en' ? grade.ar : grade.en}
                     </p>
                   </div>
                 </CardContent>

@@ -53,6 +53,11 @@ export default async function RootLayout({
     faviconUrl = "/images/the-scholar-favicon.png";
   }
 
+  // (و98) صورة المستر في الهيرو — بنعملها preload من الـ head نفسه عشان
+  // التحميل يبدأ مع أول سطر HTML (المستر: «الصورة تتحمل في الحتة الأولى
+  // دي» — كانت بتستنى الهيدريشن والأنيميشن وبتظهر متأخرة ~5 ثواني)
+  var heroPhotoUrl = String(initialConfig.instructor_photo || "/images/the-scholar-full.png");
+
   return (
     <html lang="en" dir="ltr" suppressHydrationWarning>
       <head>
@@ -80,6 +85,9 @@ export default async function RootLayout({
 
         {/* Favicon — user's custom image, NO Z logo */}
         <link rel="icon" href={faviconUrl} />
+
+        {/* (و98) تحميل صورة المستر يبدأ فورًا مع الـ HTML — مش بعد الهيدريشن */}
+        <link rel="preload" as="image" href={heroPhotoUrl} fetchPriority="high" />
 
         {/* Inject config server-side for instant client access */}
         <script

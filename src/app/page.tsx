@@ -83,6 +83,19 @@ export default function HomePage() {
   var setConfigLoaded = store.setConfigLoaded
   var setStats = store.setStats
 
+  /* (و98) تسخين صورة المستر — طلب المستر: «الصورة تتحمل في الحتة بتاعة
+     الأولى دي» (شاشة التحميل). كانت بتظهر متأخرة ~5 ثواني لأن التحميل
+     كان بيستنى الهيدريشن + الديناميك إمبورت + الأنيميشن. بنبدأ تحميل
+     الصورة هنا فورًا من الكونفيج المُحقون سيرفر سايد + بعد وصول الكونفيج */
+  var preloadPhoto = function(url: any) {
+    try {
+      var u = String(url || '')
+      if (!u || typeof window === 'undefined') return
+      var im = new Image()
+      im.src = u
+    } catch (e) {}
+  }
+
   const [appReady, setAppReady] = useState(false)
   const startTimeRef = useRef(Date.now())
 
@@ -97,6 +110,13 @@ export default function HomePage() {
 
   // Load config + gallery + stats on mount
   useEffect(function() {
+    /* (و98) صورة المستر من أول لحظة — قبل أي fetch */
+    try {
+      var ic = ((typeof window !== 'undefined' && (window as any).__INITIAL_CONFIG__) || {}) as any
+      preloadPhoto(ic.instructor_photo)
+      preloadPhoto(ic.navbar_photo)
+    } catch (eIc) {}
+
     /* (2026-و88) لينك إشعار ولي الأمر الخارجي (واتساب/SMS) بييجي بالشكل
        /#parent-login — أول ما الصفحة تفتح بننتقل على طول لشاشة تسجيل
        دخول ولي الأمر (نفس تدفق المستر: «يدوس على الإشعار من بره → يفتحه
@@ -159,6 +179,11 @@ export default function HomePage() {
         setSiteConfig(cfg)
         setConfigLoaded(true)
       }
+      /* (و98) لو صورة الكونفيج المُحقون مختلفة (الأدمن غيّرها) — سخّنها برضه */
+      try {
+        preloadPhoto((cfg as any).instructor_photo)
+        preloadPhoto((cfg as any).navbar_photo)
+      } catch (ePc) {}
       if (gal && gal.images) {
         setGalleryImages(gal.images)
       }
