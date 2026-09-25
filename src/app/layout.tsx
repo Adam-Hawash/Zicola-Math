@@ -18,10 +18,47 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+/* (و99) معاينة اللينك لما يتبعت واتساب/فيسبوك — طلب المستر: «لما ابعت
+   اللينك بتاع أحمد شعبان عايز صورة الفافيكون (صورة المستر التعليمية)
+   تظهر في المعاينة». واتساب بيقرا og:image ولازم يكون رابط مطلق —
+   metadataBase بتتحل من دومين الإنتاج على Vercel تلقائيًا.
+   الصورة: the-scholar-nav.png (نفس رسمة الفافيكون لكن 512px — الفافيكون
+   نفسه 64px صغير فواتساب بيتجاهله) */
+var SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? "https://" + process.env.VERCEL_PROJECT_PRODUCTION_URL
+    : undefined) ||
+  (process.env.VERCEL_URL ? "https://" + process.env.VERCEL_URL : undefined) ||
+  "https://zicola-in-math.vercel.app";
+
 export var metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "Zicola In Math | Mr. Ahmed Shaban",
   description:
     "منصة Zicola In Math — مستر أحمد شعبان: منصة رياضيات متكاملة. تبسيط الرياضيات، واجبات أسبوعية، امتحانات منتظمة، ومتابعة مستمرة للتقدم.",
+  openGraph: {
+    title: "Zicola In Math | Mr. Ahmed Shaban",
+    description:
+      "منصة Zicola In Math — مستر أحمد شعبان: منصة رياضيات متكاملة. تبسيط الرياضيات، واجبات أسبوعية، امتحانات منتظمة، ومتابعة مستمرة للتقدم.",
+    type: "website",
+    siteName: "Zicola In Math",
+    images: [
+      {
+        url: "/images/the-scholar-nav.png",
+        width: 512,
+        height: 512,
+        alt: "Zicola In Math — مستر أحمد شعبان",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Zicola In Math | Mr. Ahmed Shaban",
+    description:
+      "منصة Zicola In Math — مستر أحمد شعبان: منصة رياضيات متكاملة. تبسيط الرياضيات، واجبات أسبوعية، امتحانات منتظمة، ومتابعة مستمرة للتقدم.",
+    images: ["/images/the-scholar-nav.png"],
+  },
 };
 
 export default async function RootLayout({
