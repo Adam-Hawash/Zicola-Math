@@ -14,7 +14,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
-export const maxDuration = 60
+// (و100) كان 60 — تجميع الملفات الكبيرة (مثل فيديو تعريفي 221MB = ~295MB
+// base64) بياخد أكتر من 60 ثانية قراءة+كتابة → FUNCTION_INVOCATION_TIMEOUT
+// والرفع بيفشل في آخر خطوة. بقى 300 (Pro بتسمح — ولو هوب هيفضل 60 زي ما هو)
+export const maxDuration = 300
 
 // بادئة صفوف الأجزاء المؤقتة — مش بتظهر كملف نهائي أبدًا
 var CHUNK_PREFIX = '__chunks/'
