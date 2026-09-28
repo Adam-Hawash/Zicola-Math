@@ -24,12 +24,12 @@ var DEFAULTS = {
   /* (و72) التهجئة الرسمية: Shaban (من غير c) — (و73) الاسم لوحده من غير by */
   hero_title_line2_en: 'Mr. Ahmed Shaban',
   /* (و70) صورة الهيرو = مستر طالع من السحابة — الصورة الرسمية **الكاملة** (و71)
-     من غير أي قص: المستر طالع من سحابة وإسمه تحتها (the-scholar-full) */
-  instructor_photo: '/images/the-scholar-full.png',
+     من غير أي قص: المستر طالع من سحابة وإسمه تحتها (zicola-full) */
+  instructor_photo: '/images/zicola-full.png',
   /* (و70) صورة النافيبار = صورة المستر الرسمية (كحلي) — منفصلة عن الهيرو */
-  navbar_photo: '/images/the-scholar-nav.png',
+  navbar_photo: '/images/zicola-nav.png',
   /* (و70) فيفيكون المنصة = صورة المستر الرسمية */
-  favicon_url: '/images/the-scholar-favicon.png',
+  favicon_url: '/images/zicola-favicon.png',
   /* (و70) الفيديو التعريفي في أعلى الصفحة الرئيسية (لينك يوتيوب أو ملف مرفوع)
      — فاضي = القسم مش بيظهر خالص */
   intro_video_url: '',
