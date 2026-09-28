@@ -4652,7 +4652,11 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
   // YouTube state
   const [youtubeUrl, setYoutubeUrl] = useState('')
   const [numQuestions, setNumQuestions] = useState(10)
-  const [inputMode, setInputMode] = useState<'file' | 'youtube' | 'book'>('file')
+  const [inputMode, setInputMode] = useState<'file' | 'youtube' | 'book' | 'lesson'>('file')
+  /* (2026-و106) وضع «من درس» — استخراج واجب/امتحان على الدرس من كل فيديوهاته */
+  const [lessonGroups, setLessonGroups] = useState<any[]>([])
+  const [lessonId, setLessonId] = useState('')
+  const [lessonLoading, setLessonLoading] = useState(false)
   /* (2026-و40) وضع الكتاب — استخراج من صفحات محددة في كتاب كبير (طلب المستر:
      بفتح كتاب كبير، أحدد صفحات، يجيب كل الأسئلة أو أهم N سؤال بالترتيب) */
   const [bookFile, setBookFile] = useState<File | null>(null)
@@ -4682,6 +4686,16 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
   const [savedBooks, setSavedBooks] = useState<any[]>([])
   const [savedBooksLoading, setSavedBooksLoading] = useState(false)
   const [showSavedBooks, setShowSavedBooks] = useState(false)
+  /* (2026-و106) فلتر المرحلة في وضع الكتاب — «أختار المرحلة تظهر لي كتبها» */
+  const [bookGradeFilter, setBookGradeFilter] = useState('')
+  var filteredSavedBooks = useMemo(function () {
+    if (!bookGradeFilter) return savedBooks
+    var needle = bookGradeFilter.replace(/\s+/g, '')
+    return savedBooks.filter(function (b: any) {
+      var g = String(b.grade || '').replace(/\s+/g, '')
+      return g && (g === needle || g.indexOf(needle) !== -1 || needle.indexOf(g) !== -1)
+    })
+  }, [savedBooks, bookGradeFilter])
   /* (و48) مصدر القص الأخير — بنحتفظ بيه عشان زرار «قص الرسمة تاني» في
      شاشة المراجعة يقدر يعيد المحاولة لأي رسمة فشل قصّها لحظة الاستخراج */
   const lastCropSourceRef = useRef<{ file?: File | null; doc?: any | null }>({})
@@ -4742,6 +4756,154 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
     toast.success('الرسمة اتقصّت من الصفحة الأصلية واتحفظت ✓ — هتوصل للطالب بالشكل ده بالظبط')
   }
 
+  /* (2026-و106) التقاط لقطات من أي رابط فيديو على المتصفح — mp4 مباشر / archive.org /
+     Cloudinary / لينك ملف المنصة نفسه. crossOrigin='anonymous' مطلوب عشان canvas
+     ما يتلوّثش — لو المصدر ما بيسمحش CORS بنرجع فاضي وناخد المستر للبدائل */
+  var captureVideoFramesFromUrl = function (url: string, count: number): Promise<string[]> {
+    return new Promise(function (resolve) {
+      var v = document.createElement('video')
+      v.preload = 'auto'; v.muted = true
+      try { (v as any).playsInline = true } catch (e) {}
+      try { v.crossOrigin = 'anonymous' } catch (e) {}
+      var frames: string[] = []
+      var settled = false
+      var done = function (arr: string[]) {
+        if (settled) return
+        settled = true
+        try { v.removeAttribute('src'); v.load() } catch (e) {}
+        clearTimeout(to)
+        resolve(arr || [])
+      }
+      var to = setTimeout(function () { done(frames.length > 0 ? frames : []) }, 60000)
+      var times: number[] = []
+      var next = function (i: number) {
+        if (i >= times.length || frames.length >= count) { done(frames); return }
+        v.onseeked = function () {
+          try {
+            var canvas = document.createElement('canvas')
+            var w = 640
+            var ratio = (v.videoWidth && v.videoHeight) ? (v.videoHeight / v.videoWidth) : 0.5625
+            canvas.width = w
+            canvas.height = Math.max(1, Math.round(w * ratio))
+            var ctx = canvas.getContext('2d')
+            if (!ctx) { done(frames); return }
+            ctx.drawImage(v, 0, 0, canvas.width, canvas.height)
+            frames.push(canvas.toDataURL('image/jpeg', 0.78))
+            setTimeout(function () { next(i + 1) }, 80)
+          } catch (e) {
+            done(frames.length > 0 ? frames : [])
+          }
+        }
+        try { v.currentTime = times[i] } catch (e) { done(frames) }
+      }
+      v.onloadedmetadata = function () {
+        if (!isFinite(v.duration) || v.duration <= 0) { done([]); return }
+        for (var i2 = 0; i2 < count; i2++) {
+          times.push(Math.max(0.1, Math.min(v.duration * (0.05 + 0.9 * (i2 / Math.max(1, count - 1))), v.duration - 0.1)))
+        }
+        next(0)
+      }
+      v.onerror = function () { done([]) }
+      v.src = url
+    })
+  }
+
+  /* (2026-و106) استخراج عبر الإطارات/اللقطات — الكلينت يصوّر والسيرفر يبعتها لـ Gemini */
+  var extractWithFrames = async function (images: string[], context: string, youtubeIds: string[], sourceLabel: string) {
+    var ctrlF = new AbortController()
+    var tmrF = setTimeout(function () { ctrlF.abort() }, 180000)
+    var resF = await fetch('/api/ai-extract-frames', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ images: images, context: context, youtubeIds: youtubeIds, numQuestions: numQuestions, type: extractType, grade: grade, sourceLabel: sourceLabel }),
+      signal: ctrlF.signal,
+    })
+    clearTimeout(tmrF)
+    var dataF = await resF.json()
+    if (resF.ok && dataF.extracted && dataF.extracted.questions && dataF.extracted.questions.length > 0) {
+      if (dataF.extracted.title && !title) { setTitle(dataF.extracted.title) }
+      await finishExtraction(dataF.extracted.questions, {})
+      toast.success('تم استخراج ' + dataF.extracted.questions.length + ' سؤال من الفيديو بنجاح!')
+    } else {
+      toast.error(dataF.error || 'لم يتم استخراج أسئلة من الفيديو', { duration: 9000 })
+    }
+  }
+
+  /* (2026-و106) تحميل دروس المنصة (مجموعات + فردية) لوضع «من درس» */
+  var loadLessonGroups = async function () {
+    if (!adminId) return
+    setLessonLoading(true)
+    try {
+      var res = await fetch('/api/videos?pageSize=200&adminId=' + encodeURIComponent(adminId))
+      var d = await res.json()
+      var vids: any[] = d.videos || []
+      var byKey: Record<string, any[]> = {}
+      var singles: any[] = []
+      vids.forEach(function (v: any) {
+        var k = String(v.groupKey || '')
+        if (k) { (byKey[k] = byKey[k] || []).push(v) } else singles.push(v)
+      })
+      var items: any[] = []
+      Object.keys(byKey).forEach(function (k) {
+        var parts = (byKey[k] || []).slice().sort(function (a: any, b: any) { return (Number(a.orderIndex) || 0) - (Number(b.orderIndex) || 0) })
+        items.push({ key: k, title: parts[0] ? parts[0].title : k, grade: parts[0] ? parts[0].grade : '', parts: parts, count: parts.length })
+      })
+      singles.forEach(function (v: any) {
+        items.push({ key: 'single:' + v.id, title: v.title, grade: v.grade, parts: [v], count: 1 })
+      })
+      items.sort(function (a: any, b: any) {
+        var ta = new Date((a.parts[0] && a.parts[0].createdAt) || 0).getTime()
+        var tb = new Date((b.parts[0] && b.parts[0].createdAt) || 0).getTime()
+        return tb - ta
+      })
+      setLessonGroups(items)
+    } catch (e) { toast.error('فشل تحميل قايمة الدروس') }
+    setLessonLoading(false)
+  }
+
+  /* (2026-و106) استخراج من الدرس كامل — يجمع كل فيديوهات الدرس:
+     يوتيوب → ID في السياق، ملف/لينك مباشر → لقطات على المتصفح — والكل يروح لـ Gemini في طلب واحد */
+  var handleExtractLesson = async function () {
+    var sel = lessonGroups.filter(function (g) { return g.key === lessonId })[0]
+    if (!sel || extracting) return
+    setExtracting(true)
+    try {
+      var contextLines: string[] = []
+      var framePool: string[] = []
+      var youtubeIds: string[] = []
+      var needFrames: string[] = []
+      for (var pi = 0; pi < sel.parts.length; pi++) {
+        var p = sel.parts[pi]
+        contextLines.push('Part ' + (pi + 1) + ': ' + (p.title || ''))
+        var yt = getYtId(p.url || '')
+        if (yt) { youtubeIds.push(yt); continue }
+        var link = String(p.url || '').trim()
+        var src = link || String(p.filePath || '').trim()
+        if (src) needFrames.push(src)
+      }
+      var perVideo = Math.max(4, Math.floor(24 / Math.max(1, needFrames.length)))
+      for (var fi = 0; fi < needFrames.length && framePool.length < 28; fi++) {
+        setStatusMsg('بيصوّر لقطات من الفيديو ' + (fi + 1) + ' من ' + needFrames.length + '... ممكن ياخد شوية حسب الحجم')
+        var fr = await captureVideoFramesFromUrl(needFrames[fi], perVideo)
+        for (var fj = 0; fj < fr.length && framePool.length < 28; fj++) framePool.push(fr[fj])
+      }
+      if (framePool.length === 0 && youtubeIds.length === 0) {
+        toast.error('مفيش فيديوهات مقروءة في الدرس ده — لينكات الفيديو الخارجية رافضة بقراءة اللقطات (CORS). استخدم لينك يوتيوب أو mp4 مباشر (archive.org مثلًا) أو ارفع الملف على المنصة', { duration: 12000 })
+        setStatusMsg('')
+        setExtracting(false)
+        return
+      }
+      setStatusMsg('جاري استخراج الأسئلة من الدرس كامل (' + sel.parts.length + ' فيديو)...')
+      await extractWithFrames(framePool, 'Lesson: ' + sel.title + ' (' + sel.grade + ')\n' + contextLines.join('\n'), youtubeIds, 'lesson: ' + sel.title)
+      setStatusMsg('')
+    } catch (e: any) {
+      if (e && e.name === 'AbortError') toast.error('الاستخراج خد وقت أطول من المعتاد واتلغى — جرب تاني', { duration: 9000 })
+      else toast.error('فشل استخراج الدرس: ' + String((e && e.message) || ''), { duration: 9000 })
+      setStatusMsg('')
+    }
+    setExtracting(false)
+  }
+
   var resetAll = function() {
     setStep(1); setExtractType('exam'); setGrade(''); setTitle('')
     sourceMediaRef.current = ''
@@ -4749,6 +4911,7 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
     setExtractedQuestions([]); setStatusMsg('')
     lastCropSourceRef.current = {}
     setYoutubeUrl(''); setNumQuestions(10); setInputMode('file')
+    setLessonId('')
     setExamShowResult(false); setExamTimeLimit(''); setExamScheduledAt('')
     /* (2026-و40) تصفير وضع الكتاب */
     setBookFile(null); setBookNumPages(0); setBookFrom(1); setBookTo(1)
@@ -4861,10 +5024,12 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
   var canProceedStep1 = extractType && grade.trim() && title.trim()
   var canExtractFile = file || fileUrl.trim()
   var canExtractYoutube = youtubeUrl.trim().length > 5
+  /* (2026-و106) جاهزية وضع «من درس» — درس مختار */
+  var canExtractLesson = !!lessonId
   /* (2026-و40) جاهزية وضع الكتاب: ملف مفتوح + نطاق صالح (≤30 صفحة) */
   var bookPagesSelected = bookNumPages > 0 ? (bookTo - bookFrom + 1) : 0
   var canExtractBook = !!bookFile && bookNumPages > 0 && bookFrom >= 1 && bookTo >= bookFrom && bookTo <= bookNumPages && bookPagesSelected <= 30
-  var canExtract = inputMode === 'youtube' ? canExtractYoutube : inputMode === 'book' ? canExtractBook : canExtractFile
+  var canExtract = inputMode === 'youtube' ? canExtractYoutube : inputMode === 'book' ? canExtractBook : inputMode === 'lesson' ? canExtractLesson : canExtractFile
 
   var handleExtract = async function() {
     if (!canExtract || extracting) return
@@ -4872,7 +5037,25 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
     setStatusMsg('جاري استخراج الأسئلة بالذكاء الاصطناعي... قد يستغرق ذلك دقيقة')
     try {
       if (inputMode === 'youtube') {
-        // YouTube extraction
+        /* (2026-و106) أي لينك فيديو — مش يوتيوب بس: لو مش يوتيوب بنصوّر لقطات
+           من الفيديو على المتصفح ونبعتها للـ Gemini Vision (mp4 مباشر/archive.org/المنصة نفسها) */
+        var ytIdX = getYtId(youtubeUrl.trim())
+        if (!ytIdX) {
+          setStatusMsg('بيقرأ الفيديو وبيصوّر لقطات من جواه... ممكن ياخد شوية حسب حجم الفيديو')
+          var framesX = await captureVideoFramesFromUrl(youtubeUrl.trim(), Math.min(12, Math.max(6, numQuestions)))
+          if (!framesX || framesX.length === 0) {
+            toast.error('المصدر ده مش مسموح بقراءة اللقطات منه (CORS) — استخدم لينك يوتيوب أو لينك mp4 مباشر (archive.org مثلًا) أو ارفع ملف الفيديو على المنصة وحط اللينك الداخلي بتاعه (/api/files/…)', { duration: 12000 })
+            setStatusMsg('')
+            setExtracting(false)
+            return
+          }
+          setStatusMsg('جاري استخراج الأسئلة من لقطات الفيديو...')
+          await extractWithFrames(framesX, '', [], 'video link: ' + youtubeUrl.trim().slice(0, 200))
+          setStatusMsg('')
+          setExtracting(false)
+          return
+        }
+        // YouTube extraction (المسار القديم زي ما هو)
         var ctrl = new AbortController()
         var tmr = setTimeout(function() { ctrl.abort() }, 180000)
         var res = await fetch('/api/ai-extract-youtube', {
@@ -5491,7 +5674,11 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
             <Upload className="h-4 w-4" /> رفع ملف
           </button>
           <button type="button" onClick={function() { setInputMode('youtube') }} className={"flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition-all " + (inputMode === 'youtube' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground')}>
-            <PlayCircle className="h-4 w-4" /> يوتيوب
+            <PlayCircle className="h-4 w-4" /> فيديو
+          </button>
+          {/* (2026-و106) وضع «من درس» — استخراج على الدرس من كل فيديوهاته */}
+          <button type="button" onClick={function() { setInputMode('lesson'); if (lessonGroups.length === 0) loadLessonGroups() }} className={"flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition-all " + (inputMode === 'lesson' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground')}>
+            <MonitorPlay className="h-4 w-4" /> من درس
           </button>
           {/* (2026-و40) وضع الكتاب — صفحات محددة من كتاب كبير */}
           <button type="button" onClick={function() { setInputMode('book') }} className={"flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition-all " + (inputMode === 'book' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground')}>
@@ -5537,12 +5724,12 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
           <div className="p-4 rounded-xl border-2 border-dashed border-red-300 bg-red-50 dark:bg-red-950/20 space-y-3">
             <div className="text-center">
               <PlayCircle className="h-8 w-8 text-red-500 mx-auto mb-2" />
-              <p className="text-sm font-medium">استخراج من فيديو يوتيوب</p>
-              <p className="text-[10px] text-muted-foreground">الصق رابط فيديو يوتيوب وسيتم استخراج الاسئلة منه</p>
+              <p className="text-sm font-medium">استخراج من فيديو — أي لينك</p>
+              <p className="text-[10px] text-muted-foreground">يوتيوب أو mp4 مباشر (archive.org / Cloudinary) أو لينك ملف مرفوع على المنصة — والأسئلة بتتولد من محتوى الفيديو</p>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">رابط يوتيوب *</Label>
-              <Input placeholder="https://youtube.com/watch?v=..." value={youtubeUrl} onChange={function(e) { setYoutubeUrl(e.target.value) }} dir="ltr" />
+              <Label className="text-xs">رابط الفيديو *</Label>
+              <Input placeholder="https://youtube.com/watch?v=… أو https://archive.org/download/…/video.mp4" value={youtubeUrl} onChange={function(e) { setYoutubeUrl(e.target.value) }} dir="ltr" />
             </div>
             {getYtId(youtubeUrl) && (
               <div className="relative w-full aspect-video rounded-lg overflow-hidden border">
@@ -5552,6 +5739,59 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
                 </div>
               </div>
             )}
+            <div className="space-y-1.5">
+              <Label className="text-xs">عدد الاسئلة المطلوبة</Label>
+              <div className="flex items-center gap-3">
+                <input type="range" min={3} max={30} value={numQuestions} onChange={function(e) { setNumQuestions(parseInt(e.target.value)) }} className="flex-1" />
+                <span className="text-sm font-bold text-primary w-8 text-center">{numQuestions}</span>
+              </div>
+            </div>
+          </div>
+        ) : inputMode === 'lesson' ? (
+          /* ===== (2026-و106) وضع «من درس» — استخراج على الدرس من كل فيديوهاته ===== */
+          <div className="p-4 rounded-xl border-2 border-dashed border-violet-300 bg-violet-50 dark:bg-violet-950/20 space-y-3">
+            <div className="text-center">
+              <MonitorPlay className="h-8 w-8 text-violet-500 mx-auto mb-2" />
+              <p className="text-sm font-medium">استخراج من الدرس كامل — كل فيديوهاته</p>
+              <p className="text-[10px] text-muted-foreground">اختار الدرس (متعدد الفيديوهات أو فردي) — المنصة تجمع محتوى كل فيديوهات الدرس وتستخرج أسئلة على الدرس كله</p>
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">الدرس *</Label>
+                <button type="button" onClick={loadLessonGroups} className="text-[10px] text-violet-600 dark:text-violet-400 font-bold hover:underline">تحديث القايمة</button>
+              </div>
+              <select value={lessonId} onChange={function(e) { setLessonId(e.target.value) }} className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm">
+                <option value="">{lessonLoading ? 'جاري التحميل...' : 'اختر الدرس'}</option>
+                {lessonGroups.map(function (g) {
+                  return <option key={g.key} value={g.key}>{g.title} ({g.count} فيديو — {g.grade})</option>
+                })}
+              </select>
+              {lessonGroups.length === 0 && !lessonLoading && (
+                <p className="text-[10px] text-muted-foreground">مفيش دروس لسه — ضيف فيديوهات من تاب «الفيديوهات» الأول</p>
+              )}
+            </div>
+            {lessonId && (function () {
+              var sel = lessonGroups.filter(function (g) { return g.key === lessonId })[0]
+              if (!sel) return null
+              return (
+                <div className="rounded-lg border border-violet-300/60 bg-white/60 dark:bg-transparent p-3">
+                  <p className="text-xs font-bold text-violet-700 dark:text-violet-300 mb-1.5">فيديوهات الدرس ({sel.parts.length}):</p>
+                  <div className="space-y-1 max-h-36 overflow-y-auto custom-scrollbar">
+                    {sel.parts.map(function (p: any, pi: number) {
+                      var isYt = !!getYtId(p.url || '')
+                      return (
+                        <div key={p.id} className="flex items-center gap-2 text-[11px]">
+                          <span className="font-bold text-violet-500 w-5 shrink-0">{pi + 1}.</span>
+                          <span className="truncate flex-1">{p.title}</span>
+                          <Badge variant="outline" className="text-[9px] shrink-0">{isYt ? 'يوتيوب' : (String(p.url || p.filePath || '').match(/\.(mp4|webm|m3u8|mov)/i) ? 'لينك مباشر ✓' : 'ملف/لينك')}</Badge>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-2">لينكات اليوتيوب بتنضم بالاسم، والفيديوهات المباشرة/المرفوعة بتتصوّر منها لقطات تلقائيًا — والكل يروح للذكاء الاصطناعي في طلب واحد</p>
+                </div>
+              )
+            })()}
             <div className="space-y-1.5">
               <Label className="text-xs">عدد الاسئلة المطلوبة</Label>
               <div className="flex items-center gap-3">
@@ -5593,17 +5833,24 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
             {/* (2026-و44) الكتب المحفوظة — سهم يفتح قايمة الكتب المضافة من تاب
                «الكتب والملازم» (ملف أو لينك) — دوست على الكتاب يفتح وتحدد صفحاته */}
             <div className="space-y-1.5">
+              {/* (2026-و106) فلتر المرحلة — اختار مرحلة الكتاب الأول زي ما المستر طلب */}
+              <div className="flex items-center gap-2">
+                <select value={bookGradeFilter} onChange={function(e) { setBookGradeFilter(e.target.value) }} className="flex-1 h-9 rounded-md border border-sky-300/60 bg-transparent px-3 text-sm">
+                  <option value="">كل الكتب المحفوظة — اختار المرحلة للتصفية</option>
+                  {gradesList.map(function (g) { return <option key={g.ar} value={g.ar}>{(g.emoji ? g.emoji + ' ' : '') + g.ar}</option> })}
+                </select>
+              </div>
               <button type="button" onClick={function () { var next = !showSavedBooks; setShowSavedBooks(next); if (next && savedBooks.length === 0 && !savedBooksLoading) loadSavedBooks() }} className="w-full flex items-center justify-between rounded-md border border-sky-300/60 bg-white/70 dark:bg-transparent px-3 py-2 text-sm font-bold text-sky-700 dark:text-sky-300 hover:bg-sky-100/60 dark:hover:bg-sky-900/30 transition-colors cursor-pointer">
-                <span>📚 الكتب المحفوظة {savedBooks.length > 0 ? '(' + savedBooks.length + ')' : ''} — دوس على الكتاب يفتح على طول</span>
+                <span>📚 الكتب المحفوظة {bookGradeFilter ? (filteredSavedBooks.length + ' من ' + savedBooks.length + ' — ' + bookGradeFilter) : (savedBooks.length > 0 ? '(' + savedBooks.length + ')' : '')} — دوس على الكتاب يفتح على طول</span>
                 <ChevronDown className={'h-4 w-4 transition-transform' + (showSavedBooks ? ' rotate-180' : '')} />
               </button>
               {showSavedBooks && (
                 <div className="max-h-60 overflow-y-auto custom-scrollbar rounded-md border border-border">
                   {savedBooksLoading ? (
                     <div className="flex items-center justify-center py-4"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
-                  ) : savedBooks.length === 0 ? (
-                    <p className="text-xs text-muted-foreground text-center py-4 px-3">مفيش كتب محفوظة — ضيف الكتب من تاب «الكتب والملازم» بالملف أو باللينك وهتلاقيها هنا ثابتة</p>
-                  ) : savedBooks.map(function (b: any) {
+                  ) : filteredSavedBooks.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-4 px-3">{bookGradeFilter ? 'مفيش كتب محفوظة للمرحلة دي — غير الفلتر أو ضيف كتب من تاب «الكتب والملازم»' : 'مفيش كتب محفوظة — ضيف الكتب من تاب «الكتب والملازم» بالملف أو باللينك وهتلاقيها هنا ثابتة'}</p>
+                  ) : filteredSavedBooks.map(function (b: any) {
                     var srcLabel = b.sourceUrl ? '🔗 لينك خارجي' : (b.filePath ? '📄 ملف محفوظ' : '')
                     return (
                       <button key={b.id} type="button" onClick={function () { openSavedBook(b) }} className="w-full text-right px-3 py-2 border-b border-border/50 last:border-0 hover:bg-muted/60 transition-colors cursor-pointer">
@@ -5652,9 +5899,9 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
           </div>
         )}
         {statusMsg && <div className="flex items-center gap-2 p-3 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400"><Loader2 className="h-4 w-4 animate-spin" /><p className="text-sm">{statusMsg}</p></div>}
-        <Button className="w-full" size="lg" onClick={function() { if (inputMode === 'book') handleExtractBook(); else handleExtract() }} disabled={!canExtract || extracting}>
+        <Button className="w-full" size="lg" onClick={function() { if (inputMode === 'book') handleExtractBook(); else if (inputMode === 'lesson') handleExtractLesson(); else handleExtract() }} disabled={!canExtract || extracting}>
           {extracting ? <Loader2 className="h-5 w-5 ml-2 animate-spin" /> : inputMode === 'book' ? <BookOpen className="h-5 w-5 ml-2" /> : <Sparkles className="h-5 w-5 ml-2" />}
-          {extracting ? 'جاري الاستخراج...' : (inputMode === 'book' ? 'استخراج من الصفحات' : (inputMode === 'youtube' ? 'استخراج من يوتيوب' : 'استخراج الاسئلة'))}
+          {extracting ? 'جاري الاستخراج...' : (inputMode === 'book' ? 'استخراج من الصفحات' : (inputMode === 'lesson' ? 'استخراج من الدرس كامل' : (inputMode === 'youtube' ? 'استخراج من الفيديو' : 'استخراج الاسئلة')))}
         </Button>
       </div>
     )
