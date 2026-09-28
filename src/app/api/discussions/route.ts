@@ -1,5 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server'
+import { gradeWhere, storeGrade, displayGrade } from '@/lib/grade-names'
 import { db } from '@/lib/db'
 /* (و46) إشعار الطلاب — طلب المستر: «في المجتمع لو حد بعت رسالة يجي له إشعار» */
 import { notifyStudents } from '@/lib/notify'
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
     const pageSize = parseInt(searchParams.get('pageSize') || '20')
 
     const where: Record<string, unknown> = {}
-    if (grade) where.grade = grade
+    if (grade) where.grade = gradeWhere(grade)
     if (studentId) where.studentId = studentId
     if (keyword) {
       where.OR = [
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
     ])
 
     return NextResponse.json({
-      discussions,
+      discussions: (discussions as any[]).map(function (d: any) { return { ...d, grade: displayGrade(d.grade) } }),
       total,
       page,
       pageSize,
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
       data: {
         studentId: studentId || 'admin',
         studentName: studentName || 'Zicola In Math',
-        grade,
+        grade: storeGrade(grade),
         content,
         isAdminReply: isAdminReply || false,
       },

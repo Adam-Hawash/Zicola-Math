@@ -18,7 +18,8 @@ function normalizeGrade(grade: string): string {
   if (g === 'أولى' && grade.includes('عداد')) g = 'أولى إعدادي'
   if (g === 'تانية' && grade.includes('عداد')) g = 'تانية إعدادي'
   if (g === 'تالتة' && grade.includes('عداد')) g = 'تالتة إعدادي'
-  if (g === 'أولى' && grade.includes('كالور')) g = 'أولى بكالوريا'
+  if (g === 'أولى' && (grade.includes('كالور') || grade.includes('ثانوي'))) g = 'أولى ثانوي'
+  if (g === 'أولى') g = 'أولى ثانوي'
   return g
 }
 

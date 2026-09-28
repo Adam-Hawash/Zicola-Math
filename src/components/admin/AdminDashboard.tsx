@@ -5578,7 +5578,7 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
           <Label className="text-xs font-medium">الصف الدراسي *</Label>
           <select value={grade} onChange={function(e) { setGrade(e.target.value) }} className="w-full h-10 rounded-lg border border-input bg-transparent px-3 text-sm">
             <option value="">اختر الصف</option>
-            {GRADES.map(function(g) { return <option key={g} value={g}>{g}</option> })}
+            {gradesList.map(function(g) { return <option key={g.ar} value={g.ar}>{(g.emoji ? g.emoji + ' ' : '') + g.ar}</option> })}
           </select>
         </div>
         <div className="space-y-1.5">

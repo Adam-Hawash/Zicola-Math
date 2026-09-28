@@ -9,6 +9,7 @@
 // عمليات الكتابة (POST) للأدمن بس.
 // ============================================================
 import { NextRequest, NextResponse } from 'next/server'
+import { gradeWhere, storeGrade, displayGrade } from '@/lib/grade-names'
 import { db, safeWrite } from '@/lib/db'
 import { isAdmin, getStudentAnyStatus, safeThumb, getYouTubeId, mediaIdFromPath, ensureVideoTable } from '@/lib/video-guard'
 
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
     const student = admin ? null : await getStudentAnyStatus(studentId)
 
     const where: Record<string, unknown> = {}
-    if (grade) where.grade = grade
+    if (grade) where.grade = gradeWhere(grade)  // «أولى ثانوي» بتجيب «أولى بكالوريا» كمان — نفس الصف
     if (keyword) {
       where.OR = [
         { title: { contains: keyword } },
@@ -178,7 +179,7 @@ export async function POST(request: NextRequest) {
           data: {
             title: String(title).trim(),
             url: finalUrl,
-            grade,
+            grade: storeGrade(grade),
             filePath: filePath || '',
             fileType: fileType || '',
             thumbnail: finalThumb,

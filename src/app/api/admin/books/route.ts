@@ -6,6 +6,7 @@
 // DELETE بيشيل صف Book **و** صف Media اللي شايل الملف نفسه (لو لسه موجود).
 
 import { NextRequest, NextResponse } from 'next/server'
+import { storeGrade } from '@/lib/grade-names'
 import { db, safeWrite } from '@/lib/db'
 import { isAdmin } from '@/lib/video-guard'
 import { notifyStudents } from '@/lib/notify'
@@ -101,14 +102,14 @@ export async function POST(request: NextRequest) {
             sourceUrl: sourceUrl,
             fileType: 'application/pdf',
             sizeBytes: 0,
-            grade: String(grade || ''),
+            grade: storeGrade(grade),
             usage: usage,
           },
         })
       })
       /* (و44) إشعار للطلاب: كتاب جديد اتضاف */
       /* (و45) await — الإشعار بيتكتب قبل الرد */
-      try { await notifyStudents({ grade: String(grade || ''), type: 'book', title: '📕 كتاب جديد اتضاف: ' + String(title).trim(), body: String(description || '').slice(0, 200) || 'تقدر تفتحه أو تحمله من تاب الكتب والملازم' }) } catch (nE) {}
+      try { await notifyStudents({ grade: storeGrade(grade), type: 'book', title: '📕 كتاب جديد اتضاف: ' + String(title).trim(), body: String(description || '').slice(0, 200) || 'تقدر تفتحه أو تحمله من تاب الكتب والملازم' }) } catch (nE) {}
       return NextResponse.json({ message: 'تم إضافة الكتاب باللينك الخارجي', book: linkBook }, { status: 201 })
     }
 
@@ -128,7 +129,7 @@ export async function POST(request: NextRequest) {
           fileName: String(fileName || ''),
           fileType: String(fileType || 'application/pdf'),
           sizeBytes: sizeNum,
-          grade: String(grade || ''),
+          grade: storeGrade(grade),
           usage: usage,
         },
       })
@@ -136,7 +137,7 @@ export async function POST(request: NextRequest) {
 
     /* (و44) إشعار للطلاب: كتاب جديد اتضاف */
     /* (و45) await — الإشعار بيتكتب قبل الرد */
-      try { await notifyStudents({ grade: String(grade || ''), type: 'book', title: '📕 كتاب جديد اتضاف: ' + String(title).trim(), body: String(description || '').slice(0, 200) || 'تقدر تفتحه أو تحمله من تاب الكتب والملازم' }) } catch (nE) {}
+      try { await notifyStudents({ grade: storeGrade(grade), type: 'book', title: '📕 كتاب جديد اتضاف: ' + String(title).trim(), body: String(description || '').slice(0, 200) || 'تقدر تفتحه أو تحمله من تاب الكتب والملازم' }) } catch (nE) {}
 
     return NextResponse.json({ message: 'تم إضافة الكتاب', book }, { status: 201 })
   } catch (error: any) {

@@ -25,7 +25,7 @@ var GRADES = [
   'أولى إعدادي',
   'تانية إعدادي',
   'تالتة إعدادي',
-  'أولى بكالوريا',
+  'أولى ثانوي',
 ]
 
 export default function PublicComplaintsPage() {

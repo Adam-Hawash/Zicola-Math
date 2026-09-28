@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { storeGrade, displayGrade } from "@/lib/grade-names";
 import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
         name: String(name).trim(),
         phone: cleanPhone,
         password: String(password),
-        grade: grade || "تالتة إعدادي",
+        grade: storeGrade(grade) || "تالتة إعدادي",
         parentName: parentName ? String(parentName).trim() : "",
         parentPhone: parentPhone ? String(parentPhone).trim() : "",
         status: "active",
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
         id: student.id,
         name: student.name,
         phone: student.phone,
-        grade: student.grade,
+        grade: displayGrade(student.grade),
         status: student.status,
         isPaidAccess: student.isPaidAccess,
       },
