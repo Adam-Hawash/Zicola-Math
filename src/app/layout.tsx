@@ -75,9 +75,10 @@ export default async function RootLayout({
 }>) {
   var initialConfig: Record<string, string> = {};
   try {
-    // Use dynamic import with timeout to avoid blocking the page if DB is slow
-    var dbPromise = import("@/lib/db").then(function(dbModule) {
-      return dbModule.db.siteConfig.findMany();
+    /* (تسريع المنصة) الكونفيج من الكاش (30s) بدل قراءة قاعدة Turso في كل طلب
+       — نفس سلوك الشفاء الذاتي: لو القاعدة بطيئة/ناقصة، الكلينت هيجيب عبر /api/config */
+    var dbPromise = import("@/lib/site-config").then(function(cfgModule) {
+      return cfgModule.getSiteConfigRaw();
     });
     var configs = await Promise.race([
       dbPromise,

@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { invalidateSiteConfigCache } from '@/lib/site-config'
 
 export async function GET() {
   try {
@@ -19,6 +20,7 @@ export async function PUT(request: NextRequest) {
       update: { value, updatedAt: new Date() },
       create: { key, value },
     })
+    invalidateSiteConfigCache()
     return NextResponse.json(updated)
   } catch (error) {
     return NextResponse.json({ error: 'Failed to update config' }, { status: 500 })
@@ -29,6 +31,7 @@ export async function POST(request: NextRequest) {
   try {
     const { key, value } = await request.json()
     const created = await db.siteConfig.create({ data: { key, value } })
+    invalidateSiteConfigCache()
     return NextResponse.json(created)
   } catch (error) {
     return NextResponse.json({ error: 'Failed to create config' }, { status: 500 })
