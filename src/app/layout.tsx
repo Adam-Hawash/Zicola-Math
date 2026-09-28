@@ -22,7 +22,7 @@ const geistMono = Geist_Mono({
    اللينك بتاع أحمد شعبان عايز صورة الفافيكون (صورة المستر التعليمية)
    تظهر في المعاينة». واتساب بيقرا og:image ولازم يكون رابط مطلق —
    metadataBase بتتحل من دومين الإنتاج على Vercel تلقائيًا.
-   الصورة: zicola-nav.png (نفس رسمة الفافيكون لكن 512px — الفافيكون
+   الصورة: the-scholar-nav.png (نفس رسمة الفافيكون لكن 512px — الفافيكون
    نفسه 64px صغير فواتساب بيتجاهله) */
 var SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ||
@@ -31,6 +31,13 @@ var SITE_URL =
     : undefined) ||
   (process.env.VERCEL_URL ? "https://" + process.env.VERCEL_URL : undefined) ||
   "https://zicola-in-math.vercel.app";
+
+/* (و103) الصفحة كلها dynamic — إعدادات الهيد (الفافيكون/صورة المعلم/الكونفيج
+   المبدئي) كانت بتتجمّد وقت البناء: أي تغيير صورة من الأدمن كان محتاج
+   deploy جديد عشان يبان (وده اللي خلّى الفافيكون يختفي لما مسارات
+   الصور اتغيرت والقيمة القديمة اتحفظت في البناء). بالـ force-dynamic
+   الهيد بيتقري من قاعدة البيانات في كل طلب — أي تغيير من الأدمن يظهر فورًا */
+export const dynamic = "force-dynamic";
 
 export var metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -45,7 +52,7 @@ export var metadata: Metadata = {
     siteName: "Zicola In Math",
     images: [
       {
-        url: "/images/zicola-nav.png",
+        url: "/images/the-scholar-nav.png",
         width: 512,
         height: 512,
         alt: "Zicola In Math — مستر أحمد شعبان",
@@ -57,7 +64,7 @@ export var metadata: Metadata = {
     title: "Zicola In Math | Mr. Ahmed Shaban",
     description:
       "منصة Zicola In Math — مستر أحمد شعبان: منصة رياضيات متكاملة. تبسيط الرياضيات، واجبات أسبوعية، امتحانات منتظمة، ومتابعة مستمرة للتقدم.",
-    images: ["/images/zicola-nav.png"],
+    images: ["/images/the-scholar-nav.png"],
   },
 };
 
@@ -85,15 +92,15 @@ export default async function RootLayout({
 
   // (و70) Favicon = صورة المستر الرسمية (favicon_url من الكونفيج — الافتراضي الصورة الجديدة)
   // (و73) نفس ترميم الـ API: أي favicon_url قديمة (logo.svg) أو فاضية = صورة المستر
-  var faviconUrl = initialConfig.favicon_url || "/images/zicola-favicon.png";
+  var faviconUrl = initialConfig.favicon_url || "/images/the-scholar-favicon.png";
   if (typeof faviconUrl !== "string" || faviconUrl === "" || faviconUrl.indexOf("logo.svg") !== -1) {
-    faviconUrl = "/images/zicola-favicon.png";
+    faviconUrl = "/images/the-scholar-favicon.png";
   }
 
   // (و98) صورة المستر في الهيرو — بنعملها preload من الـ head نفسه عشان
   // التحميل يبدأ مع أول سطر HTML (المستر: «الصورة تتحمل في الحتة الأولى
   // دي» — كانت بتستنى الهيدريشن والأنيميشن وبتظهر متأخرة ~5 ثواني)
-  var heroPhotoUrl = String(initialConfig.instructor_photo || "/images/zicola-full.png");
+  var heroPhotoUrl = String(initialConfig.instructor_photo || "/images/the-scholar-full.png");
 
   return (
     <html lang="en" dir="ltr" suppressHydrationWarning>
