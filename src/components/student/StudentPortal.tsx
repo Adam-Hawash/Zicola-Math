@@ -11,7 +11,7 @@ import {
   LogOut, Loader2, FileDown, PlayCircle, CheckCircle2,
   BookOpen, Target, TrendingUp, GraduationCap, ChevronLeft, ExternalLink,
   User, Phone, Award, Lock, X, ListTodo, Search,
-  HelpCircle, ArrowLeft, Rocket, Flag, XCircle, Timer,
+  HelpCircle, ArrowLeft, Rocket, Flag, XCircle, Timer, Layers,
 } from 'lucide-react'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import Image from 'next/image'
@@ -636,11 +636,33 @@ function VideosTab({ videos, watchedIds, approvedVideoIds, studentId, grade, vid
     })
   }, [videos])
 
+  /* (و104) الدروس متعددة الفيديوهات: نفس groupKey = نفس الدرس.
+     الترتيب التسلسلي للقفل بيبقى واعي بالمجموعات — نفس قاعدة السيرفر بالظبط:
+     مرساة الدرس = وقت أول جزء، والأجزاء بترتب بينهم بـ orderIndex */
+  var groupKeyOf = function (v: any): string { return String((v && v.groupKey) || '') }
+  const seqOrdered = useMemo(function () {
+    var anchor: Record<string, number> = {}
+    orderedVideos.forEach(function (v: any) {
+      var k = groupKeyOf(v)
+      if (!k) return
+      var t = new Date(v.createdAt || 0).getTime() || 0
+      if (!(k in anchor) || t < anchor[k]) anchor[k] = t
+    })
+    return orderedVideos.slice().sort(function (a: any, b: any) {
+      var ka = groupKeyOf(a), kb = groupKeyOf(b)
+      var ta = ka ? (anchor[ka] || 0) : (new Date(a.createdAt || 0).getTime() || 0)
+      var tb = kb ? (anchor[kb] || 0) : (new Date(b.createdAt || 0).getTime() || 0)
+      if (ta !== tb) return ta - tb
+      return (a.orderIndex || 0) - (b.orderIndex || 0)
+    })
+  }, [orderedVideos])
+
   // قفل التسلسل (طلب المستر): الفيديو ميفتحش غير لما اللي قبله يتشاف كامل 100%
+  // (و104) الترتيب التسلسلي دلوقتي واعي بالدروس متعددة الفيديوهات (seqOrdered)
   const lockedMap = useMemo(function () {
     var map: Record<string, boolean> = {}
     var prevTrackable: string | null = null
-    orderedVideos.forEach(function (v) {
+    seqOrdered.forEach(function (v) {
       var k = videoKindOf(v)
       var trackable = k === 'youtube' || k === 'file'
       if (trackable && prevTrackable) {
@@ -652,20 +674,48 @@ function VideosTab({ videos, watchedIds, approvedVideoIds, studentId, grade, vid
       if (trackable) prevTrackable = v.id
     })
     return map
-  }, [orderedVideos, mergedProgress])
+  }, [seqOrdered, mergedProgress])
 
-  // الفيديو اللي قبل كل فيديو (عشان نعرض نسبته على كارت المقفول)
+  // الفيديو اللي قبل كل فيديو (عشان نعرض نسبته على كارت المقفول) — (و104) بترتيب المجموعات
   const prevVideoMap = useMemo(function () {
     var map: Record<string, string> = {}
     var prevTrackable: string | null = null
-    orderedVideos.forEach(function (v) {
+    seqOrdered.forEach(function (v) {
       var k = videoKindOf(v)
       var trackable = k === 'youtube' || k === 'file'
       if (trackable && prevTrackable) map[v.id] = prevTrackable
       if (trackable) prevTrackable = v.id
     })
     return map
-  }, [orderedVideos])
+  }, [seqOrdered])
+
+  // أجزاء كل درس متعدد — مرتبين (orderIndex) ومفلترين من المخفيين بالجدولة
+  const groupPartsMap = useMemo(function () {
+    var map: Record<string, VideoType[]> = {}
+    orderedVideos.forEach(function (v) {
+      var k = groupKeyOf(v)
+      if (!k || hiddenVideoIds.has(v.id)) return
+      if (!map[k]) map[k] = []
+      map[k].push(v)
+    })
+    Object.keys(map).forEach(function (k) {
+      map[k].sort(function (a, b) {
+        var oa = (a as any).orderIndex || 0, ob = (b as any).orderIndex || 0
+        if (oa !== ob) return oa - ob
+        return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+      })
+    })
+    return map
+  }, [orderedVideos, hiddenVideoIds])
+
+  // الدرس المفتوح حاليًا (صفحة الدرس — قائمة الفيديوهات بالترتيب)
+  const [openLessonKey, setOpenLessonKey] = useState<string | null>(null)
+  const openLesson = useMemo(function () {
+    if (!openLessonKey) return null
+    var parts = groupPartsMap[openLessonKey]
+    if (!parts || parts.length === 0) return null
+    return { key: openLessonKey, title: parts[0].title, parts: parts }
+  }, [openLessonKey, groupPartsMap])
 
   // فتح أي درس (يوتيوب أو ملف مرفوع): بنطلب تذكرة تشغيل واحدة الاستخدام
   // من /api/video-ticket — مفيش أي YouTube ID أو رابط ملف بيرجع للصفحة.
@@ -698,6 +748,138 @@ function VideosTab({ videos, watchedIds, approvedVideoIds, studentId, grade, vid
       {orderedVideos.map((video) => {
         // Skip hidden videos entirely (الجدولة القديمة — الإخفاء)
         if (hiddenVideoIds.has(video.id)) return null
+
+        /* ===== (و104) الدرس متعدد الفيديوهات — الكارت بيتعرض مرة واحدة عند أول جزء ظاهر،
+           والضغط عليه بيفتح صفحة الدرس (قائمة الفيديوهات بالترتيب ١، ٢، ٣…) ===== */
+        const gKey = groupKeyOf(video)
+        if (gKey) {
+          const gParts = groupPartsMap[gKey] || []
+          if (gParts.length === 0 || gParts[0].id !== video.id) return null
+          if (gParts.length > 1) {
+            const first = gParts[0]
+            const schedG = isVideoLocked(first.id)
+            const gThumb = first.thumbnail || (first as any).thumb || null
+            const gProgress = Math.round(gParts.reduce(function (s: number, p) { return s + (mergedProgress[p.id] || 0) }, 0) / gParts.length)
+            const allWatched = gParts.every(function (p) { return localWatched.has(p.id) })
+            const gHasPrice = (first.price || 0) > 0
+            const gNeedsPay = gHasPrice && !approvedVideoIds.has(first.id)
+
+            if (schedG.locked && schedG.unlockAt) {
+              return (
+                <Card key={gKey} className="overflow-hidden border-amber-500/30">
+                  <div className="relative aspect-video bg-gradient-to-br from-amber-900/50 to-black flex flex-col items-center justify-center gap-3 p-4">
+                    <div className="h-14 w-14 rounded-full bg-amber-500/20 flex items-center justify-center">
+                      <Lock className="h-7 w-7 text-amber-400" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-white font-bold text-sm mb-1">الدرس هيفتح بعد ما تحضر الحصة بتاعتك</p>
+                      <CountdownTimer unlockAt={schedG.unlockAt} />
+                    </div>
+                  </div>
+                  <CardContent className="p-3">
+                    <h3 className="font-semibold text-sm">{video.title}</h3>
+                    <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1"><Layers className="h-3 w-3" />{gParts.length} فيديوهات في الدرس</p>
+                  </CardContent>
+                </Card>
+              )
+            }
+
+            return (
+              <Card key={gKey} className={`overflow-hidden transition-all border-emerald-500/30 ${allWatched ? 'border-emerald-500/60' : ''}`}>
+                <div className="relative aspect-video bg-black">
+                  {gNeedsPay ? (
+                    <div className="w-full h-full relative">
+                      {gThumb ? (
+                        <Image src={gThumb} alt={video.title} fill className="object-cover blur-sm" sizes="(max-width: 640px) 100vw, 50vw" unoptimized loading="eager" />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-black/80 to-black" />
+                      )}
+                      <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-3 z-20">
+                        <div className="h-14 w-14 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
+                          <Lock className="h-7 w-7 text-white" />
+                        </div>
+                        <Badge className="text-lg px-4 py-1.5 bg-amber-500 text-white">
+                          {first.price} ج.م
+                        </Badge>
+                        <Button
+                          className="mt-1"
+                          onClick={() => {
+                            setPendingPaymentVideo({
+                              id: first.id,
+                              title: first.title,
+                              price: first.price || 0,
+                              grade: grade,
+                            })
+                            setView('student-payment')
+                          }}
+                        >
+                          ادفع الآن
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      className="w-full h-full relative cursor-pointer group/vid"
+                      onClick={function () { setOpenLessonKey(gKey) }}
+                      role="button"
+                      aria-label={'فتح درس ' + video.title + ' — ' + gParts.length + ' فيديوهات'}
+                    >
+                      {gThumb ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={gThumb} alt={video.title} className="w-full h-full object-cover transition-transform duration-500 group-hover/vid:scale-105" draggable={false} />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-black/80 to-black" />
+                      )}
+                      <div className="absolute inset-0 bg-black/25 group-hover/vid:bg-black/40 transition-colors" />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center shadow-2xl transition-transform group-hover/vid:scale-110">
+                          <PlayCircle className="h-8 w-8 text-primary ml-0.5" />
+                        </div>
+                      </div>
+                      <div className="absolute top-2 left-2 z-20">
+                        <Badge className="bg-emerald-600 text-white text-[10px] gap-1 px-2">
+                          <Layers className="h-3 w-3" />{gParts.length} فيديوهات
+                        </Badge>
+                      </div>
+                    </div>
+                  )}
+                  {gProgress > 0 && !gNeedsPay && (
+                    <div className="absolute bottom-0 left-0 right-0 z-30">
+                      <div className="w-full h-1.5 bg-black/30">
+                        <div
+                          className={`h-full transition-all ${gProgress >= 90 ? 'bg-emerald-500' : gProgress >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}
+                          style={{ width: gProgress + '%' }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {allWatched && (
+                    <div className="absolute top-2 right-2 z-30">
+                      <Badge className="bg-emerald-500 text-white text-[10px] gap-1">
+                        <CheckCircle2 className="h-3 w-3" /> خلصت الدرس
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+                <CardContent className="p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="font-semibold text-sm truncate flex-1">{video.title}</h3>
+                    {gProgress > 0 && !gNeedsPay && (
+                      <span className={`text-[11px] font-bold shrink-0 ${gProgress >= 90 ? 'text-emerald-600' : gProgress >= 50 ? 'text-amber-600' : 'text-red-500'}`}>
+                        {gProgress}%
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1 flex items-center gap-1">
+                    <Layers className="h-3 w-3" />{gParts.length} فيديوهات في الدرس — دوس عشان تشوفهم بالترتيب
+                  </p>
+                </CardContent>
+              </Card>
+            )
+          }
+          // مجموعة ظاهر منها جزء واحد بس → الكارت العادي زي ما هو (تحت)
+        }
+
         const kind = videoKindOf(video)
         const isVideoFile = kind === 'file'
         const isWatched = localWatched.has(video.id)
@@ -866,6 +1048,24 @@ function VideosTab({ videos, watchedIds, approvedVideoIds, studentId, grade, vid
       })}
       </div>
 
+      {/* (و104) صفحة الدرس — قائمة فيديوهات الدرس الواحد بالترتيب (١، ٢، ٣…) — الطالب يشوفهم واحد واحد */}
+      {openLesson && (
+        <LessonPartsModal
+          title={openLesson.title}
+          parts={openLesson.parts}
+          mergedProgress={mergedProgress}
+          lockedMap={lockedMap}
+          approvedVideoIds={approvedVideoIds}
+          localWatched={localWatched}
+          onClose={function () { setOpenLessonKey(null) }}
+          onPlayPart={function (p) { openPlayModal(p) }}
+          onPayPart={function (p) {
+            setPendingPaymentVideo({ id: p.id, title: p.title, price: p.price || 0, grade: grade })
+            setView('student-payment')
+          }}
+        />
+      )}
+
       {/* المشغل الآمن — تذكرة واحدة الاستخدام، مفيش أي لينك في الصفحة */}
       {activeLessonVideo && (activeLessonVideo as any).playTicket && (
         <SecurePlayerModal
@@ -901,6 +1101,107 @@ function VideosTab({ videos, watchedIds, approvedVideoIds, studentId, grade, vid
         />
       )}
     </>
+  )
+}
+
+/* ========== (و104) صفحة الدرس — قائمة فيديوهات الدرس الواحد بالترتيب ==========
+   الطالب بيضغط على اسم الدرس → بيلاقي فيديوهات الدرس مرتبة (١، ٢، ٣…)
+   وكل فيديو بالصورة المصغرة بتاعته (أول لقطة من الفيديو) ونسبة مشاهدته
+   وحالته (مفتوح / مقفول بالتسلسل / محتاج تسديد) — بيشوفهم واحد واحد */
+function LessonPartsModal({ title, parts, mergedProgress, lockedMap, approvedVideoIds, localWatched, onClose, onPlayPart, onPayPart }: {
+  title: string
+  parts: VideoType[]
+  mergedProgress: Record<string, number>
+  lockedMap: Record<string, boolean>
+  approvedVideoIds: Set<string>
+  localWatched: Set<string>
+  onClose: () => void
+  onPlayPart: (p: VideoType) => void
+  onPayPart: (p: VideoType) => void
+}) {
+  const AR_NUM = ['١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩', '١٠', '١١', '١٢', '١٣', '١٤', '١٥']
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4" onClick={onClose} role="dialog" aria-label={'فيديوهات درس ' + title}>
+      <div
+        className="bg-card w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl border shadow-2xl max-h-[85vh] flex flex-col overflow-hidden"
+        onClick={function (e) { e.stopPropagation() }}
+      >
+        <div className="flex items-center justify-between gap-2 p-4 border-b shrink-0">
+          <div className="min-w-0">
+            <h3 className="font-bold text-sm truncate">{title}</h3>
+            <p className="text-[11px] text-muted-foreground mt-0.5">{parts.length} فيديوهات في الدرس — شوفهم بالترتيب واحد واحد</p>
+          </div>
+          <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground shrink-0" aria-label="إغلاق">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="p-3 space-y-2 overflow-y-auto">
+          {parts.map(function (p, i) {
+            const pct = mergedProgress[p.id] || 0
+            const locked = lockedMap[p.id] === true
+            const needsPay = (p.price || 0) > 0 && !approvedVideoIds.has(p.id)
+            const watched = localWatched.has(p.id)
+            const thumb = p.thumbnail || (p as any).thumb || null
+            const label = 'الفيديو ' + (AR_NUM[i] || String(i + 1))
+            return (
+              <div
+                key={p.id}
+                role="button"
+                tabIndex={0}
+                aria-label={label + (locked ? ' — مقفول' : needsPay ? ' — محتاج تسديد' : ' — تشغيل')}
+                onClick={function () {
+                  if (needsPay) { onPayPart(p); return }
+                  if (locked) {
+                    toast.error('الفيديو ده هيتفتح أول ما تشوف الفيديو اللي قبله كامل (100%) — كمّل مشاهدة الفيديو اللي قبله الأول', { duration: 6000 })
+                    return
+                  }
+                  onPlayPart(p)
+                }}
+                onKeyDown={function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); (e.currentTarget as HTMLElement).click() } }}
+                className={`flex items-center gap-3 rounded-xl border p-2 transition-colors ${needsPay ? 'border-amber-500/40 bg-amber-500/5' : locked ? 'border-red-500/30 bg-red-500/5 opacity-80' : 'hover:bg-muted/60 cursor-pointer'}`}
+              >
+                {/* الرقم — ترتيب الفيديو في الدرس */}
+                <span className={`w-7 h-7 shrink-0 rounded-full text-xs font-bold flex items-center justify-center ${watched ? 'bg-emerald-600 text-white' : locked ? 'bg-red-500/15 text-red-600 dark:text-red-400' : 'bg-primary text-primary-foreground'}`}>
+                  {i + 1}
+                </span>
+                {/* الصورة المصغرة — أول لقطة من الفيديو نفسه */}
+                <div className="relative w-20 h-12 sm:w-24 sm:h-14 shrink-0 rounded-lg overflow-hidden bg-black">
+                  {thumb ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={thumb} alt={label} className="w-full h-full object-cover" draggable={false} loading="lazy" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center"><Video className="h-4 w-4 text-white/30" /></div>
+                  )}
+                  {pct > 0 && (
+                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/40">
+                      <div className={`h-full ${pct >= 90 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: pct + '%' }} />
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold truncate">{label}</p>
+                  {pct > 0 ? (
+                    <p className={`text-[10.5px] font-bold ${pct >= 90 ? 'text-emerald-600' : 'text-amber-600'}`}>شفته {pct}%</p>
+                  ) : (
+                    <p className="text-[10.5px] text-muted-foreground truncate">{locked ? 'هيتفتح بعد اللي قبله' : needsPay ? 'محتاج تسديد' : 'جاهز للمشاهدة'}</p>
+                  )}
+                </div>
+                {/* الحالة */}
+                {needsPay ? (
+                  <Badge className="bg-amber-500 text-white text-[10px] shrink-0">{p.price} ج.م</Badge>
+                ) : locked ? (
+                  <Lock className="h-4 w-4 text-red-500 shrink-0" />
+                ) : watched ? (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                ) : (
+                  <PlayCircle className="h-5 w-5 text-primary shrink-0" />
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
   )
 }
 

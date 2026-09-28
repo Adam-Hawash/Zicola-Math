@@ -86,6 +86,9 @@ export interface Video {
   thumbnail: string
   grade: string
   price: number
+  /* (و104) درس بفيديوهات متعددة — نفس groupKey = نفس الدرس وorderIndex = الترتيب */
+  groupKey?: string
+  orderIndex?: number
   createdAt: string
 }
 
