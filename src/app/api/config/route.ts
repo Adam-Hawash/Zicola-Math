@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { NextResponse } from 'next/server'
 import { db, safeWrite } from '@/lib/db'
+import { getSiteConfigRaw, invalidateSiteConfigCache } from '@/lib/site-config'
 
 var DEFAULTS = {
   // === Navbar ===
@@ -199,12 +200,10 @@ var DEFAULTS = {
 
 export async function GET() {
   try {
-    var configs = await db.siteConfig.findMany()
-    var map = Object.assign({}, DEFAULTS)
-    for (var i = 0; i < configs.length; i++) {
-      var c = configs[i]
-      map[c.key] = c.value
-    }
+    /* (تسريع المنصة) القراءة من كاش الذاكرة (30s) بدل Turso في كل طلب —
+       نفس الدمج بالظبط: DEFAULTS وبعدين قيم الداتابيز فوقها */
+    var configs = await getSiteConfigRaw()
+    var map = Object.assign({}, DEFAULTS, configs)
     /* (و80) إصلاح جذري لعلة «عدّل حاجة في الأدمن وبعد الـ reload بترجع زي ما كانت»:
      * القراءة هنا بقت **زي ما هي من قاعدة البيانات من غير أي تعديل أو تصحيح مفروض** —
      * شيلنا كل طبقات الشفاء الذاتي وقت القراءة: ترميمات البراند (Zicola/Mr/Mister)،
@@ -227,21 +226,30 @@ export async function PUT(request) {
     var body = await request.json()
     var keys = Object.keys(body)
 
-    for (var i = 0; i < keys.length; i++) {
-      var key = keys[i]
-      var value = body[key]
-      // Skip non-config keys that might come from error responses
-      if (key === 'error' || key === 'defaults') continue
-      await safeWrite(function(k, v) {
-        return function() {
-          return db.siteConfig.upsert({
-            where: { key: k },
-            update: { value: v, updatedAt: new Date() },
-            create: { key: k, value: v },
-          })
-        }
-      }(key, value))
+    /* (تسريع المنصة) الكتابة كانت متسلسلة: كل مفتاح يستنى اللي قبله —
+       حفظ لوحة الأدمن (عشرات المفاتيح × زمن Turso) كان بياخد دقائق.
+       دلوقتي دفعات متوازية (8 في نفس الوقت) = نفس النتيجة في جزء من الوقت */
+    var BATCH = 8
+    for (var start = 0; start < keys.length; start += BATCH) {
+      var batch = keys.slice(start, start + BATCH)
+      await Promise.all(batch.map(function(key) {
+        var value = body[key]
+        // Skip non-config keys that might come from error responses
+        if (key === 'error' || key === 'defaults') return Promise.resolve()
+        return safeWrite(function(k, v) {
+          return function() {
+            return db.siteConfig.upsert({
+              where: { key: k },
+              update: { value: v, updatedAt: new Date() },
+              create: { key: k, value: v },
+            })
+          }
+        }(key, value))
+      }))
     }
+
+    /* الكاش بقى قديم بعد الكتابة — إبطال فوري عشان التعديل يظهر لحظيًا */
+    invalidateSiteConfigCache()
 
     return NextResponse.json({ message: 'Config updated' })
   } catch (error) {

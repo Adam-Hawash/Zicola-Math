@@ -12,6 +12,34 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { isAdmin, verifyVideoToken } from '@/lib/video-guard'
 
+/* (تسريع المنصة + تنظيف) حذف ملف من جدول Media — محمي بمعرّف الأدمن
+   (نفس بوابة isAdmin بتاعة تشغيل الفيديو). بيستخدمه لوحة الأدمن لمسح
+   أي ملف قديم مش محتاجه (زي الفيديو التعريفي) عشان مايفضلش ياكل
+   مساحة من قاعدة البيانات */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    var { id } = await params
+    const { searchParams } = new URL(request.url)
+    const adminOk = await isAdmin(searchParams.get('adminId'))
+    if (!adminOk) {
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 403 })
+    }
+    var removed = await db.media.delete({ where: { id } }).catch(function (e) {
+      return null
+    })
+    if (!removed) {
+      return NextResponse.json({ error: 'الملف مش موجود' }, { status: 404 })
+    }
+    return NextResponse.json({ ok: true, deleted: id })
+  } catch (error: any) {
+    console.error('File delete error:', error)
+    return NextResponse.json({ error: 'حذف الملف فشل' }, { status: 500 })
+  }
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

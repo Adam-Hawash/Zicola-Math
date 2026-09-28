@@ -429,7 +429,9 @@ function AdminLoginDialog() {
     setStatusMsg('جاري الاتصال بالسيرفر...')
 
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 15000) // 15s hard timeout
+    /* (تسريع المنصة) كانت 15s — الشبكات المصرية المزدحمة كانت بتقطع الاتصال
+       قبل ما السيرفر يرد (السيرفر نفسه بيرد في أقل من ثانية) — بقت 30s */
+    const timeout = setTimeout(() => controller.abort(), 30000) // 30s hard timeout
 
     try {
       setStatusMsg('جاري التحقق من البيانات...')

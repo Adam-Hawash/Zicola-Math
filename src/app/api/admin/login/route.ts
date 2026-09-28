@@ -62,9 +62,35 @@ export async function POST(request) {
   }
 
   try {
-    var admin = await findAdminSafe()
+    /* (تسريع المنصة) حارس مهلة: لو قاعدة Turso علّاقة/بطيئة جدًا، الطلب كان
+       يفضل مفتوح لحد ما المتصفح يقطعه بالمهلة («انتهت مهلة الاتصال») —
+       دلوقتي السيرفر بيرد برسالة واضحة خلال 6 ثواني بدل الانتظار المفتوح */
+    var dbSlow = false
+    var admin = null
+    try {
+      admin = await Promise.race([
+        findAdminSafe(),
+        new Promise(function (resolve, reject) {
+          setTimeout(function () { reject(new Error('db-slow')) }, 6000)
+        }),
+      ])
+    } catch (eRace) {
+      if (eRace && eRace.message === 'db-slow') {
+        dbSlow = true
+        admin = null
+      } else {
+        admin = null /* القاعدة ردّت بخطأ — نكمل كأن مفيش أدمن (شفاء ذاتي تحت) */
+      }
+    }
 
     if (!admin) {
+      if (dbSlow) {
+        /* بطء قاعدة حقيقي — رسالة صريحة بدل «خطأ في السيرفر» المبهم */
+        return NextResponse.json(
+          { error: 'الاتصال بقاعدة البيانات بطيء دلوقتي — استنى ثواني وحاول تاني' },
+          { status: 503 }
+        )
+      }
       if (!emailMatch(cleanEmail) || cleanPassword !== squash(DEFAULT_PASSWORD)) {
         return NextResponse.json({ error: 'البريد أو كلمة المرور غلط' }, { status: 401 })
       }
