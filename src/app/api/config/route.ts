@@ -25,11 +25,11 @@ var DEFAULTS = {
   hero_title_line2_en: 'Mr. Ahmed Shaban',
   /* (و70) صورة الهيرو = مستر طالع من السحابة — الصورة الرسمية **الكاملة** (و71)
      من غير أي قص: المستر طالع من سحابة وإسمه تحتها (zicola-full) */
-  instructor_photo: '/images/zicola-full.png',
+  instructor_photo: '/images/the-scholar-full.png',
   /* (و70) صورة النافيبار = صورة المستر الرسمية (كحلي) — منفصلة عن الهيرو */
-  navbar_photo: '/images/zicola-nav.png',
+  navbar_photo: '/images/the-scholar-nav.png',
   /* (و70) فيفيكون المنصة = صورة المستر الرسمية */
-  favicon_url: '/images/zicola-favicon.png',
+  favicon_url: '/images/the-scholar-favicon.png',
   /* (و70) الفيديو التعريفي في أعلى الصفحة الرئيسية (لينك يوتيوب أو ملف مرفوع)
      — فاضي = القسم مش بيظهر خالص */
   intro_video_url: '',

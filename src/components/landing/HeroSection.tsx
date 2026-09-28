@@ -350,7 +350,7 @@ export default function HeroSection() {
                   {/* (و73) فولباك الصورة: فافيكون المستر الرسمي لو موجود وإلا أيقونة القبعة */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src="/images/zicola-favicon.png"
+                    src="/images/the-scholar-favicon.png"
                     alt={L('instructor_name', 'مستر أحمد شعبان', 'Mr. Ahmed Shaban')}
                     className="w-56 h-56 object-contain"
                     onError={function (e) {
