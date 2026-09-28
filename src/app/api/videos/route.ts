@@ -146,6 +146,18 @@ export async function POST(request: NextRequest) {
       return errOut('لازم لينك فيديو (يوتيوب أو أي موقع) أو ملف فيديو مرفوع — دوس واحدة منهم الأول', 400)
     }
 
+    /* (و104) درس بفيديوهات متعددة:
+       - isMulti = المستر معلّم إن الدرس فيه أكتر من فيديو → أول إضافة بنولّد
+         groupKey جديد ونجيبه في الرد عشان باقي الإضافات تكمل على نفس الدرس
+       - groupKey موجود مسبقًا = «ضيف فيديو للدرس الفلاني» → بنستخدمه زي ما هو
+       - orderIndex = ترتيب الفيديو جوه الدرس (١، ٢، ٣…) */
+    let finalGroupKey = String(body.groupKey || '').trim().slice(0, 80)
+    if (!finalGroupKey && body.isMulti) {
+      finalGroupKey = 'les_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
+    }
+    const rawOrder = Number(body.orderIndex)
+    const finalOrder = Number.isFinite(rawOrder) && rawOrder > 0 ? Math.floor(rawOrder) : 0
+
     /* (و45) الصورة المصغرة الأوتوماتيكية — لو الأدمن ماحطش صورة وفيه لينك
        يوتيوب: بنخزّن صورة الفيديو من i.ytimg.com على السيرفر كمان
        (hqdefault) عشان تظهر في كل الشاشات من غير خطوة إضافية */
@@ -171,6 +183,8 @@ export async function POST(request: NextRequest) {
             fileType: fileType || '',
             thumbnail: finalThumb,
             price: Number(price) || 0,
+            groupKey: finalGroupKey,
+            orderIndex: finalOrder,
           },
         })
       })

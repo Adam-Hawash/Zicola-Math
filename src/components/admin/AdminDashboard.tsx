@@ -24,7 +24,8 @@ import {
   PlayCircle, Pause, Film, Search, FileDown, PictureInPicture2, Save, Sparkles, Wallet,
   Video as VideoIcon, LinkIcon, MonitorPlay, Send,
   MessageCircle, Copy,
-  ChevronLeft, CheckCircle2, Smartphone, RotateCcw, ShieldCheck, Monitor, Tablet, Flag, GraduationCap, UsersRound, PieChart, BookOpen, ChevronDown, Wrench
+  ChevronLeft, CheckCircle2, Smartphone, RotateCcw, ShieldCheck, Monitor, Tablet, Flag, GraduationCap, UsersRound, PieChart, BookOpen, ChevronDown, Wrench,
+  Layers, ChevronUp
 } from 'lucide-react'
 import { AdminComplaints } from './AdminComplaints'
 import { CMSPanel } from './CMSPanel'
@@ -1190,6 +1191,48 @@ function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
   const [allStudents, setAllStudents] = useState<any[]>([])
   const videoFileRef = useRef<HTMLInputElement>(null)
   const thumbFileRef = useRef<HTMLInputElement>(null)
+  /* (و104) درس بفيديوهات متعددة:
+     - multiMode = المستر معلّم «الدرس ده فيه أكتر من فيديو»
+     - groupKeyActive = مفتاح الدرس الجاري (فاضي = لسه مفيش حاجة متضافة)
+     - groupParts = الفيديوهات اللي اتضافت في الدرس ده بالترتيب
+     الفورم بيفضل مفتوح بعد كل حفظ عشان المستر يزود لينكات أكتر ويرتبهم */
+  const [multiMode, setMultiMode] = useState(false)
+  const [groupKeyActive, setGroupKeyActive] = useState('')
+  const [groupParts, setGroupParts] = useState<Video[]>([])
+  const [reordering, setReordering] = useState(false)
+
+  /* تصفير حالة الدرس المتعدد بالكامل (قفل الدرس / إلغاء) */
+  const resetMultiState = function () {
+    setMultiMode(false); setGroupKeyActive(''); setGroupParts([])
+  }
+
+  /* أجزاء الدرس الحالي مرتبة (orderIndex ثم وقت الإضافة) */
+  const sortedGroupParts = useMemo(function () {
+    return groupParts.slice().sort(function (a, b) {
+      var oa = a.orderIndex || 0, ob = b.orderIndex || 0
+      if (oa !== ob) return oa - ob
+      return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+    })
+  }, [groupParts])
+
+  /* خريطة مجموعات كل الفيديوهات (للكروت: فيديو ٢ من ٣ + زرار ضيف) */
+  const groupMap = useMemo(function () {
+    var map: Record<string, Video[]> = {}
+    videos.forEach(function (v) {
+      var k = String((v as any).groupKey || '')
+      if (!k) return
+      if (!map[k]) map[k] = []
+      map[k].push(v)
+    })
+    Object.keys(map).forEach(function (k) {
+      map[k].sort(function (a, b) {
+        var oa = a.orderIndex || 0, ob = b.orderIndex || 0
+        if (oa !== ob) return oa - ob
+        return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+      })
+    })
+    return map
+  }, [videos])
 
   const loadVideos = async (showLoader = true) => {
     if (showLoader) setLoading(true)
@@ -1214,6 +1257,49 @@ function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
   const uploadFileWithProgress = async (file: File, category: string, onProgress: (pct: number) => void, statusMsg: (msg: string) => void): Promise<string> => {
     const result = await chunkedUpload(file, category, onProgress, statusMsg)
     return result.filePath
+  }
+
+  /* (و104) تبديل ترتيب جزأين في الدرس المتعدد — PATCH للاتنين + تحديث محلي */
+  const swapGroupOrder = async function (a: Video, b: Video) {
+    if (reordering) return
+    setReordering(true)
+    try {
+      var oa = a.orderIndex || 0, ob = b.orderIndex || 0
+      await Promise.all([
+        fetch('/api/videos/' + a.id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ adminId: currentAdminId, orderIndex: ob }) }),
+        fetch('/api/videos/' + b.id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ adminId: currentAdminId, orderIndex: oa }) }),
+      ])
+      /* تحديث محلي فوري — في الكروت وفي شريط الفورم */
+      setVideos(function (prev) { return prev.map(function (v) {
+        if (v.id === a.id) return { ...v, orderIndex: ob }
+        if (v.id === b.id) return { ...v, orderIndex: oa }
+        return v
+      }) })
+      setGroupParts(function (prev) { return prev.map(function (v) {
+        if (v.id === a.id) return { ...v, orderIndex: ob }
+        if (v.id === b.id) return { ...v, orderIndex: oa }
+        return v
+      }) })
+      toast.success('اتغير الترتيب بنجاح')
+    } catch { toast.error('حصل خطأ في تغيير الترتيب — جرب تاني') }
+    setReordering(false)
+  }
+
+  /* (و104) فتح الفورم عشان يزود فيديو على درس موجود (من كارت الفيديو) */
+  const openAddToLesson = function (groupKey: string) {
+    var parts = groupMap[groupKey] || []
+    if (parts.length === 0) return
+    var first = parts[0]
+    setShowForm(true)
+    setMultiMode(true)
+    setGroupKeyActive(groupKey)
+    setGroupParts(parts)
+    setFormTitle(first.title)
+    setFormGrade(first.grade)
+    setFormPrice(String(first.price || 0))
+    setFormUrl(''); setFormFile(null); setFormFileRes(null); setFormThumbnail(null); setAutoThumbRef('')
+    setFormThumbnailUrl('')
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }) } catch (e) {}
   }
 
   const handleSubmit = async () => {
@@ -1277,6 +1363,13 @@ function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
         url: formUrl.trim(),
         price: formPrice.trim() || '0',
       }
+      /* (و104) درس متعدد: isMulti للإضافة الأولى (السيرفر بيولّد groupKey)،
+         groupKey للإضافات اللي بعدها على نفس الدرس، orderIndex = رقم الفيديو */
+      if (multiMode) {
+        body.isMulti = '1'
+        if (groupKeyActive) body.groupKey = groupKeyActive
+        body.orderIndex = String(sortedGroupParts.length + 1)
+      }
       if (videoPath) { body.filePath = videoPath; body.fileType = videoType }
       if (thumbnailPath) { body.thumbnail = thumbnailPath }
       else if (formThumbnailUrl.trim()) { body.thumbnail = formThumbnailUrl.trim() }
@@ -1289,12 +1382,32 @@ function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
       })
 
       if (res.ok) {
-        toast.success('تم إضافة الفيديو بنجاح! سيظهر للصف ' + formGrade)
-        setShowForm(false)
-        setFormTitle(''); setFormUrl(''); setFormGrade(''); setFormPrice('')
-        setFormFile(null); setFormThumbnail(null); setFormThumbnailUrl(''); setAutoThumbRef('')
-        loadVideos(false)
-        onStatsRefresh()
+        /* (و104) درس متعدد: الفورم بيفضل مفتوح — المستر بيكمل يزود فيديوهات على نفس الدرس */
+        if (multiMode) {
+          var savedVideo: Video | null = null
+          try { var rd = await res.json(); savedVideo = (rd && rd.video) || null } catch (e) { savedVideo = null }
+          if (savedVideo) {
+            setGroupParts(function (prev) { return [...prev, savedVideo as Video] })
+            if (!groupKeyActive && (savedVideo as any).groupKey) setGroupKeyActive(String((savedVideo as any).groupKey))
+            var partNum = sortedGroupParts.length + 1
+            toast.success('✓ الفيديو رقم ' + partNum + ' اتضاف للدرس! ضيف اللي بعده أو دوس «تمام — قفل الدرس»', { duration: 6000 })
+          } else {
+            toast.success('✓ اتضاف — كمل باقي فيديوهات الدرس', { duration: 6000 })
+          }
+          /* مسح حقول الفيديو بس — العنوان والصف والسعر بيفضلوا زي ما هم (نفس الدرس) */
+          setFormUrl(''); setFormFile(null); setFormFileRes(null); setFormThumbnail(null)
+          setFormThumbnailUrl(''); setAutoThumbRef('')
+          setUploadProgress(0); setUploadStatus('')
+          loadVideos(false)
+          onStatsRefresh()
+        } else {
+          toast.success('تم إضافة الفيديو بنجاح! سيظهر للصف ' + formGrade)
+          setShowForm(false)
+          setFormTitle(''); setFormUrl(''); setFormGrade(''); setFormPrice('')
+          setFormFile(null); setFormThumbnail(null); setFormThumbnailUrl(''); setAutoThumbRef('')
+          loadVideos(false)
+          onStatsRefresh()
+        }
       } else {
         /* (و45) رسالة الخطأ الحقيقية بتوصل للمستر — مفيش «في مشكلة» من غير سبب */
         var errDetail = ''
@@ -1315,6 +1428,8 @@ function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
     try {
       await fetch(`/api/videos/${id}?adminId=${encodeURIComponent(currentAdminId)}`, { method: 'DELETE' })
       toast.success('تم حذف الفيديو')
+      /* (و104) لو الجزء الممسوح كان من الدرس الجاري في الفورم — نشيله من الشريط */
+      setGroupParts(function (prev) { return prev.filter(function (p) { return p.id !== id }) })
       loadVideos(false)
       onStatsRefresh()
     } catch { toast.error('خطأ في الحذف') }
@@ -1391,7 +1506,7 @@ function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
 
   /* ===== (و45) الصورة المصغرة الأوتوماتيكية — طلب المستر =====
      يوتيوب → نفس صورة الفيديو من i.ytimg.com (hqdefault)
-     ملف مرفوع → لقطة حقيقية من الفيديو نفسه (canvas عند ~1 ثانية أو 10% من المدة)
+     ملف مرفوع أو لينك mp4 مباشر → أول لقطة من الفيديو نفسه (طلب المستر — و104)
      والأدمن دايمًا يقدر يعمّل override بصورة من عنده */
   const applyAutoThumb = function (val: string) {
     setAutoThumbRef(val)
@@ -1408,9 +1523,11 @@ function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
       /* اللينك بقي مش يوتيوب والصورة الحالية أوتوماتيك قديمة → نفرغها */
       applyAutoThumb('')
     }
+    /* (و104) لينك mp4 مباشر → أول لقطة أوتوماتيك من الفيديو نفسه */
+    if (!ytId) captureUrlFirstFrame(val)
   }
 
-  /* لقطة من ملف الفيديو: بنحمّل أول ثانية (أو 10% من المدة) ونرسمها على canvas 640px */
+  /* لقطة أول فريم من ملف الفيديو — (و104) طلب المستر: أول لقطة في كل الحالات */
   const captureVideoFrame = async function (file: File): Promise<string> {
     return new Promise(function (resolve) {
       var url = ''
@@ -1427,7 +1544,8 @@ function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
       var timer = setTimeout(function () { done('') }, 10000)
       v.onloadedmetadata = function () {
         try {
-          var t = isFinite(v.duration) && v.duration > 0 ? Math.min(Math.max(v.duration * 0.1, 0.5), 3) : 1
+          /* (و104) أول لقطة من الفيديو بالظبط — مش لقطة من النص */
+          v.currentTime = 0.1
           v.onseeked = function () {
             try {
               var w = 640
@@ -1443,12 +1561,69 @@ function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
               done(dataUrl)
             } catch (e) { clearTimeout(timer); done('') }
           }
-          v.currentTime = t
         } catch (e) { clearTimeout(timer); done('') }
       }
       v.onerror = function () { clearTimeout(timer); done('') }
       v.src = url
     })
+  }
+
+  /* (و104) لقطة أولى أوتوماتيكية للينكات المباشرة (mp4 من أي موقع زي archive.org):
+     بنقرا أول فريم في المتصفح ونرفعها كصورة مصغرة — المواقع اللي بتسمح بـ CORS
+     (زي archive.org) هتنجح أوتوماتيك، واللي مبتسمحش الأدمن يرفع صورة يدوي زي قبل */
+  const urlThumbTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastUrlThumbRef = useRef('')
+  const captureUrlFirstFrame = function (u: string) {
+    if (urlThumbTimerRef.current) clearTimeout(urlThumbTimerRef.current)
+    urlThumbTimerRef.current = setTimeout(async function () {
+      var s = String(u || '').trim()
+      if (!/^https?:\/\//i.test(s)) return
+      if (!/\.(mp4|webm|mov|ogv|ogg)(\?.*)?$/i.test(s)) return
+      if (lastUrlThumbRef.current === s) return
+      lastUrlThumbRef.current = s
+      setThumbCapturing(true)
+      try {
+        var dataUrl = await new Promise<string>(function (resolve) {
+          var v = document.createElement('video')
+          v.crossOrigin = 'anonymous'
+          v.muted = true
+          v.preload = 'metadata'
+          var settled = false
+          var done = function (val: string) {
+            if (settled) return
+            settled = true
+            try { v.removeAttribute('src'); v.load() } catch (e) {}
+            resolve(val)
+          }
+          var timer = setTimeout(function () { done('') }, 12000)
+          v.onloadedmetadata = function () { try { v.currentTime = 0.1 } catch (e) { clearTimeout(timer); done('') } }
+          v.onseeked = function () {
+            try {
+              var w = 640
+              var ratio = (v.videoWidth && v.videoHeight) ? (v.videoHeight / v.videoWidth) : 0.5625
+              var canvas = document.createElement('canvas')
+              canvas.width = w
+              canvas.height = Math.max(1, Math.round(w * ratio))
+              var ctx = canvas.getContext('2d')
+              if (!ctx) { clearTimeout(timer); done(''); return }
+              ctx.drawImage(v, 0, 0, canvas.width, canvas.height)
+              var d = canvas.toDataURL('image/jpeg', 0.82)
+              clearTimeout(timer)
+              done(d)
+            } catch (e) { clearTimeout(timer); done('') } /* canvas ملوث (CORS) → فشل صامت */
+          }
+          v.onerror = function () { clearTimeout(timer); done('') }
+          v.src = s
+        })
+        if (dataUrl) {
+          var blob = await (await fetch(dataUrl)).blob()
+          var asFile = new File([blob], 'video-thumb.jpg', { type: 'image/jpeg' })
+          var up = await chunkedUpload(asFile, 'thumbnails')
+          if (up && up.filePath) applyAutoThumb(up.filePath)
+        }
+      } catch (e) { /* اللقطة الأوتوماتيكية اختيارية — فشلها ما يمنعش إضافة الفيديو */ }
+      setThumbCapturing(false)
+    }, 900)
   }
 
   const handleVideoFilePick = async function (f: File | null) {
@@ -1517,23 +1692,69 @@ function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
         {/* Add Video Form */}
         {showForm && (
           <div className="p-4 rounded-lg border bg-muted/30 space-y-3">
-            <h4 className="font-semibold text-sm flex items-center gap-2"><Plus className="h-4 w-4" />إضافة فيديو جديد</h4>
+            <h4 className="font-semibold text-sm flex items-center gap-2"><Plus className="h-4 w-4" />{multiMode && groupKeyActive ? 'إضافة فيديو تاني لنفس الدرس' : 'إضافة فيديو جديد'}</h4>
+
+            {/* (و104) الدرس فيه أكتر من فيديو؟ — مرة واحدة بتعلّمها، وبعدين الفورم بيفضل مفتوح
+               عشان تزود لينكات أكتر لنفس الدرس وترتبهم (١، ٢، ٣…) والطالب يشوفهم واحد واحد */}
+            {!groupKeyActive && (
+              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold flex items-center gap-1.5"><Layers className="h-3.5 w-3.5 text-emerald-600" />الدرس ده فيه أكتر من فيديو؟</p>
+                    <p className="text-[10.5px] text-muted-foreground mt-0.5">فعّلها لو الدرس مقسوم أجزاء (شرح + حل أمثلة + مراجعة…) — الطالب هيشوفهم صفحة واحدة بالترتيب</p>
+                  </div>
+                  <Switch checked={multiMode} onCheckedChange={function (v) { setMultiMode(v) }} />
+                </div>
+              </div>
+            )}
+
+            {/* (و104) شريط فيديوهات الدرس الجاري — ترتيب بالأسهم + حذف */}
+            {multiMode && groupKeyActive && sortedGroupParts.length > 0 && (
+              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 space-y-2">
+                <p className="text-xs font-bold flex items-center gap-1.5"><Layers className="h-3.5 w-3.5 text-emerald-600" />فيديوهات الدرس ({sortedGroupParts.length}) — رتّبهم بالأسهم</p>
+                <div className="space-y-1.5 max-h-56 overflow-y-auto">
+                  {sortedGroupParts.map(function (p, pi) {
+                    return (
+                      <div key={p.id} className="flex items-center gap-2 rounded-md border bg-card px-2 py-1.5">
+                        <span className="w-6 h-6 shrink-0 rounded-full bg-emerald-600 text-white text-[11px] font-bold flex items-center justify-center">{pi + 1}</span>
+                        <span className="text-xs truncate flex-1">{p.title}</span>
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <Button size="icon" variant="ghost" className="h-6 w-6" disabled={reordering || pi === 0} onClick={function () { swapGroupOrder(sortedGroupParts[pi - 1], p) }} title="لفوق — يظهر قبل اللي قبله">
+                            <ChevronUp className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-6 w-6" disabled={reordering || pi === sortedGroupParts.length - 1} onClick={function () { swapGroupOrder(p, sortedGroupParts[pi + 1]) }} title="لتحت — يظهر بعد اللي بعده">
+                            <ChevronDown className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" disabled={submitting || uploading} onClick={function () { handleDelete(p.id) }} title="حذف الفيديو ده من الدرس">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label className="text-xs">الصف الدراسي *</Label>
-                <select value={formGrade} onChange={(e) => setFormGrade(e.target.value)} className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm">
+                <select value={formGrade} disabled={multiMode && !!groupKeyActive} onChange={(e) => setFormGrade(e.target.value)} className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm disabled:opacity-60">
                   <option value="">اختر الصف</option>{gradesList.map((g) => <option key={g.ar} value={g.ar}>{(g.emoji ? g.emoji + ' ' : '') + g.ar}</option>)}
                 </select>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">عنوان الدرس *</Label>
-                <Input value={formTitle} onChange={(e) => setFormTitle(e.target.value)} placeholder="مثال: الباب الأول - الكسور" />
+                <Input value={formTitle} disabled={multiMode && !!groupKeyActive} onChange={(e) => setFormTitle(e.target.value)} placeholder="مثال: الباب الأول - الكسور" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">السعر (ج.م) — اتركه فاضي للمجاني</Label>
-                <Input value={formPrice} onChange={(e) => setFormPrice(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="0" dir="ltr" type="number" min="0" step="0.01" />
+                <Input value={formPrice} disabled={multiMode && !!groupKeyActive} onChange={(e) => setFormPrice(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="0" dir="ltr" type="number" min="0" step="0.01" />
               </div>
             </div>
+            {multiMode && groupKeyActive && (
+              <p className="text-[10.5px] text-emerald-700 dark:text-emerald-400">🔒 العنوان والصف والسعر مقفولين — دي إضافة على الدرس الموجود. ضيف الفيديو الجديد واضغط حفظ.</p>
+            )}
 
             {/* YouTube URL */}
             <div className="space-y-1.5">
@@ -1580,7 +1801,7 @@ function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
                   ولو بتستخدم فيديو يوتيوب: يوتيوب بياخد من نص ساعة لساعات بيجهز نسخة HD بعد الرفع — الجودة الأعلى بتظهر لوحدها بعد المعالجة.
                 </p>
               )}
-              <p className="text-[10px] text-muted-foreground">لو الفيديو ملف مرفوع، هتاخد صورة مصغرة أوتوماتيك من وسط الفيديو نفسه — وتقدر تغيرها من خانة الصورة المصغرة لو عايز</p>
+              <p className="text-[10px] text-muted-foreground">لو الفيديو ملف مرفوع أو لينك mp4 مباشر، هتاخد أول لقطة من الفيديو نفسه أوتوماتيك — وتقدر تغيرها من خانة الصورة المصغرة لو عايز</p>
             </div>
 
             {/* Thumbnail Upload */}
@@ -1601,7 +1822,7 @@ function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
 
             {/* Thumbnail URL */}
             <div className="space-y-1.5">
-              <Label className="text-xs">أو رابط صورة مصغرة (اختياري — أوتوماتيك من اليوتيوب لو سبتها فاضي)</Label>
+              <Label className="text-xs">أو رابط صورة مصغرة (اختياري — أوتوماتيك: أول لقطة من الفيديو / من اليوتيوب لو سبتها فاضي)</Label>
               <Input value={formThumbnailUrl} onChange={(e) => setFormThumbnailUrl(e.target.value)} placeholder="https://example.com/thumbnail.jpg" dir="ltr" />
               {formThumbnailUrl && (
                 <div className="mt-2 w-40 aspect-video rounded-lg overflow-hidden border relative">
@@ -1623,11 +1844,16 @@ function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
               </div>
             )}
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Button size="sm" onClick={handleSubmit} disabled={submitting || uploading}>
-                {submitting || uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'حفظ ونشر'}
+                {submitting || uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : multiMode ? 'حفظ وإضافة للدرس' : 'حفظ ونشر'}
               </Button>
-              <Button size="sm" variant="outline" onClick={() => { setShowForm(false); setFormTitle(''); setFormUrl(''); setFormGrade(''); setFormFile(null); setFormThumbnail(null); setFormThumbnailUrl(''); setAutoThumbRef('') }}>إلغاء</Button>
+              {multiMode && (
+                <Button size="sm" variant="outline" className="border-emerald-500/50 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10" onClick={function () { resetMultiState(); setShowForm(false); setFormTitle(''); setFormUrl(''); setFormGrade(''); setFormPrice(''); setFormFile(null); setFormThumbnail(null); setFormThumbnailUrl(''); setAutoThumbRef('') }}>
+                  <Check className="h-4 w-4 ml-1" />تمام — قفل الدرس
+                </Button>
+              )}
+              <Button size="sm" variant="outline" onClick={function () { setShowForm(false); resetMultiState(); setFormTitle(''); setFormUrl(''); setFormGrade(''); setFormPrice(''); setFormFile(null); setFormThumbnail(null); setFormThumbnailUrl(''); setAutoThumbRef('') }}>إلغاء</Button>
             </div>
           </div>
         )}
@@ -1640,8 +1866,13 @@ function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
             {videos.map((v) => {
               const ytId = getYouTubeId(v.url)
               const thumb = v.thumbnail || (ytId ? `https://img.youtube.com/vi/${ytId}/mqdefault.jpg` : null)
+              /* (و104) بيانات المجموعة: فيديو ٢ من ٣ + زرار ضيف فيديو للدرس */
+              const gKey = String((v as any).groupKey || '')
+              const gParts = gKey ? (groupMap[gKey] || []) : []
+              const gPos = gParts.findIndex(function (p) { return p.id === v.id }) + 1
+              const isGrouped = gParts.length > 1
               return (
-                <div key={v.id} className="rounded-lg border bg-card overflow-hidden group">
+                <div key={v.id} className={`rounded-lg border bg-card overflow-hidden group ${isGrouped ? 'border-emerald-500/40' : ''}`}>
                   <div className="relative aspect-video bg-black">
                     {thumb ? (
                       <Image src={thumb} alt={v.title} fill className="object-cover" sizes="200px" unoptimized />
@@ -1651,6 +1882,11 @@ function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
                     <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <PlayCircle className="h-10 w-10 text-white" />
                     </div>
+                    {isGrouped && (
+                      <div className="absolute top-2 left-2 z-10">
+                        <Badge className="bg-emerald-600 text-white text-[10px] gap-1"><Layers className="h-3 w-3" />فيديو {gPos} من {gParts.length}</Badge>
+                      </div>
+                    )}
                   </div>
                   <div className="p-3 space-y-1.5">
                     <p className="font-semibold text-sm truncate">{v.title}</p>
@@ -1662,7 +1898,7 @@ function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
                       </div>
                     </div>
                     <p className="text-[10px] text-muted-foreground">{new Date(v.createdAt).toLocaleDateString('ar-EG')}</p>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 flex-wrap">
                       <Button size="sm" variant="ghost" className="flex-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-xs h-7" onClick={() => { setSelectedVideoForSchedule(v); setScheduleOpen(true); loadStudentsForSchedule(v.grade); loadExistingSchedule(v.id) }}>
                         <Clock className="h-3.5 w-3.5 mr-1" />جدولة
                       </Button>
@@ -1672,6 +1908,10 @@ function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
                       </Button>
                       <Button size="sm" variant="ghost" className="flex-1 text-destructive hover:text-destructive hover:bg-destructive/10 text-xs h-7" onClick={() => handleDelete(v.id)}>
                         <Trash2 className="h-3.5 w-3.5 mr-1" />حذف
+                      </Button>
+                      {/* (و104) ضيف فيديو تاني لنفس الدرس — بيدعم الدروس متعددة الفيديوهات */}
+                      <Button size="sm" variant="ghost" className={`w-full ${isGrouped ? 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20' : 'text-muted-foreground'} text-xs h-7`} onClick={() => { if (gKey) openAddToLesson(gKey) }} title="ضيف فيديو تاني على نفس الدرس">
+                        <Layers className="h-3.5 w-3.5 mr-1" />{isGrouped ? 'ضيف فيديو تاني للدرس ده' : 'درس بفيديوهات متعددة؟'}
                       </Button>
                     </div>
                   </div>

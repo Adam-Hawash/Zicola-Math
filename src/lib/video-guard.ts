@@ -104,6 +104,9 @@ export async function ensureVideoTable(force = false): Promise<void> {
       ['fileType', 'TEXT', "DEFAULT ''"],
       ['thumbnail', 'TEXT', "DEFAULT ''"],
       ['price', 'REAL', 'DEFAULT 0'],
+      /* (و104) درس بفيديوهات متعددة — نفس groupKey = نفس الدرس وorderIndex = الترتيب */
+      ['groupKey', 'TEXT', "DEFAULT ''"],
+      ['orderIndex', 'INTEGER', 'DEFAULT 0'],
     ]
     for (var i = 0; i < cols.length; i++) {
       try {
@@ -193,14 +196,34 @@ export async function checkSequentialUnlock(
     const gradeVideos = await db.video.findMany({
       where: { grade: video.grade },
       orderBy: { createdAt: 'asc' },
-      select: { id: true, url: true, filePath: true, fileType: true },
+      select: { id: true, url: true, filePath: true, fileType: true, groupKey: true, orderIndex: true, createdAt: true },
     })
-    const idx = gradeVideos.findIndex((v) => v.id === videoId)
+    /* (و104) ترتيب واعي بالدروس متعددة الفيديوهات:
+       - فيديو مفرد → مرساه createdAt بتاعته
+       - فيديو جوه درس متعدد (groupKey) → مرساه createdAt لأول جزء في الدرس،
+         وبعدين الأجزاء بترتب بينهم بـ orderIndex (١، ٢، ٣…)
+       كده لو المستر رتّب أجزاء الدرس بيدويًا، قفل التسلسل بيمشي مع نفس الترتيب اللي الطالب شايفه */
+    const anchor: Record<string, number> = {}
+    for (const v of gradeVideos) {
+      const t = new Date(v.createdAt || 0).getTime() || 0
+      const k = String(v.groupKey || '')
+      if (!k) continue
+      if (!(k in anchor) || t < anchor[k]) anchor[k] = t
+    }
+    const seq = gradeVideos.slice().sort(function (a, b) {
+      const ka = String(a.groupKey || '')
+      const kb = String(b.groupKey || '')
+      const ta = ka ? (anchor[ka] ?? 0) : (new Date(a.createdAt || 0).getTime() || 0)
+      const tb = kb ? (anchor[kb] ?? 0) : (new Date(b.createdAt || 0).getTime() || 0)
+      if (ta !== tb) return ta - tb
+      return (a.orderIndex || 0) - (b.orderIndex || 0)
+    })
+    const idx = seq.findIndex((v) => v.id === videoId)
     // أول فيديو في الترتيب دايمًا مفتوح
     if (idx <= 0) return { ok: true }
     // ندوّر على أقرب فيديو قبله قابل لتتبع النسبة (يوتيوب أو ملف مرفوع)
     for (let i = idx - 1; i >= 0; i--) {
-      const v = gradeVideos[i]
+      const v = seq[i]
       const isYT = Boolean(getYouTubeId(v.url || ''))
       const isFile = Boolean(v.filePath || v.fileType)
       if (!isYT && !isFile) continue // لينك خارجي — مش قابل للتتبع، نتخطاه
