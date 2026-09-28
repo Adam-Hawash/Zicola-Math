@@ -148,7 +148,7 @@ export const GRADES = [
   'أولى إعدادي',
   'تانية إعدادي',
   'تالتة إعدادي',
-  'أولى بكالوريا',
+  'أولى ثانوي',
 ] as const
 
 export const GRADE_SHORT_NAMES: Record<string, string> = {
@@ -158,7 +158,7 @@ export const GRADE_SHORT_NAMES: Record<string, string> = {
   'أولى إعدادي': '1',
   'تانية إعدادي': '2',
   'تالتة إعدادي': '3',
-  'أولى بكالوريا': '1B',
+  'أولى ثانوي': '1B',
 }
 
 export const GRADES_EN = [
@@ -168,7 +168,7 @@ export const GRADES_EN = [
   { ar: 'أولى إعدادي', en: 'Prep 1', icon: '1' },
   { ar: 'تانية إعدادي', en: 'Prep 2', icon: '2' },
   { ar: 'تالتة إعدادي', en: 'Prep 3', icon: '3' },
-  { ar: 'أولى بكالوريا', en: '1 Bac', icon: '1B' },
+  { ar: 'أولى ثانوي', en: '1 Bac', icon: '1B' },
 ] as const
 
 // ============================================================
@@ -194,7 +194,7 @@ export const DEFAULT_GRADES: GradeItem[] = [
   { ar: 'أولى إعدادي', en: 'Prep 1', emoji: '1️⃣', short: '1' },
   { ar: 'تانية إعدادي', en: 'Prep 2', emoji: '2️⃣', short: '2' },
   { ar: 'تالتة إعدادي', en: 'Prep 3', emoji: '3️⃣', short: '3' },
-  { ar: 'أولى بكالوريا', en: '1 Bac', emoji: '🅱️', short: '1B' },
+  { ar: 'أولى ثانوي', en: '1 Bac', emoji: '🅱️', short: '1B' },
 ]
 
 // بتفك JSON من siteConfig.grades_data (المفتاح اللي لوحة الأدمن بتكتب فيه)

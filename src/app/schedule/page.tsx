@@ -62,7 +62,7 @@ const DEFAULT_SCHEDULE: DaySchedule[] = [
     slots: [
       { time: '2:00 ظهرًا', grade: 'تانية إعدادي' },
       { time: '4:00 عصرًا', grade: 'أولى إعدادي' },
-      { time: '5:30 مساءً', grade: 'أولى بكالوريا' },
+      { time: '5:30 مساءً', grade: 'أولى ثانوي' },
     ],
   },
 ]

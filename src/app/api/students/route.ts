@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { gradeWhere, storeGrade, displayGrade } from '@/lib/grade-names'
 import { db, safeWrite } from '@/lib/db'
 import { makeLibsqlClient, ensureSchema } from '@/lib/ensure-schema'
 
@@ -351,7 +352,7 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        return NextResponse.json({ students: [{ ...student, watchedVideoCount: 0 }], total: 1, page: 1, pageSize: 1, totalPages: 1 }, { headers: noStore })
+        return NextResponse.json({ students: [{ ...student, grade: displayGrade((student as any).grade), watchedVideoCount: 0 }], total: 1, page: 1, pageSize: 1, totalPages: 1 }, { headers: noStore })
       } catch (loginErr: any) {
         console.error('Student login error:', loginErr)
         return NextResponse.json(
@@ -363,7 +364,7 @@ export async function GET(request: NextRequest) {
 
     // ===== قائمة الطلاب (لوحة التحكم) =====
     var where: Record<string, unknown> = {}
-    if (grade) where.grade = grade
+    if (grade) where.grade = gradeWhere(grade)
     if (status) where.status = status
     if (keyword) {
       where.OR = [
@@ -413,7 +414,7 @@ export async function GET(request: NextRequest) {
     }
 
     var studentsWithStats = students.map(function (s) {
-      return { ...s, watchedVideoCount: watchMap[s.id] || 0, lastDeviceBlock: blockMap[s.id] || null }
+      return { ...s, grade: displayGrade((s as any).grade), watchedVideoCount: watchMap[s.id] || 0, lastDeviceBlock: blockMap[s.id] || null }
     })
 
     return NextResponse.json({
@@ -485,7 +486,7 @@ export async function POST(request: NextRequest) {
         data: {
           name: name,
           phone: phone,
-          grade: grade,
+          grade: storeGrade(grade),
           status: status,
           parentName: parentName,
           parentPhone: parentPhone,

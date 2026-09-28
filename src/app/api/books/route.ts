@@ -6,6 +6,7 @@
 // بنرجّع الحقول الآمنة بس (من غير أي داتا داخلية).
 
 import { NextRequest, NextResponse } from 'next/server'
+import { gradeWhere, displayGrade } from '@/lib/grade-names'
 import { db } from '@/lib/db'
 
 export const runtime = 'nodejs'
@@ -59,11 +60,10 @@ export async function GET(request: NextRequest) {
     const where: Record<string, unknown> = {}
     if (grade) {
       // Fuzzy grade matching: نفس فلاتر /api/homework بالظبط
-      const normalizedGrade = normalizeGrade(grade)
       where.OR = [
         { grade: grade },
-        { grade: normalizedGrade },
-        { grade: { contains: normalizedGrade.split(' ')[0] } },
+        { grade: gradeWhere(grade) },  // «أولى ثانوي» بتجيب «أولى بكالوريا» كمان — نفس الصف
+        { grade: { contains: normalizeGrade(grade).split(' ')[0] } },
       ]
     }
 
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
         fileName: b.fileName || '',
         fileType: b.fileType || 'application/pdf',
         sizeBytes: b.sizeBytes || 0,
-        grade: b.grade || '',
+        grade: displayGrade(b.grade),
         sourceUrl: b.sourceUrl || '',
         createdAt: b.createdAt,
       }

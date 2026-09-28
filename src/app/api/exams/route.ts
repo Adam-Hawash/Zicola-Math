@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { normalizeGrade, gradeWhere, storeGrade, displayGrade } from '@/lib/grade-names'
 import { db, safeWrite } from '@/lib/db'
 import { notifyStudents } from '@/lib/notify'
 import { isAdmin } from '@/lib/video-guard'
@@ -44,26 +45,6 @@ function normalizeTargetIds(v: unknown): string | undefined {
 /* (2026-و26) قراءة قايمة الاستهداف من صف */
 function parseTargetIds(raw: unknown): string[] {
   try { var p = JSON.parse(String(raw || '[]')); return Array.isArray(p) ? p : [] } catch (e) { return [] }
-}
-
-// Normalize grade names so old and new naming conventions match
-function normalizeGrade(grade: string): string {
-  if (!grade) return ''
-  var g = grade.trim()
-  g = g.replace(/^الصف\s+/i, '')
-  g = g.replace(/الاعدادي/gi, 'إعدادي').replace(/الإعدادي/gi, 'إعدادي')
-  g = g.replace(/البكالوريا/gi, 'بكالوريا')
-  if (g.includes('أولى') || g.includes('اولى') || g.includes('الأول')) g = 'أولى'
-  if (g.includes('تانية') || g.includes('الثاني')) g = 'تانية'
-  if (g.includes('تالتة') || g.includes('الثالث')) g = 'تالتة'
-  if (g.includes('الرابع')) g = 'الرابع'
-  if (g.includes('الخامس')) g = 'الخامس'
-  if (g.includes('السادس')) g = 'السادس'
-  if (g === 'أولى' && grade.includes('عداد')) g = 'أولى إعدادي'
-  if (g === 'تانية' && grade.includes('عداد')) g = 'تانية إعدادي'
-  if (g === 'تالتة' && grade.includes('عداد')) g = 'تالتة إعدادي'
-  if (g === 'أولى' && grade.includes('كالور')) g = 'أولى بكالوريا'
-  return g
 }
 
 // ============================================================
@@ -132,11 +113,10 @@ export async function GET(request: NextRequest) {
 
     const where: Record<string, unknown> = {}
     if (grade) {
-      const normalizedGrade = normalizeGrade(grade)
       where.OR = [
         { grade: grade },
-        { grade: normalizedGrade },
-        { grade: { contains: normalizedGrade.split(' ')[0] } },
+        { grade: gradeWhere(grade) },  // «أولى ثانوي» بتجيب «أولى بكالوريا» كمان — نفس الصف
+        { grade: { contains: normalizeGrade(grade).split(' ')[0] } },
       ]
     }
     if (keyword) {
@@ -253,7 +233,7 @@ export async function POST(request: NextRequest) {
         data: {
           title,
           content: content || '',
-          grade,
+          grade: storeGrade(grade),
           filePath: filePath || '',
           fileType: fileType || '',
           answerKeyPath: answerKeyPath || '',

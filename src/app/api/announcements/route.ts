@@ -1,5 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server'
+import { gradeWhere, storeGrade, displayGrade } from '@/lib/grade-names'
 import { db } from '@/lib/db'
 import { notifyStudents } from '@/lib/notify'
 
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
     const pageSize = parseInt(searchParams.get('pageSize') || '20')
 
     const where: Record<string, unknown> = {}
-    if (grade) where.grade = grade
+    if (grade) where.grade = gradeWhere(grade)
     if (keyword) {
       where.OR = [
         { title: { contains: keyword } },
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
     ])
 
     return NextResponse.json({
-      announcements,
+      announcements: (announcements as any[]).map(function (a: any) { return { ...a, grade: displayGrade(a.grade) } }),
       total,
       page,
       pageSize,
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
     }
 
     const announcement = await db.announcement.create({
-      data: { title, content, grade },
+      data: { title, content, grade: storeGrade(grade) },
     })
 
     /* (و44) إشعار للطلاب: إعلان جديد */
