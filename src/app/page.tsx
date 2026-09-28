@@ -24,7 +24,7 @@ const GradesSection = dynamic(() => import('@/components/landing/GradesSection')
 })
 /* (2026-و29) قسم الأوائل اتشال من الصفحة الرئيسية بطلب المستر — بقى زرار
    «أوائل الطلبة» في النافبار يفتح دايلوج بأول 3 طلاب (TopStudentsDialog) */
-/* (و70) قسم النصايح اتشال من الرئيسية بطلب المستر — والتسمية اتغيرت لـ The Scholar */
+/* (و70) قسم النصايح اتشال من الرئيسية بطلب المستر — والتسمية اتغيرت لـ Zicola In Math */
 const GallerySection = dynamic(() => import('@/components/landing/GallerySection'), {
   loading: () => <div className="h-20" />,
 })

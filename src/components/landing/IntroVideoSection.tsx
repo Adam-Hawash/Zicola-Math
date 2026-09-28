@@ -14,6 +14,18 @@ function youTubeId(u: string): string | null {
   return m ? m[1] : null
 }
 
+/* (و102) حماية الفيديو التعريفي بالطريقة بتاعتنا: controlsList nodownload
+   يشيل زرار التحميل من المشغل + منع كليك يمين + منع picture-in-picture —
+   الفيديو بيتشاف بس، مفيش زرار تحميل ولينك مش واضح للاستخدام العادي */
+
+function videoGuardProps() {
+  return {
+    controlsList: 'nodownload noremoteplayback' as const,
+    disablePictureInPicture: true,
+    onContextMenu: function (e: React.MouseEvent) { e.preventDefault() },
+  }
+}
+
 export function IntroVideoSection() {
   const T = useT()
   const siteConfig = useAppStore((s) => s.siteConfig)
@@ -53,9 +65,9 @@ export function IntroVideoSection() {
                 className="w-full h-full"
               />
             ) : isFile ? (
-              <video src={url} controls preload="metadata" playsInline className="w-full h-full" />
+              <video src={url} controls preload="metadata" playsInline {...videoGuardProps()} className="w-full h-full" />
             ) : (
-              <video src={url} controls preload="metadata" playsInline className="w-full h-full" />
+              <video src={url} controls preload="metadata" playsInline {...videoGuardProps()} className="w-full h-full" />
             )}
           </div>
         </div>
