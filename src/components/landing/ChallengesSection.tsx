@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { useT } from '@/lib/i18n'
+/* (تسريع المنصة — و112) بيانات التحدي جاهزة من شاشة التحميل */
+import { takeLanding } from '@/lib/landing-prefetch'
 import { toast } from 'sonner'
 
 function youTubeId(u: string): string | null {
@@ -53,8 +55,9 @@ export function ChallengesSection() {
 
   const load = useCallback(async () => {
     try {
-      const r = await fetch('/api/challenges/active', { cache: 'no-store' })
-      const d = await r.json()
+      /* (تسريع المنصة — و112) أول عرض بياخد البيانات الجاهزة من شاشة التحميل */
+      var preChallenge = takeLanding('/api/challenges/active')
+      const d = preChallenge ? await preChallenge : await (await fetch('/api/challenges/active', { cache: 'no-store' })).json()
       setChallenge(d.challenge || null)
       setSolutions(d.solutions || [])
     } catch {

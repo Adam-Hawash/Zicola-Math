@@ -9,6 +9,8 @@ import { LoginView, RegisterView } from '@/components/landing/AuthPages'
 import dynamic from 'next/dynamic'
 import { useEffect, useState, useRef } from 'react'
 import { PlatformLoader } from '@/components/PlatformLoader'
+/* (تسريع المنصة — و112) شاشة التحميل تحمّل بيانات الأقسام */
+import { prefetchLanding } from '@/lib/landing-prefetch'
 
 const HeroSection = dynamic(() => import('@/components/landing/HeroSection'), {
   loading: () => <div className="min-h-[70vh] bg-background" />,
@@ -110,6 +112,12 @@ export default function HomePage() {
 
   // Load config + gallery + stats on mount
   useEffect(function() {
+    /* (تسريع المنصة — و112) طلب المستر: شاشة التحميل اللي في الاول تحمّل البيانات
+       جوه المنصه — بيانات قسمي الدروس والتحديات بتتجهز هنا بالتوازي (مفيش وقت
+       زيادة على اللودر) + كود الهيرو بينزل في نفس اللحظة فالصورة والقسم يظهروا فورًا */
+    try { prefetchLanding('/api/videos?pageSize=50') } catch (ePV) {}
+    try { prefetchLanding('/api/challenges/active') } catch (ePC) {}
+    try { import('@/components/landing/HeroSection') } catch (ePH) {}
     /* (و98) صورة المستر من أول لحظة — قبل أي fetch */
     try {
       var ic = ((typeof window !== 'undefined' && (window as any).__INITIAL_CONFIG__) || {}) as any

@@ -23,6 +23,8 @@ import { PlatformLoader } from '@/components/PlatformLoader'
 import { SecurePlayerModal } from '@/components/student/SecurePlayerModal'
 import { StudentComplaints } from '@/components/student/StudentComplaints'
 import { BooksTab } from '@/components/student/BooksTab'
+/* (تسريع المنصة — و112) البيانات بتتجهز من لحظة نجاح الدخول */
+import { takePortalBundle, fetchPortalBundleOnce } from '@/lib/portal-prefetch'
 /* (2026-و66) نظام منع الغش والتشتت الذكي — مراقبة مغادرة الامتحان */
 import { useAntiCheat, AntiCheatModal, AntiCheatBadge } from '@/components/student/useAntiCheat'
 import { FractionText } from '@/components/FractionText'
@@ -235,18 +237,10 @@ function StudentPortalInner() {
     setExamResultsLoaded(false)
     ;(async () => {
       try {
-        const [videosRes, hwRes, examsRes, annRes, resultsRes, actRes, payRes, accessRes, progressRes, hwResultsRes] = await Promise.all([
-          fetch(`/api/videos?grade=${encodeURIComponent(grade)}&pageSize=100`).then(r => r.json()),
-          fetch(`/api/homework?grade=${encodeURIComponent(grade)}&pageSize=50&studentId=${encodeURIComponent(studentId)}`).then(r => r.json()),
-          fetch(`/api/exams?grade=${encodeURIComponent(grade)}&pageSize=50&studentId=${encodeURIComponent(studentId)}`).then(r => r.json()),
-          fetch(`/api/announcements?grade=${encodeURIComponent(grade)}&pageSize=10`).then(r => r.json()),
-          fetch(`/api/exam-results?studentId=${studentId}`).then(function(r) { return r.ok ? r.json() : { results: [], _fetchFailed: true } }).catch(function() { return { results: [], _fetchFailed: true } }),
-          fetch(`/api/activities?studentId=${studentId}&action=watched_video&pageSize=200`).then(r => r.json()),
-          fetch(`/api/payments?studentId=${studentId}&status=approved&pageSize=200`).then(r => r.json()),
-          fetch(`/api/video-access?studentId=${studentId}`).then(r => r.json()).catch(() => ({ accesses: [] })),
-          fetch(`/api/video-progress?studentId=${studentId}`).then(r => r.json()).catch(() => ({ progress: [] })),
-          fetch(`/api/homework-results?studentId=${studentId}`).then(r => r.json()).catch(() => ({ results: [] })),
-        ])
+        /* (تسريع المنصة — و112) لو الدخول أطلق التحميل المسبق بنستنى نفس الوعد
+           (غالبًا البيانات وصلت خلاص) — غير كده بنجيب طازة زي ما كان بالظبط */
+        const preBundle = takePortalBundle(grade, studentId)
+        const [videosRes, hwRes, examsRes, annRes, resultsRes, actRes, payRes, accessRes, progressRes, hwResultsRes] = await (preBundle || fetchPortalBundleOnce(grade, studentId))
         if (cancelled) return
         const videos = videosRes.videos || []
         const watchedIds = new Set<string>((actRes.activities || []).map((a: any) => a.details?.replace('Watched: ', '')))

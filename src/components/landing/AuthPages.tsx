@@ -13,6 +13,8 @@ import { useT } from '@/lib/i18n'
 import { getDeviceId, getDeviceCandidates, getDeviceType, getDeviceTraits } from '@/lib/device'
 import { ArrowRight, Phone, Lock, GraduationCap, Users, Loader2, AlertCircle, AlertTriangle, Eye, EyeOff } from 'lucide-react'
 import { toast } from 'sonner'
+/* (تسريع المنصة — و112) تحميل بيانات الفسحة يبدأ لحظة نجاح الدخول */
+import { startPortalBundle } from '@/lib/portal-prefetch'
 
 var fadeInUp = {
   hidden: { opacity: 0, y: 30 },
@@ -247,6 +249,10 @@ export function LoginView() {
         setCurrentStudent(student); setView('student-pending')
         toast.info('حسابك لسه في المراجعة — جرب تعمل تسجيل دخول تاني بعدين وشوف اتقبلت ولا لسه')
       } else if (student.status === 'approved' || student.status === 'paid') {
+        /* (تسريع المنصة — و112) طلب المستر: المنصه تفتح والبيانات كلها جاهزه —
+           بنبدأ تحميل كل بيانات الفسحة + كودها نفسه بالتوازي مع الانتقال */
+        startPortalBundle(student.grade, student.id)
+        try { import('@/components/student/StudentPortal') } catch (eWarm) {}
         setCurrentStudent(student); setView('student-portal')
         toast.success('مرحباً ' + student.name + '!')
         fetch('/api/students/track-login', {
