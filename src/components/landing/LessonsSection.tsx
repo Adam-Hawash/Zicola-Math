@@ -7,6 +7,8 @@ import { BookOpen, Lock, PlayCircle, ChevronLeft, ChevronRight } from 'lucide-re
 import Image from 'next/image'
 /* (2026-و95) لودر رموز الرياضيات الموحد */
 import { PlatformLoader } from '@/components/PlatformLoader'
+/* (تسريع المنصة — و112) بيانات الدروس جاهزة من شاشة التحميل */
+import { takeLanding } from '@/lib/landing-prefetch'
 
 function getYouTubeId(url: string) {
   var match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/))([\w-]{11})/)
@@ -29,8 +31,9 @@ export default function LessonsSection() {
     setCenterIndex(0)
     var params = new URLSearchParams({ pageSize: '50' })
     if (selectedGrade) params.set('grade', selectedGrade)
-    fetch('/api/videos?' + params.toString())
-      .then(function(r) { return r.json() })
+    /* (تسريع المنصة — و112) أول عرض بياخد البيانات الجاهزة من شاشة التحميل */
+    var preVideos = selectedGrade ? null : takeLanding('/api/videos?pageSize=50')
+    ;(preVideos || fetch('/api/videos?' + params.toString()).then(function(r) { return r.json() }))
       .then(function(data) {
         setVideos(data.videos || [])
         lenRef.current = (data.videos || []).length
