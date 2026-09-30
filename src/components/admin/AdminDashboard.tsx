@@ -1155,6 +1155,8 @@ function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
   const gradesList = useGradesList()
   const currentAdminId = useAppStore(function (s) { return s.currentAdmin?.id || '' })
   const [videos, setVideos] = useState<Video[]>([])
+  /* (2026-ص) قفل أثناء ترتيب الدروس عشان ميتدوسش مرتين ورا بعض */
+  const [movingOrder, setMovingOrder] = useState(false)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [formGrade, setFormGrade] = useState('')
@@ -1214,6 +1216,61 @@ function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
       return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
     })
   }, [groupParts])
+
+  /* (2026-ص) قايمة موحدة بترتيب الطلبة الفعلي: كل وحدة = درس متعدد (groupKey) أو فيديو مستقل */
+  const unitList = useMemo(function () {
+    type Unit = { type: 'group'; key: string; grade: string; parts: Video[] } | { type: 'single'; v: Video; grade: string }
+    const units: Unit[] = []
+    const seen = new Set<string>()
+    videos.forEach(function (v) {
+      var k = String((v as any).groupKey || '')
+      if (!k) { units.push({ type: 'single', v, grade: String(v.grade || '') }); return }
+      if (seen.has(k)) return
+      seen.add(k)
+      var parts = videos.filter(function (x) { return String((x as any).groupKey || '') === k })
+        .slice().sort(function (a, b) { return (a.orderIndex || 0) - (b.orderIndex || 0) })
+      units.push({ type: 'group', key: k, grade: parts[0] ? String(parts[0].grade || '') : '', parts })
+    })
+    return units
+  }, [videos])
+
+  /* (2026-ص) فهرس الوحدة لكل فيديو (الكارت بيتحرك كوحدة كاملة) */
+  const unitIndexOf = useMemo(function () {
+    var m: Record<string, number> = {}
+    unitList.forEach(function (u, i) {
+      const ids = u.type === 'group' ? u.parts.map(function (p) { return p.id }) : [u.v.id]
+      ids.forEach(function (id) { m[id] = i })
+    })
+    return m
+  }, [unitList])
+
+  /* (2026-ص) ترتيب الدروس ▲▼ — بنبعت الترتيب كامل للسيرفر وهو بيكتب sortIndex */
+  const moveLesson = async function (unitIdx: number, dir: -1 | 1) {
+    const units = unitList.slice()
+    const target = unitIdx + dir
+    if (target < 0 || target >= units.length) return
+    const tmp = units[unitIdx]; units[unitIdx] = units[target]; units[target] = tmp
+    setMovingOrder(true)
+    try {
+      const res = await fetch('/api/videos/reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminId: currentAdminId,
+          mode: 'lessons',
+          units: units.map(function (u) { return u.type === 'group' ? u.parts.map(function (p) { return p.id }) : [u.v.id] }),
+        }),
+      })
+      if (res.ok) {
+        toast.success('تم حفظ الترتيب')
+        await loadVideos(false)
+      } else {
+        var d: any = null; try { d = await res.json() } catch {}
+        toast.error('فشل حفظ الترتيب: ' + (d && d.error ? d.error : 'خطأ غير معروف'))
+      }
+    } catch { toast.error('خطأ في الاتصال') }
+    setMovingOrder(false)
+  }
 
   /* خريطة مجموعات كل الفيديوهات (للكروت: فيديو ٢ من ٣ + زرار ضيف) */
   const groupMap = useMemo(function () {
@@ -1897,7 +1954,27 @@ function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
                         {v.url && !v.filePath && <Badge variant="secondary" className="text-[10px]">▶ YouTube</Badge>}
                       </div>
                     </div>
-                    <p className="text-[10px] text-muted-foreground">{new Date(v.createdAt).toLocaleDateString('ar-EG')}</p>
+                    <div className="flex items-center justify-between gap-1">
+                      <p className="text-[10px] text-muted-foreground">{new Date(v.createdAt).toLocaleDateString('ar-EG')}</p>
+                      {(() => {
+                        /* (2026-ص) ترتيب الدروس ▲▼ — الكارت بيتحرك بوحدته (الدرس المتعدد كله) */
+                        const ui = unitIndexOf[v.id] ?? -1
+                        if (ui < 0) return null
+                        const unit = unitList[ui]
+                        const sameGrade = unitList.map((x, xi) => ({ x, xi })).filter(function (t) { return t.x.grade === unit.grade })
+                        const gradeTotal = sameGrade.length
+                        const gradePos = sameGrade.findIndex(function (t) { return t.xi === ui }) + 1
+                        let prevSame = -1; let nextSame = -1
+                        for (let j = 0; j < sameGrade.length; j++) { if (sameGrade[j].xi < ui) prevSame = sameGrade[j].xi; if (nextSame === -1 && sameGrade[j].xi > ui) nextSame = sameGrade[j].xi }
+                        return (
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <Badge variant="secondary" className="text-[9px] h-4 px-1">درس {gradePos}/{gradeTotal}</Badge>
+                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0" disabled={movingOrder || prevSame === -1} onClick={() => moveLesson(ui, -1)} aria-label="طلوع الدرس فوق">↑</Button>
+                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0" disabled={movingOrder || nextSame === -1} onClick={() => moveLesson(ui, 1)} aria-label="تنزيل الدرس تحت">↓</Button>
+                          </div>
+                        )
+                      })()}
+                    </div>
                     <div className="flex items-center gap-1 flex-wrap">
                       <Button size="sm" variant="ghost" className="flex-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-xs h-7" onClick={() => { setSelectedVideoForSchedule(v); setScheduleOpen(true); loadStudentsForSchedule(v.grade); loadExistingSchedule(v.id) }}>
                         <Clock className="h-3.5 w-3.5 mr-1" />جدولة
