@@ -107,6 +107,8 @@ export async function ensureVideoTable(force = false): Promise<void> {
       /* (و104) درس بفيديوهات متعددة — نفس groupKey = نفس الدرس وorderIndex = الترتيب */
       ['groupKey', 'TEXT', "DEFAULT ''"],
       ['orderIndex', 'INTEGER', 'DEFAULT 0'],
+      // (2026-د) مدة الفيديو بالثواني — بادج ⏱ على كروت الفيديوهات
+      ['durationSec', 'INTEGER', 'DEFAULT 0'],
     ]
     for (var i = 0; i < cols.length; i++) {
       try {

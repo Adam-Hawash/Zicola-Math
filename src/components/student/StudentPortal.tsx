@@ -551,6 +551,22 @@ function ytIdOf(url: string) {
 // اللي كانت بترفض اللينكات من غير امتداد (.mp4/.m3u8) اتنست لأن المشغل
 // بقى بيشغل أي لينك (يوتيوب/Cloudinary/Drive/Dropbox/أي موقع)
 
+/* (2026-د) تنسيق مدة الفيديو للبادج ⏱ — "لما يتجاب يعرفوا الفيديو قد إيه" */
+function fmtDur(sec: number): string {
+  var s = Math.round(Number(sec) || 0)
+  if (s <= 0) return ''
+  var h = Math.floor(s / 3600)
+  var m = Math.floor((s % 3600) / 60)
+  var ss = s % 60
+  if (h > 0) return h + ':' + String(m).padStart(2, '0') + ':' + String(ss).padStart(2, '0')
+  return m + ':' + String(ss).padStart(2, '0')
+}
+/* أيقونة الساعة الصغيرة للبادج */
+function DurIcon() {
+  return (
+    <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" strokeLinecap="round" /></svg>
+  )
+}
 function videoKindOf(v: any): 'youtube' | 'file' | 'link' | 'none' {
   if (v.kind) {
     // (2026-و3) فيديو مضاف من كود HTML embed — بيتشغل في المشغل الآمن
@@ -835,6 +851,13 @@ function VideosTab({ videos, watchedIds, approvedVideoIds, studentId, grade, vid
                           <Layers className="h-3 w-3" />{gParts.length} فيديوهات
                         </Badge>
                       </div>
+                      {/* (2026-د) إجمالي مدة الدرس ⏱ */}
+                      {gParts.reduce(function (acc: number, p: any) { return acc + (Number(p.durationSec) || 0) }, 0) > 0 && !gNeedsPay && (
+                        <div className="absolute top-9 left-2 z-20 flex items-center gap-1 rounded-md bg-black/80 border border-white/15 px-1.5 py-0.5 text-white text-[10px] font-bold" dir="ltr">
+                          <DurIcon />
+                          {fmtDur(gParts.reduce(function (acc: number, p: any) { return acc + (Number(p.durationSec) || 0) }, 0))}
+                        </div>
+                      )}
                     </div>
                   )}
                   {gProgress > 0 && !gNeedsPay && (
@@ -1003,6 +1026,13 @@ function VideosTab({ videos, watchedIds, approvedVideoIds, studentId, grade, vid
               ) : (
                 <div className="flex items-center justify-center w-full h-full">
                   <Video className="h-10 w-10 text-white/30" />
+                </div>
+              )}
+              {/* (2026-د) بادج مدة الفيديو — "لما يتجاب يعرفوا الفيديو قد إيه" */}
+              {!needsPay && (video as any).durationSec > 0 && (
+                <div className="absolute bottom-2 left-2 z-30 flex items-center gap-1 rounded-md bg-black/80 border border-white/15 px-1.5 py-0.5 text-white text-[10px] font-bold" dir="ltr">
+                  <DurIcon />
+                  {fmtDur((video as any).durationSec)}
                 </div>
               )}
               {/* Progress Bar Overlay */}
