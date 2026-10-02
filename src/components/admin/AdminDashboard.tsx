@@ -7,6 +7,7 @@ import { PlatformLoader } from '@/components/PlatformLoader'
 import { QuestionsEditorDialog, EditQuestionsButton, RegradeButton, RegradeAllButton, OverrideButton } from '@/components/admin/QuestionsEditor'
 import { GradesSchedulePanel } from '@/components/admin/GradesSchedulePanel'
 import { Button } from '@/components/ui/button'
+import { InstallPwaButton } from '@/components/InstallPwaButton'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -1739,6 +1740,8 @@ function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
               {gradesList.map((g) => <option key={g.ar} value={g.ar}>{(g.emoji ? g.emoji + ' ' : '') + g.ar}</option>)}
             </select>
             <Button size="sm" onClick={() => setShowForm(!showForm)}><Plus className="h-4 w-4 ml-1" />إضافة فيديو</Button>
+            {/* (Z-7) تثبيت المنصة كتطبيق على الموبايل — PWA زي Maths-Genius */}
+            <InstallPwaButton variant="outline" className="h-8 text-xs" />
           </div>
         </div>
       </CardHeader>

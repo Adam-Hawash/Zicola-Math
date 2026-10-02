@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AIAssistant } from "@/components/student/AIAssistant";
+import { FloatingInstallButton } from "@/components/InstallPwaButton";
 import { RecordingGuard } from "@/components/RecordingGuard";
 import { DeviceMessages } from "@/components/DeviceMessages";
 import { LangBoot } from "@/lib/i18n";
@@ -176,6 +177,8 @@ export default async function RootLayout({
         <LangBoot />
         {/* (و47) المساعد الذكي رجع زي ما كان — المستر طلب رجوعه بنفس المميزات (شيرين بس هي اللي اتشالت) */}
         <AIAssistant />
+        {/* (Z-7) الزرار العايم الثابت «ثبّت التطبيق» — شمال تحت في كل الصفحات (زي Maths-Genius) */}
+        <FloatingInstallButton />
         {/* حماية عامة من التسجيل/التصوير + أدوات المطوّر في كل الصفحات */}
         <RecordingGuard />
         {/* (2026-و111) رسايل حل الشكاوى للجهاز — أول ما الطالب يفتح المنصة
