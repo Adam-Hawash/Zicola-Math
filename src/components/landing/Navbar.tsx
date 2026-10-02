@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
+import { InstallPwaButton } from '@/components/InstallPwaButton'
 import {
   Dialog,
   DialogContent,
@@ -178,6 +179,8 @@ export function Navbar() {
               <Shapes className="h-4 w-4" />
               Geometry Laws
             </a>
+            {/* (Z-7) زرار «التطبيق» في الرئيسية — زي Maths-Genius: ظاهر دايمًا في الديسكتوب لكل الحالات */}
+            <InstallPwaButton variant="outline" size="sm" className="min-h-[44px] rounded-xl" />
             {/* (و43) مواعيد السنتر اتشالت من النافبار الديسك توب بطلب المستر —
                بتفضل في قايمة الموبايل وصفحة /schedule شغالة زي ما هي */}
             {currentStudent ? (
@@ -329,6 +332,10 @@ export function Navbar() {
               <CalendarClock className="h-4 w-4" />
               Center Schedule
             </a>
+            {/* (Z-7) زر تثبيت المنصة كتطبيق على الموبايل — PWA */}
+            <div className="flex [&_button]:w-full [&_button]:justify-center [&_button]:min-h-[44px]">
+              <InstallPwaButton variant="outline" />
+            </div>
             {currentStudent ? (
               <>
                 <p className="text-sm text-muted-foreground py-2">

@@ -2,6 +2,7 @@
 
 import { useAppStore } from '@/stores/app-store'
 import { Button } from '@/components/ui/button'
+import { InstallPwaButton } from '@/components/InstallPwaButton'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
@@ -340,6 +341,8 @@ function StudentPortalInner() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
+                  {/* (Z-7) زرار «التطبيق» في بورتال الطالب — زي Maths-Genius */}
+                  <InstallPwaButton variant="outline" size="sm" className="gap-1.5 h-11 sm:h-8 shrink-0" />
                   <Button variant="outline" size="sm" onClick={() => setShowGuide(true)} className="gap-1.5 h-11 sm:h-8">
                     <HelpCircle className="h-4 w-4" />
                     <span className="hidden sm:inline">{T('دليل التعامل', 'Guide')}</span>
