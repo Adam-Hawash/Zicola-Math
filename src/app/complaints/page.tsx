@@ -9,8 +9,9 @@
    (بادج «زائر» في لوحة الشكاوى).
    الصفحة عامة 100% — مفيش أي حاجة بتتحقق من الدخول.
    ============================================================ */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { gradesFromConfig, type GradeItem } from '@/stores/app-store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -19,14 +20,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Loader2, MessageSquareHeart, Send, CheckCircle2, Home, Phone, User, GraduationCap } from 'lucide-react'
 
-// (2026-ف) الصفوف بتوع المنصة بالظبط — نفس قايمة app-store GRADES
-var GRADES = [
-  'الصف السادس الابتدائي',
-  'أولى إعدادي',
-  'تانية إعدادي',
-  'تالتة إعدادي',
-  'أولى ثانوي',
-]
+// (Z-1) القايمة من grades_data (مصدر واحد زي باقي المنصة) — مع فولباك
+// DEFAULT_GRADES لحد ما الكونفج يوصل، ومفيش قايمة ثابتة قديمة هنا
 
 /* (2026-و111) Device ID الجهاز — بيتعمل مرة وبيفضل على الجهاز
    عشان رسالة حل الشكوى توصل الجهاز اللي بعت منها (طلب المستر) */
@@ -52,6 +47,14 @@ export default function PublicComplaintsPage() {
   var [sending, setSending] = useState(false)
   var [done, setDone] = useState(false)
   var [error, setError] = useState('')
+  /* (Z-1) قايمة الصفوف من grades_data — نفس المصدر اللي بتبنيه لوحة الأدمن */
+  var [gradeItems, setGradeItems] = useState<GradeItem[]>(function () { return gradesFromConfig(null) })
+  useEffect(function () {
+    fetch('/api/config')
+      .then(function (r) { return r.json() })
+      .then(function (d) { if (d && !d.error) setGradeItems(gradesFromConfig(d)) })
+      .catch(function () {})
+  }, [])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -165,7 +168,7 @@ export default function PublicComplaintsPage() {
                     <Select value={grade} onValueChange={setGrade} dir="rtl">
                       <SelectTrigger className="h-10 w-full"><SelectValue placeholder="اختار صفك" /></SelectTrigger>
                       <SelectContent>
-                        {GRADES.map(function (g) { return <SelectItem key={g} value={g}>{g}</SelectItem> })}
+                        {gradeItems.map(function (g) { return <SelectItem key={g.ar} value={g.ar}>{(g.emoji ? g.emoji + ' ' : '') + g.ar}</SelectItem> })}
                       </SelectContent>
                     </Select>
                   </div>
