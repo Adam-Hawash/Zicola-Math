@@ -8,6 +8,7 @@
    - تفعيل تحدي واحد في المرة (التفعيل بيقفل اللي قبله)
    - يشوف حلول الطلاب بترتيب الوصول ويمسح أي حل
    - لينك/ملف الفيديو التعريفي (intro_video_url)
+   - (Z-4) لينك/ملف فيديو تعريف المستر (teacher_video_url) — تحت فيديو المنصة
    ============================================================ */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -19,7 +20,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent } from '@/components/ui/card'
-import { Trophy, Plus, Loader2, Trash2, Power, RefreshCw, Video, Film, Link2, Eye, Upload, CalendarDays } from 'lucide-react'
+import { Trophy, Plus, Loader2, Trash2, Power, RefreshCw, Video, Film, Link2, Eye, Upload, CalendarDays, GraduationCap } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { chunkedUpload } from '@/lib/chunked-upload'
 import { normalizeIntroVideoUrl, introMediaId, introVideoKind, introEmbedSrc } from '@/lib/intro-video'
@@ -91,6 +92,19 @@ export function ChallengesPanel() {
      المستر يكتب لينك جديد فوق ملف مرفوع → الملف القديم بيتمسح مش يفضل يتيم */
   const savedIntroRef = useRef('')
 
+  /* ============================================================
+     (Z-4) الفيديو التعريفي عن المستر — نفس بنية intro بالظبط
+     (SiteConfig: teacher_video_url) — بيظهر تحت فيديو «إزاي تستخدم
+     المنصة» في الرئيسية وقبل المعرض. فاضي = مخفي خالص.
+     ============================================================ */
+  const [teacherUrl, setTeacherUrl] = useState('')
+  const [teacherSaving, setTeacherSaving] = useState(false)
+  const [teacherUploading, setTeacherUploading] = useState(false)
+  const [teacherStatus, setTeacherStatus] = useState('')
+  const [teacherMeta, setTeacherMeta] = useState<{ filename: string; createdAt: string | null; fileSize: number } | null>(null)
+  const teacherFileRef = useRef<HTMLInputElement>(null)
+  const savedTeacherRef = useRef('')
+
   const load = useCallback(async function () {
     if (!adminId) return
     setLoading(true)
@@ -116,6 +130,20 @@ export function ChallengesPanel() {
       .catch(function () { setIntroMeta(null) })
   }, [])
 
+  /* (Z-4) ميتاداتا فيديو المستر الحالي — نفس بنية refreshIntroMeta */
+  const refreshTeacherMeta = useCallback(function (value: string) {
+    var mediaId = introMediaId(value)
+    if (!mediaId) { setTeacherMeta(null); return }
+    var adminIdNow = useAppStore.getState().currentAdmin?.id || ''
+    fetch('/api/files/' + mediaId + '?meta=1&adminId=' + encodeURIComponent(adminIdNow))
+      .then(function (r) { return r.ok ? r.json() : null })
+      .then(function (d) {
+        if (d && d.filename) setTeacherMeta({ filename: d.filename, createdAt: d.createdAt || null, fileSize: Number(d.fileSize || 0) })
+        else setTeacherMeta(null)
+      })
+      .catch(function () { setTeacherMeta(null) })
+  }, [])
+
   /* تحميل الفيديو التعريفي من الكونفيج */
   useEffect(function () {
     fetch('/api/config')
@@ -125,9 +153,14 @@ export function ChallengesPanel() {
         savedIntroRef.current = v
         setIntroUrl(v)
         refreshIntroMeta(v)
+        /* (Z-4) فيديو تعريف المستر من نفس الرد */
+        var tv = d && typeof d.teacher_video_url === 'string' ? d.teacher_video_url : ''
+        savedTeacherRef.current = tv
+        setTeacherUrl(tv)
+        refreshTeacherMeta(tv)
       })
       .catch(function () {})
-  }, [refreshIntroMeta])
+  }, [refreshIntroMeta, refreshTeacherMeta])
 
   /* مسح ملف الـ Media اليتيم (لينك/ملف جديد استبدل ملف قديم) — زي ما /api/files/[id] بيمسح */
   function removeIntroMediaIfOrphan(oldValue: string) {
@@ -220,6 +253,93 @@ export function ChallengesPanel() {
     setIntroSaving(false)
   }
 
+  /* (Z-4) كتابة قيمة فيديو المستر في teacher_video_url — نفس بوابة /api/config */
+  async function writeTeacherConfig(value: string): Promise<boolean> {
+    const res = await fetch('/api/config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ teacher_video_url: value }),
+    })
+    return res.ok
+  }
+
+  /* (Z-4) مسح ملف فيديو المستر اليتيم — نفس removeIntroMediaIfOrphan */
+  function removeTeacherMediaIfOrphan(oldValue: string) {
+    var oldId = introMediaId(oldValue)
+    if (!oldId) return
+    var adminIdNow = useAppStore.getState().currentAdmin?.id || ''
+    fetch('/api/files/' + oldId + '?adminId=' + encodeURIComponent(adminIdNow), { method: 'DELETE' })
+      .catch(function () {})
+  }
+
+  async function saveTeacherLink() {
+    if (teacherSaving || teacherUploading) return
+    var raw = teacherUrl.trim()
+    var normalized = normalizeIntroVideoUrl(raw)
+    setTeacherSaving(true)
+    try {
+      var ok = await writeTeacherConfig(normalized)
+      if (!ok) { toast.error('فشل الحفظ'); return }
+      var prevSaved = savedTeacherRef.current
+      if (normalized !== prevSaved) removeTeacherMediaIfOrphan(prevSaved)
+      savedTeacherRef.current = normalized
+      setTeacherUrl(normalized)
+      refreshTeacherMeta(normalized)
+      if (!normalized) {
+        toast.success('فيديو المستر اتشال — القسم اختفى من الصفحة الرئيسية')
+      } else {
+        toast.success('فيديو المستر اتسجل ✅ — هيظهر تحت فيديو المنصة في الرئيسية')
+      }
+    } catch { toast.error('فشل الاتصال') }
+    setTeacherSaving(false)
+  }
+
+  /* (Z-4) رفع فيديو المستر — نفس بنية uploadIntroFile */
+  async function uploadTeacherFile(file: File) {
+    if (!file) return
+    if (file.type && file.type.indexOf('video/') !== 0) {
+      toast.error('اختار ملف فيديو (mp4 / webm / mov)')
+      return
+    }
+    setTeacherUploading(true)
+    setTeacherStatus('جاري الرفع...')
+    try {
+      const result = await chunkedUpload(file, 'videos', function (pct) {
+        setTeacherStatus('جاري الرفع... ' + pct + '%')
+      }, function (msg) { setTeacherStatus(msg) })
+      setTeacherStatus('جاري الحفظ...')
+      var ok = await writeTeacherConfig(result.filePath)
+      if (!ok) { toast.error('الفيديو اترفع لكن الحفظ فشل — جرب تاني'); return }
+      var prevSavedFile = savedTeacherRef.current
+      if (result.filePath !== prevSavedFile) removeTeacherMediaIfOrphan(prevSavedFile)
+      savedTeacherRef.current = result.filePath
+      setTeacherUrl(result.filePath)
+      setTeacherMeta({ filename: result.filename || file.name, createdAt: new Date().toISOString(), fileSize: result.size || file.size })
+      toast.success('فيديو المستر اترفع وبقى ظاهر للطلاب ✅')
+    } catch (e: any) {
+      toast.error(e?.message || 'فشل رفع الفيديو — حاول تاني')
+    }
+    setTeacherUploading(false)
+    setTeacherStatus('')
+  }
+
+  async function deleteTeacher() {
+    if (teacherSaving || teacherUploading) return
+    if (!teacherUrl) return
+    if (!window.confirm('حذف فيديو تعريف المستر؟ القسم هيختفي من الصفحة الرئيسية.')) return
+    setTeacherSaving(true)
+    try {
+      var ok = await writeTeacherConfig('')
+      if (!ok) { toast.error('فشل الحذف'); return }
+      removeTeacherMediaIfOrphan(savedTeacherRef.current)
+      savedTeacherRef.current = ''
+      setTeacherUrl('')
+      setTeacherMeta(null)
+      toast.success('فيديو المستر اتمسح ✅')
+    } catch { toast.error('فشل الاتصال') }
+    setTeacherSaving(false)
+  }
+
   const introKind = introVideoKind(introUrl)
   const introKindLabel = introKind === 'youtube' ? 'لينك يوتيوب'
     : introKind === 'drive' ? 'لينك جوجل درايف'
@@ -227,7 +347,20 @@ export function ChallengesPanel() {
     : introKind === 'file' ? 'ملف مرفوع من الجهاز'
     : introKind === 'link' ? 'لينك خارجي'
     : ''
-  const introPreviewEmbed = (introKind === 'file' || introKind === 'link' || introKind === 'none') ? null : introEmbedSrc(introUrl)
+  /* (Z-4) أي لينك معروف (يوتيوب/درايف/فيميو/ستريمابل/أرشايف) بيتعاين بـ iframe —
+     الملفات المرفوعة بس اللي بتتعاين بـ <video>. قبل كده لينك ستريمابل كان
+     بيتحط في <video> فكان بيطلع أسود على 0:00 — ده سبب عيب الفيديو الأسود */
+  const introPreviewEmbed = introKind === 'file' ? null : introEmbedSrc(introUrl)
+
+  /* (Z-4) نوع ومعاينة فيديو المستر — نفس المنطق */
+  const teacherKind = introVideoKind(teacherUrl)
+  const teacherKindLabel = teacherKind === 'youtube' ? 'لينك يوتيوب'
+    : teacherKind === 'drive' ? 'لينك جوجل درايف'
+    : teacherKind === 'vimeo' ? 'لينك فيميو'
+    : teacherKind === 'file' ? 'ملف مرفوع من الجهاز'
+    : teacherKind === 'link' ? 'لينك خارجي'
+    : ''
+  const teacherPreviewEmbed = teacherKind === 'file' ? null : introEmbedSrc(teacherUrl)
 
   useEffect(function () { load() }, [load])
 
@@ -436,6 +569,125 @@ export function ChallengesPanel() {
               </p>
             ) : null}
             <p className="text-[11px] text-muted-foreground">الرفع بنفس نظام المنصة (أجزاء 2MB) — يدعم الفيديوهات الكبيرة، والفيديو بيتعرض تحت عنوان «الفيديو التعريفي» فوق في الرئيسية.</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ============================================================ */}
+      {/* (Z-4) الفيديو التعريفي عن المستر — تحت فيديو المنصة وقبل المعرض */}
+      <Card>
+        <CardContent className="p-4 sm:p-6 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="flex items-center gap-2 font-bold text-base sm:text-lg">
+              <GraduationCap className="h-5 w-5 text-primary" />
+              الفيديو التعريفي عن المستر
+            </h3>
+            {teacherKind !== 'none' ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={deleteTeacher}
+                disabled={teacherSaving || teacherUploading}
+                className="min-h-[36px] hover:bg-red-500/10 text-red-600 border-red-200"
+              >
+                {teacherSaving && !teacherUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                حذف الفيديو
+              </Button>
+            ) : null}
+          </div>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            بيظهر تحت فيديو «إزاي تستخدم المنصة» في الصفحة الرئيسية وقبل قسم المعرض — فيديو تعريفي عنك أنت. لو فاضي القسم مش هيظهر خالص.
+          </p>
+
+          {/* الحالة الحالية */}
+          {teacherKind !== 'none' ? (
+            <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/5 p-3 space-y-2">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 text-white text-[11px] font-black px-2 py-0.5">
+                  ● الحالة الحالية
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted text-muted-foreground text-[11px] font-bold px-2 py-0.5">
+                  {teacherKind === 'file' ? <Film className="h-3 w-3" /> : <Link2 className="h-3 w-3" />}
+                  {teacherKindLabel}
+                </span>
+                {teacherKind === 'file' ? (
+                  <span className="text-xs font-bold truncate max-w-full">
+                    {teacherMeta?.filename || 'فيديو مرفوع'}
+                    {teacherMeta?.createdAt ? <span className="text-muted-foreground font-normal"> — {new Date(teacherMeta.createdAt).toLocaleDateString('ar-EG')}</span> : null}
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground truncate max-w-full" dir="ltr">{teacherUrl}</span>
+                )}
+              </div>
+              {/* معاينة سريعة — لينك معروف بيتعرض بـ iframe، ملف بـ مشغل صغير */}
+              {teacherKind === 'file' ? (
+                <video src={teacherUrl} controls preload="metadata" className="w-full max-h-44 rounded-lg bg-black" />
+              ) : teacherPreviewEmbed ? (
+                <div className="aspect-video max-h-44 overflow-hidden rounded-lg bg-black">
+                  <iframe src={teacherPreviewEmbed} title="معاينة فيديو المستر" allowFullScreen className="w-full h-full" loading="lazy" />
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-border p-3 text-xs text-muted-foreground">
+              مفيش فيديو حاليًا — القسم مخفي تمامًا عن الطلاب. حط لينك أو ارفع ملف وسيبه يظهر.
+            </div>
+          )}
+
+          {/* الخيار الأول: لينك */}
+          <div className="rounded-xl border border-border/60 bg-muted/20 p-3 sm:p-4 space-y-2">
+            <Label className="flex items-center gap-1.5 text-sm font-bold">
+              <Link2 className="h-4 w-4 text-primary" />
+              الخيار الأول: لينك (يوتيوب / جوجل درايف / فيميو / ستريمابل)
+            </Label>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Input
+                value={teacherUrl}
+                onChange={function (e) { setTeacherUrl(e.target.value) }}
+                placeholder="https://www.youtube.com/watch?v=... أو لينك درايف أو ستريمابل"
+                className="min-h-[44px]"
+                dir="ltr"
+              />
+              <Button onClick={saveTeacherLink} disabled={teacherSaving || teacherUploading} className="min-h-[44px] font-bold shrink-0">
+                {teacherSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                حفظ اللينك
+              </Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground">أي لينك معروف بيتحول أوتوماتيك لصيغة تشغيل جوه المنصة (حتى لينك ستريمابل اللي كان بيبان أسود).</p>
+          </div>
+
+          {/* الخيار التاني: رفع من الجهاز */}
+          <div className="rounded-xl border border-border/60 bg-muted/20 p-3 sm:p-4 space-y-2">
+            <Label className="flex items-center gap-1.5 text-sm font-bold">
+              <Upload className="h-4 w-4 text-primary" />
+              الخيار التاني: رفع فيديو من الجهاز (mp4)
+            </Label>
+            <input
+              ref={teacherFileRef}
+              type="file"
+              accept="video/mp4,video/webm,video/quicktime,video/x-m4v"
+              className="hidden"
+              onChange={function (e) { const f = e.target.files?.[0]; if (f) uploadTeacherFile(f); e.target.value = '' }}
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={function () { teacherFileRef.current?.click() }}
+                disabled={teacherUploading || teacherSaving}
+                className="min-h-[44px]"
+              >
+                {teacherUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Film className="h-4 w-4" />}
+                {teacherUploading ? (teacherStatus || 'جاري الرفع...') : 'اختار فيديو وارفعه'}
+              </Button>
+              {teacherKind === 'file' && !teacherUploading ? <span className="text-xs text-emerald-600 font-bold">✅ الفيديو المرفوع هو المعروض دلوقتي</span> : null}
+            </div>
+            {teacherUploading && teacherStatus ? (
+              <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                <CalendarDays className="h-3 w-3" /> {teacherStatus}
+              </p>
+            ) : null}
+            <p className="text-[11px] text-muted-foreground">الرفع بنفس نظام المنصة (أجزاء 2MB) — الفيديو بيتعرض تحت عنوان «تعرّف على مستر أحمد شعبان» في الرئيسية.</p>
           </div>
         </CardContent>
       </Card>
