@@ -104,6 +104,66 @@ export function isCloudinaryVideoUrl(u: string): boolean {
   return /^https:\/\/res\.cloudinary\.com\/[^\/]+\/video\/upload\//.test(String(u || '').trim())
 }
 
+/* ============================================================
+   (2026-ص3) جودات archive.org الحقيقية — طلب المستر:
+   «أنا رفعت لينك من archive.org فالمفروض يظهر بجودته الطبيعية
+   وأقدر أتحكم في الجودة براحتي»
+   archive.org بيحفظ لنفس الفيديو كذا نسخة: الأصلي HD + مشتقات مضغوطة
+   (512kb.mp4 اللي غالبًا المستر بياخد لينكها من صفحة العنصر = 360p).
+   بنقرأ metadata العنصر منهم بنبني قايمة جودات حقيقية، والافتراضي =
+   **أعلى جودة متاحة** (الجودة الطبيعية للفيديو) + المستر يبدّل براحته.
+   أي فشل (مفيش نت / لينك مش archive / عنصر من غير نسخ) = السلوك القديم
+   بالظبط — بيتشغل باللينك اللي اتقاله. */
+export function archiveOrgItemId(u: string): string {
+  const s = String(u || '')
+  // الصيغ المدعومة: archive.org/{download|details|embed|metadata}/{id}/{file}
+  // + لينكات النود المباشرة: {iaXXXX.}archive.org/{NN}/items/{id}/{file}
+  const m = s.match(/archive\.org\/(?:download|details|embed|metadata)\/([^\/\?#]+)/i)
+    || s.match(/archive\.org\/(?:\d+\/)?items\/([^\/\?#]+)/i)
+  return m ? decodeURIComponent(m[1]) : ''
+}
+async function archiveOrgLevels(url: string): Promise<{ h: number; url: string }[] | null> {
+  try {
+    const id = archiveOrgItemId(url)
+    if (!id) return null
+    const r = await fetch('https://archive.org/metadata/' + encodeURIComponent(id), {
+      signal: AbortSignal.timeout(3500),
+      cache: 'no-store',
+    })
+    if (!r.ok) return null
+    const j: any = await r.json().catch(() => null)
+    const files: any[] = (j && j.files) || []
+    const vids: { h: number; name: string; size: number }[] = []
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i] || {}
+      const nm = String(f.name || '')
+      if (!/\.(mp4|m4v|mkv|webm|mov|mpg|mpeg|avi)$/i.test(nm)) continue
+      // ملفات معاينات/تشيكسوم — مش تشغيل
+      if (/(_thumbs|\.ia\.|_source\.)/i.test(nm)) continue
+      vids.push({
+        h: parseInt(String(f.height || ''), 10) || 0,
+        name: nm,
+        size: parseInt(String(f.size || ''), 10) || 0,
+      })
+    }
+    if (!vids.length) return null
+    // الأعلى ارتفاعًا أولًا — وفي نفس الارتفاع الأكبر حجمًا (النسخة الأصلية)
+    vids.sort((a, b) => (b.h - a.h) || (b.size - a.size))
+    const out: { h: number; url: string }[] = []
+    const seen: Record<string, boolean> = {}
+    for (let i = 0; i < vids.length; i++) {
+      const key = String(vids[i].h) // نفس الارتفاع = نفس الجودة — ناخد أكبر ملف
+      if (seen[key]) continue
+      seen[key] = true
+      const filePart = vids[i].name.split('/').map(encodeURIComponent).join('/')
+      out.push({ h: vids[i].h, url: 'https://archive.org/download/' + encodeURIComponent(id) + '/' + filePart })
+    }
+    return out.length > 1 ? out : null // نسخة واحدة = مفيش قايمة، السلوك القديم
+  } catch (e) {
+    return null
+  }
+}
+
 export const dynamic = 'force-dynamic'
 
 function htmlEscape(s: string): string {
@@ -290,6 +350,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       cfg.fileUrl = directUrl
       // (و35) لينكات Cloudinary بياخدوا قايمة جودات حقيقية (1080/720/480/360)
       if (isCloudinaryVideoUrl(directUrl)) cfg.cloudinary = true
+      // (2026-ص3) لينكات archive.org بياخدوا كل نسخ الجودة الموجودة في
+      // العنصر + الافتراضي أعلى جودة (الجودة الطبيعية) — طلب المستر
+      if (!/\.m3u8(\?|$)/i.test(String(cfg.fileUrl))) {
+        const archLv = await archiveOrgLevels(String(cfg.fileUrl))
+        if (archLv && archLv.length > 1) {
+          cfg.archive = archLv
+          cfg.fileUrl = archLv[0].url // الافتراضي = أعلى جودة متاحة في العنصر
+        }
+      }
     }
     const cfgJson = JSON.stringify(cfg).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026')
 
@@ -1893,6 +1962,10 @@ var fileQualityLabel = '';
    بنبدّل transformations الرابط (c_scale,h_X,q_auto) وسيرفرهم بيقلل الجودة
    فعليًا — 1080 تبقى 720/480/360 من غير ما نلمس الملف الأصلي */
 var cloudBase = '', cloudLevels = [], cloudCur = -1;
+/* (2026-ص3) جودات archive.org الحقيقية — جايه من السيرفر من metadata العنصر.
+   الافتراضي = أعلى جودة (السيرفر بيحط fileUrl = أعلى نسخة) — والمستر يبدّل براحته */
+var archLevels = (CFG.archive && CFG.archive.length) ? CFG.archive : [];
+var archCur = 0;
 function fmtTime(s){
   s = Math.max(0, Math.floor(Number(s) || 0));
   var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
@@ -1945,6 +2018,24 @@ function switchCloudQuality(h){
     updateQLabel(); renderQMenu();
   }catch(e){}
 }
+/* (2026-ص3) تبديل جودة archive.org في نفس المكان — نفس الثانية ونفس حالة التشغيل */
+function switchArchiveQuality(i){
+  try{
+    var v = fileApi; if(!v || !archLevels[i] || !archLevels[i].url) return;
+    var cur = v.currentTime, wasPlaying = !v.paused;
+    archCur = i;
+    fileQualityLabel = '';
+    v.src = archLevels[i].url;
+    v.load();
+    var once = function(){
+      try{ v.removeEventListener('loadedmetadata', once); }catch(e2){}
+      try{ if(cur > 0 && v.duration && cur < v.duration - 1) v.currentTime = cur; }catch(e2){}
+      if(wasPlaying){ try{ var pp = v.play(); if(pp && pp.catch) pp.catch(function(){}); }catch(e2){} }
+    };
+    v.addEventListener('loadedmetadata', once);
+    updateQLabel(); renderQMenu();
+  }catch(e){}
+}
 /* رسايل أخطاء المشغل العادي — شاشة واضحة + زرار إعادة */
 function fileError(msg){
   var ov = document.getElementById('fileErrOv');
@@ -1971,6 +2062,10 @@ function updateQLabel(){
     } else {
       el.textContent = hLabel((hlsLevels[hlsCurIdx] || {}).h);
     }
+  } else if(archLevels.length){
+    /* (2026-ص3) archive.org — الليبل من المستوى المختار */
+    var ah = (archLevels[archCur] || {}).h || 0;
+    el.textContent = hLabel(ah);
   } else if(CFG.cloudinary && cloudBase){
     el.textContent = (cloudCur === -1) ? (fileQualityLabel || 'أصلية') : hLabel(cloudCur);
   } else {
@@ -1991,6 +2086,13 @@ function renderQMenu(){
       var L = hd[i];
       html += '<div class="qi' + (!hlsAuto && hlsCurIdx === L.i ? ' on' : '') + '" data-lv="' + L.i + '"><span>' + hLabel(L.h) + '</span><span class="ck">' + ((!hlsAuto && hlsCurIdx === L.i) ? '✓' : '') + '</span></div>';
     }
+  } else if(archLevels.length){
+    /* (2026-ص3) جودات archive.org الحقيقية — الأعلى مختارة تلقائيًا والباقي براحتك */
+    for(var ai = 0; ai < archLevels.length; ai++){
+      var AL = archLevels[ai];
+      html += '<div class="qi' + (archCur === ai ? ' on' : '') + '" data-aq="' + ai + '"><span>' + esc(hLabel(AL.h || 0)) + '</span><span class="ck">' + (archCur === ai ? '✓' : '') + '</span></div>';
+    }
+    html += '<div class="qNote">دي نسخ archive.org الأصلية للفيديو ده — بيفتح تلقائيًا بأعلى جودة متاحة</div>';
   } else if(CFG.cloudinary && cloudBase){
     /* (و35) جودات Cloudinary الحقيقية — الأصلية + تصغير لحد ما */
     html += '<div class="qi' + (cloudCur === -1 ? ' on' : '') + '" data-cq="-1"><span>' + esc(fileQualityLabel || 'الجودة الأصلية') + '</span><span class="ck">' + (cloudCur === -1 ? '✓' : '') + '</span></div>';
@@ -2008,6 +2110,9 @@ function renderQMenu(){
     (function(item){
       item.addEventListener('click', function(ev){
         ev.preventDefault(); ev.stopPropagation();
+        /* (2026-ص3) جودات archive.org */
+        var aq = item.getAttribute('data-aq');
+        if(aq !== null){ switchArchiveQuality(parseInt(aq, 10)); closeQMenu(); return; }
         /* (و35) جودات Cloudinary */
         var cq = item.getAttribute('data-cq');
         if(cq !== null){ switchCloudQuality(parseInt(cq, 10)); closeQMenu(); return; }
@@ -2145,7 +2250,7 @@ function buildFileBar(){
 function onFileMeta(){
   try{
     var v = fileApi; if(!v) return;
-    if(!fileQualityLabel){ fileQualityLabel = hLabel(v.videoHeight); }
+    if(!fileQualityLabel && !archLevels.length){ fileQualityLabel = hLabel(v.videoHeight); }
     /* (و35) بناء جودات Cloudinary من مقاس الفيديو الأصلي — الأصغر بس (مفيش تكبير)
        (2026-د) من غير أي مستوى تحت 720 — طلب المستر: ال360 وحشة */
     if(CFG.cloudinary && cloudBase && !cloudLevels.length){
@@ -2210,6 +2315,8 @@ function mountFile(){
   buildFileBar();
   /* المصدر: بث HLS له قايمة جودات حقيقية — Cloudinary ليه جودات حقيقية من الرابط — الملف المباشر بجودته الأصلية */
   var src = String(CFG.fileUrl || '');
+  /* (2026-ص3) archive.org: الافتراضي أعلى جودة متاحة (احتياط لو السيرفر ما بدّلش) */
+  if(archLevels.length && archLevels[0] && archLevels[0].url) src = archLevels[0].url;
   if(CFG.cloudinary) cloudVariants(src);
   if(/\\.m3u8(\\?|$)/i.test(src)) setupHls(src);
   else v.src = src;

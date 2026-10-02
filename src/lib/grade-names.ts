@@ -44,6 +44,37 @@ export function gradeWhere(grade: string): string | { in: string[] } {
   return g
 }
 
+/* (2026-ص3) كل الصيغ المخزنة اللي تعني نفس الصف — مطابقة **تساوي حرفية**
+   مكان خدعة contains بكلمة واحدة اللي كانت بتسرّب الحاجات بين الصفوف:
+   «أولى ثانوي» كانت بتجيب «أولى إعدادي» و«أولى ابتدائي» كمان لأن أول
+   كلمة فيهم «أولى»! — يعني امتحان أولى ثانوي كان بيظهر لأولى إعدادي.
+   القاعدة دلوقتي: نفس الصف بالاسم الرسمي + الاسم القديم (بكالوريا) +
+   «أولى» لوحدها (تخزين قديم قبل التوحيد — مرجع normalizeGrade) + التوأم
+   الإملائي (ثانوى/اعدادى بالى) للصفوف اللي اتحفظت قبل التوحيد — **وبس**.
+   عمرها ما تطابق صف تاني مهما كان قريب. */
+export function gradeVariants(grade: string): string[] {
+  var g = String(grade || '').trim()
+  var n = normalizeGrade(g)
+  var out: string[] = []
+  if (g) out.push(g) // الصيغة الخام زي ما بعتها الطلب
+  if (n) out.push(n) // الصيغة المطبعة الرسمية
+  if (n === GRADE_S1) {
+    out.push(GRADE_S1_LEGACY) // «أولى بكالوريا» — نفس الصف بالاسم القديم
+    out.push('أولى')          // «أولى» لوحدها — تخزين قديم = أولى ثانوي
+  }
+  /* توأم إملائي محدود للكلمات اللي بتتباين في الى/ي بس — ممنوع استبدال
+     عمي (كان بيخرّب «بكالوريا» لـ«بكالورياى») */
+  var twin = function (v: string): string {
+    return String(v || '').replace('ثانوي', 'ثانوى').replace('إعدادي', 'إعدادى')
+  }
+  var arr = out.slice()
+  for (var i = 0; i < arr.length; i++) { var t = twin(arr[i]); if (t !== arr[i]) out.push(t) }
+  var seen: Record<string, boolean> = {}
+  var res: string[] = []
+  for (var j = 0; j < out.length; j++) { var v = out[j]; if (v && !seen[v]) { seen[v] = true; res.push(v) } }
+  return res
+}
+
 /* أي اسم قديم في بيانات مخزنة بيرجع معروض بالاسم الجديد */
 export function displayGrade(grade?: string | null): string {
   var g = String(grade || '').trim()

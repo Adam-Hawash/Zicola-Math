@@ -23,6 +23,7 @@
 // الرد {ok,code,reason} + التوصيل 423 في مسارَي التسليم زي ما هما بالظبط.
 // ============================================================
 import { db, withRetry } from '@/lib/db'
+import { gradeVariants } from '@/lib/grade-names'
 
 export interface SeqCheckResult {
   ok: boolean
@@ -130,9 +131,11 @@ function isScheduledAhead(item: any): boolean {
 }
 
 /* (2026-و40) سلسلة العناصر المرئية لنفس الصف — **نفس فلاتر قايمة الطالب
-   بالترتيب**: تطابق الصف الضبابي (exact + normalized + يحتوي أول كلمة —
-   نفس where.OR في القايمتين) ← إخفاء المجدول ← فلتر الاستهداف ← تخطي
-   اللي ملوش أسئلة — ومرتبة من الأقدم للأحدث زي orderedHw/orderedExams.
+   بالترتيب**: تطابق الصف (تساوي حرفي لكل صيغ نفس الصف — gradeVariants —
+   نفس where في القايمتين؛ خدعة LIKE بأول كلمة اتمسحت — كانت بتخلّي
+   سلسلة «أولى ثانوي» تحتسب عناصر «أولى إعدادي») ← إخفاء المجدول ←
+   فلتر الاستهداف ← تخطي اللي ملوش أسئلة — ومرتبة من الأقدم للأحدث
+   زي orderedHw/orderedExams.
    أي فشل في تحميل السلسلة نفسها = فاضي = مفيش "قبله" = فتح (fail-open). */
 async function loadVisibleChain(
   kind: 'homework' | 'exam',
@@ -140,16 +143,17 @@ async function loadVisibleChain(
   studentId: string
 ): Promise<any[]> {
   var table = kind === 'homework' ? 'Homework' : 'Exam'
-  var normalized = normalizeGradeSeq(grade)
-  var firstWord = String(normalized || grade || '').trim().split(' ')[0] || ''
+  /* (2026-ص3) مطابقة تساوي حرفية لكل صيغ نفس الصف — زي /api/homework
+     و /api/exams بالظبط. مفيش LIKE بكلمة واحدة — «أولى» كانت بتلحق
+     «أولى إعدادي» بسلسلة «أولى ثانوي» */
+  var variants = gradeVariants(grade)
+  var ph = variants.map(function () { return '?' }).join(', ')
   var rows: any[] = []
   try {
     rows = await withRetry(function () {
-      return (db as any).$queryRawUnsafe(
-        'SELECT id, title, questions, scheduledAt, targetStudentIds, targetGroupIds FROM ' + table +
-        ' WHERE grade = ? OR grade = ? OR grade LIKE ? ORDER BY createdAt ASC',
-        grade, normalized, '%' + firstWord + '%'
-      )
+      var sql = 'SELECT id, title, questions, scheduledAt, targetStudentIds, targetGroupIds FROM ' + table +
+        ' WHERE grade IN (' + ph + ') ORDER BY createdAt ASC'
+      return (db as any).$queryRawUnsafe.apply(null, [sql].concat(variants))
     }, 3, 300) as any[]
   } catch (e) {
     console.warn('[SequentialGuard] chain load failed — failing OPEN (' + table + '):', e)

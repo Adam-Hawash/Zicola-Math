@@ -6,7 +6,7 @@
 // بنرجّع الحقول الآمنة بس (من غير أي داتا داخلية).
 
 import { NextRequest, NextResponse } from 'next/server'
-import { gradeWhere, displayGrade } from '@/lib/grade-names'
+import { gradeWhere, displayGrade, gradeVariants } from '@/lib/grade-names'
 import { db } from '@/lib/db'
 
 export const runtime = 'nodejs'
@@ -59,11 +59,11 @@ export async function GET(request: NextRequest) {
 
     const where: Record<string, unknown> = {}
     if (grade) {
-      // Fuzzy grade matching: نفس فلاتر /api/homework بالظبط
+      /* (2026-ص3) مطابقة تساوي حرفية لكل صيغ نفس الصف — نفس فلاتر الواجبات
+         والامتحانات بالظبط. خدعة contains بكلمة واحدة اتمسحت: كانت بتخلّي
+         كتاب «أولى ثانوي» يظهر لأولى إعدادي (وأي صف فيه «أولى») */
       where.OR = [
-        { grade: grade },
-        { grade: gradeWhere(grade) },  // «أولى ثانوي» بتجيب «أولى بكالوريا» كمان — نفس الصف
-        { grade: { contains: normalizeGrade(grade).split(' ')[0] } },
+        { grade: { in: gradeVariants(grade) } },
       ]
     }
 

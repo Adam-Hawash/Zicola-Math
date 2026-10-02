@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { normalizeGrade, gradeWhere, storeGrade, displayGrade } from '@/lib/grade-names'
+import { normalizeGrade, gradeWhere, gradeVariants, storeGrade, displayGrade } from '@/lib/grade-names'
 import { db, safeWrite } from '@/lib/db'
 import { notifyStudents } from '@/lib/notify'
 import { isAdmin } from '@/lib/video-guard'
@@ -45,14 +45,12 @@ export async function GET(request: NextRequest) {
 
     const where: Record<string, unknown> = {}
     if (grade) {
-      // Fuzzy grade matching: normalize both sides
+      /* (2026-ص3) مطابقة تساوي حرفية لكل صيغ نفس الصف — مفيش contains بكلمة
+         واحدة: كانت بتخلّي «تالتة إعدادي» تلحق «تالتة ثانوي» والعكس،
+         وده اللي كان بيخلي الواجب يظهر لكل الصفوف */
       where.OR = [
-        { grade: grade },                              // exact match
-        { grade: gradeWhere(grade) },                  // «أولى ثانوي» بتجيب «أولى بكالوريا» كمان — نفس الصف
-        { grade: { contains: normalizeGrade(grade).split(' ')[0] } },
+        { grade: { in: gradeVariants(grade) } },
       ]
-      // Also match if the homework grade contains the normalized grade's first word
-      // This handles cases like "تالتة إعدادي" matching "الصف الثالث الاعدادي"
     }
     if (keyword) {
       where.OR = where.OR ? [...(where.OR as unknown[]), { title: { contains: keyword } }] : [{ title: { contains: keyword } }]

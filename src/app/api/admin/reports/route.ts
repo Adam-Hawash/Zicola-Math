@@ -23,6 +23,7 @@
    ============================================================ */
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { gradeVariants } from '@/lib/grade-names'
 
 /* توحيد أسماء الصفوف — نفس منطق /api/students/analytics بالظبط */
 function normalizeGrade(grade: string): string {
@@ -45,16 +46,13 @@ function normalizeGrade(grade: string): string {
   return g
 }
 
-/* مطابقة صف بعنصر (فيديو/امتحان/واجب) — نفس سماحية analytics:
-   نفس الاسم بعد التوحيد، أو أول كلمة من صف الطالب جوه اسم العنصر */
+/* مطابقة صف بعنصر (فيديو/امتحان/واجب) — (2026-ص3) تساوي حرفي على كل صيغ
+   نفس الصف (gradeVariants): خدعة «أول كلمة جوه اسم العنصر» اتمسحت —
+   كانت بتلحق طالب «أولى إعدادي» بعناصر «أولى ثانوي» */
 function gradeMatches(itemGrade: string, studentGrade: string): boolean {
   if (!itemGrade || !studentGrade) return false
   if (itemGrade === studentGrade) return true
-  var ni = normalizeGrade(itemGrade)
-  var ns = normalizeGrade(studentGrade)
-  if (ni === ns) return true
-  var first = ns.split(' ')[0]
-  return !!first && itemGrade.indexOf(first) !== -1
+  return gradeVariants(studentGrade).indexOf(itemGrade) !== -1
 }
 
 /* نسبة المشاهدة — زي ما بتتحسب في progress API */
@@ -213,13 +211,15 @@ export async function GET(request: NextRequest) {
 
       var studentsRaw
       if (gradeFilter) {
-        var ng = normalizeGrade(gradeFilter)
-        var fw = ng.split(' ')[0]
+        /* (2026-ص3) مطابقة تساوي حرفية لكل صيغ نفس الصف — مفيش LIKE بأول كلمة
+           (كانت بتخلّي تقرير «أولى ثانوي» يحسب طلاب «أولى إعدادي» كمان) */
+        var gv = gradeVariants(gradeFilter)
+        var gvPh = gv.map(function () { return '?' }).join(', ')
         studentsRaw = await db.$queryRawUnsafe(
           `SELECT id, name, phone, grade, status FROM Student
-           WHERE status IN ('approved','paid') AND (grade = ? OR grade = ? OR grade LIKE ?)
+           WHERE status IN ('approved','paid') AND grade IN (` + gvPh + `)
            ORDER BY name`,
-          gradeFilter, ng, '%' + fw + '%'
+          ...gv
         ) || []
       } else {
         studentsRaw = await db.$queryRawUnsafe(
