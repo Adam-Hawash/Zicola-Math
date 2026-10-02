@@ -34,6 +34,10 @@ const GallerySection = dynamic(() => import('@/components/landing/GallerySection
 const IntroVideoSection = dynamic(() => import('@/components/landing/IntroVideoSection'), {
   loading: () => <div className="h-20" />,
 })
+/* (Z-4) الفيديو التعريفي عن المستر — تحت فيديو إزاي تستخدم المنصة وقبل المعرض */
+const TeacherVideoSection = dynamic(() => import('@/components/landing/TeacherVideoSection'), {
+  loading: () => <div className="h-20" />,
+})
 const ChallengesSection = dynamic(() => import('@/components/landing/ChallengesSection'), {
   loading: () => <div className="h-20" />,
 })
@@ -230,6 +234,8 @@ export default function HomePage() {
           <HeroSection />
           {/* (و70) الفيديو التعريفي في الأعلى + قسم التحديات — طلب المستر */}
           <IntroVideoSection />
+          {/* (Z-4) فيديو تعريف المستر — تحته على طول، وقبل المعرض */}
+          <TeacherVideoSection />
           <FeaturesGuideSection />
           <FeaturesSection />
           <GradesSection />

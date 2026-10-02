@@ -108,22 +108,26 @@ export async function GET(
 
     // ===== بوابة الفيديو: ملفات الفيديو محمية دايماً =====
     /* (و93) استثناء فيديوهات المعرض: category='gallery' عامة زي يوتيوب.
-       (2026-و84) الفيديو التعريفي العام — بيبص على القيمة الحالية كل طلب. */
+       (2026-و84) الفيديو التعريفي العام — بيبص على القيمة الحالية كل طلب.
+       (Z-4) كمان فيديو «تعرّف على المستر» (teacher_video_url) — نفس المنطق:
+       أي واحد من الاتنين محطوط قيمته الحالية فيها id الملف → عام. */
     if (String(contentType).startsWith('video/') && meta.category !== 'gallery') {
       const token = searchParams.get('token')
       const reqId = searchParams.get('req') || ''
       const adminId = searchParams.get('adminId') || ''
       const tokenOk = token ? verifyVideoToken(token, id, reqId) : false
       const adminOk = adminId ? await isAdmin(adminId) : false
-      var isIntroPublic = false
+      var isPublicConfigVideo = false
       try {
-        var introRows: any[] = await db.$queryRawUnsafe(
-          "SELECT value FROM SiteConfig WHERE key = 'intro_video_url' LIMIT 1"
+        var pubRows: any[] = await db.$queryRawUnsafe(
+          "SELECT value FROM SiteConfig WHERE key IN ('intro_video_url', 'teacher_video_url')"
         ) as any[]
-        var introVal = introRows && introRows[0] ? String(introRows[0].value || '') : ''
-        isIntroPublic = !!introVal && introVal.indexOf(id) !== -1
+        for (var ri = 0; ri < pubRows.length; ri++) {
+          var pubVal = String(pubRows[ri].value || '')
+          if (pubVal && pubVal.indexOf(id) !== -1) { isPublicConfigVideo = true; break }
+        }
       } catch (e) { /* جدول ناقص — نكمل بالحماية العادية */ }
-      if (!tokenOk && !adminOk && !isIntroPublic) {
+      if (!tokenOk && !adminOk && !isPublicConfigVideo) {
         return NextResponse.json(
           { error: 'غير مسموح — الفيديو بيتشغل من داخل المنصة بس' },
           { status: 403 }

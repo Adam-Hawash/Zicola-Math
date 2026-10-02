@@ -2,7 +2,7 @@
 // (Z-1) intro-video — المصدر الموحد لمنطق الفيديو التعريفي
 // ============================================================
 // المفتاح في SiteConfig: intro_video_url (موجود من و70)
-//  • لينك (YouTube / Google Drive / Vimeo) → بيتطبع لصيغة embed
+//  • لينك (YouTube / Google Drive / Vimeo / Streamable / Archive.org) → بيتطبع لصيغة embed
 //  • ملف مرفوع من الجهاز → /api/files/<mediaId> (بنية chunk الموجودة)
 //  • فاضي → القسم كله بيختفي من الـ DOM (لا صندوق فاضي ولا placeholder)
 // الاتنين (الأدمن + صفحة الطالب) بيقرؤوا ويعرضوا من نفس الدوال دي.
@@ -38,6 +38,33 @@ export function vimeoId(u: string): string | null {
   return m ? m[1] : null
 }
 
+/* ============================================================
+ * (Z-4) Streamable — لينك صفحة streamable.com/<id> أو embed الحالي
+ * streamable.com/e/<id>. ده كان سبب «الفيديو الأسود على 0:00»:
+ * لينك صفحة HTML بيتحط في <video> فمفيش حاجة بتتقرا.
+ * الحل: بيتحول لصيغة الإembed الرسمية streamable.com/e/<id>
+ * (iframe) زي اليوتيوب بالظبط.
+ * ============================================================ */
+export function streamableId(u: string): string | null {
+  if (!u) return null
+  var m = String(u).match(/streamable\.com\/(?:e\/)?([a-z0-9]+)(?:[?&#/]|$)/i)
+  return m ? m[1] : null
+}
+
+/* (Z-4) Archive.org — صفحة تفاصيل archive.org/details/<id> بتتحول
+ * لإembed الرسمي archive.org/embed/<id>. لينكات التحميل المباشرة
+ * (download/....mp4) بتسيب <video> يشغلها عادي لأنها ملف حقيقي. */
+export function archiveId(u: string): string | null {
+  if (!u) return null
+  var m = String(u).match(/archive\.org\/(?:details|embed|download)\/([\w.\-]+)/i)
+  return m ? m[1] : null
+}
+
+/* لينك ملف فيديو مباشر؟ (بيتعرض في <video> مش iframe) */
+function isDirectVideoFile(u: string): boolean {
+  return /\.(mp4|webm|mov|m4v|ogg|ogv)(\?.*)?$/i.test(String(u || ''))
+}
+
 /* ملف فيديو مرفوع أو بامتداد فيديو */
 export function isVideoFileUrl(u: string): boolean {
   if (!u) return false
@@ -57,7 +84,7 @@ export function introVideoKind(url: string | null | undefined): IntroVideoKind {
   return 'link'
 }
 
-/* عناوين الـ embed الجاهزة للعرض (iframe src) */
+/* عناوين الـ embed الجاهزة للعرض (iframe src) — (Z-4) فيها Streamable وArchive.org */
 export function introEmbedSrc(url: string): string | null {
   var u = String(url || '').trim()
   if (!u) return null
@@ -67,6 +94,10 @@ export function introEmbedSrc(url: string): string | null {
   if (dv) return 'https://drive.google.com/file/d/' + dv + '/preview'
   var vm = vimeoId(u)
   if (vm) return 'https://player.vimeo.com/video/' + vm
+  var st = streamableId(u)
+  if (st) return 'https://streamable.com/e/' + st
+  var ar = archiveId(u)
+  if (ar && !isDirectVideoFile(u)) return 'https://archive.org/embed/' + ar
   return null
 }
 
@@ -89,6 +120,12 @@ export function normalizeIntroVideoUrl(raw: string): string {
     if (dv) return 'https://drive.google.com/file/d/' + dv + '/preview'
     var vm = vimeoId(u)
     if (vm) return 'https://player.vimeo.com/video/' + vm
+    /* (Z-4) Streamable + Archive.org — لينك الصفحة بيتحول لصيغة تشغيل
+       جوه المنصة قبل الحفظ، فمفيش «فيديو أسود» تاني */
+    var st = streamableId(u)
+    if (st) return 'https://streamable.com/e/' + st
+    var ar = archiveId(u)
+    if (ar && !isDirectVideoFile(u)) return 'https://archive.org/embed/' + ar
   }
   return u
 }
