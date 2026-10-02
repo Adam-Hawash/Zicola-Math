@@ -23,7 +23,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Trophy, Plus, Loader2, Trash2, Power, RefreshCw, Video, Film, Link2, Eye, Upload, CalendarDays, GraduationCap } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { chunkedUpload } from '@/lib/chunked-upload'
-import { normalizeIntroVideoUrl, introMediaId, introVideoKind, introEmbedSrc } from '@/lib/intro-video'
+import { normalizeIntroVideoUrl, introMediaId, introVideoKind, streamableId } from '@/lib/intro-video'
+import { ConfigVideoPlayer } from '@/components/landing/ConfigVideoPlayer'
 
 interface ChallengeRow {
   id: string
@@ -341,26 +342,25 @@ export function ChallengesPanel() {
   }
 
   const introKind = introVideoKind(introUrl)
+  /* (Z-5) أي لينك معروف (يوتيوب/درايف/فيميو/ستريمابل/أرشايف) بيتعاين بالمشغل
+     الموحد ConfigVideoPlayer — ستريمابل بيتشغل على مشغلنا من غير براندينج */
+  const introIsStreamable = !!streamableId(introUrl)
   const introKindLabel = introKind === 'youtube' ? 'لينك يوتيوب'
     : introKind === 'drive' ? 'لينك جوجل درايف'
     : introKind === 'vimeo' ? 'لينك فيميو'
     : introKind === 'file' ? 'ملف مرفوع من الجهاز'
-    : introKind === 'link' ? 'لينك خارجي'
+    : introKind === 'link' ? (introIsStreamable ? 'لينك ستريمابل — بيتشغل على مشغل المنصة' : 'لينك خارجي')
     : ''
-  /* (Z-4) أي لينك معروف (يوتيوب/درايف/فيميو/ستريمابل/أرشايف) بيتعاين بـ iframe —
-     الملفات المرفوعة بس اللي بتتعاين بـ <video>. قبل كده لينك ستريمابل كان
-     بيتحط في <video> فكان بيطلع أسود على 0:00 — ده سبب عيب الفيديو الأسود */
-  const introPreviewEmbed = introKind === 'file' ? null : introEmbedSrc(introUrl)
 
-  /* (Z-4) نوع ومعاينة فيديو المستر — نفس المنطق */
+  /* (Z-4) نوع فيديو المستر — نفس المنطق */
   const teacherKind = introVideoKind(teacherUrl)
+  const teacherIsStreamable = !!streamableId(teacherUrl)
   const teacherKindLabel = teacherKind === 'youtube' ? 'لينك يوتيوب'
     : teacherKind === 'drive' ? 'لينك جوجل درايف'
     : teacherKind === 'vimeo' ? 'لينك فيميو'
     : teacherKind === 'file' ? 'ملف مرفوع من الجهاز'
-    : teacherKind === 'link' ? 'لينك خارجي'
+    : teacherKind === 'link' ? (teacherIsStreamable ? 'لينك ستريمابل — بيتشغل على مشغل المنصة' : 'لينك خارجي')
     : ''
-  const teacherPreviewEmbed = teacherKind === 'file' ? null : introEmbedSrc(teacherUrl)
 
   useEffect(function () { load() }, [load])
 
@@ -500,14 +500,10 @@ export function ChallengesPanel() {
                   <span className="text-xs text-muted-foreground truncate max-w-full" dir="ltr">{introUrl}</span>
                 )}
               </div>
-              {/* معاينة سريعة — ملف مرفوع بيتعرض بلبل مشغل صغير */}
-              {introKind === 'file' ? (
-                <video src={introUrl} controls preload="metadata" className="w-full max-h-44 rounded-lg bg-black" />
-              ) : introPreviewEmbed ? (
-                <div className="aspect-video max-h-44 overflow-hidden rounded-lg bg-black">
-                  <iframe src={introPreviewEmbed} title="معاينة الفيديو التعريفي" allowFullScreen className="w-full h-full" loading="lazy" />
-                </div>
-              ) : null}
+              {/* معاينة سريعة — المشغل الموحد (ستريمابل بيتشغل على مشغلنا كمان) */}
+              <div className="aspect-video max-h-44 overflow-hidden rounded-lg bg-black">
+                <ConfigVideoPlayer url={introUrl} title="معاينة الفيديو التعريفي" />
+              </div>
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-border p-3 text-xs text-muted-foreground">
@@ -619,14 +615,10 @@ export function ChallengesPanel() {
                   <span className="text-xs text-muted-foreground truncate max-w-full" dir="ltr">{teacherUrl}</span>
                 )}
               </div>
-              {/* معاينة سريعة — لينك معروف بيتعرض بـ iframe، ملف بـ مشغل صغير */}
-              {teacherKind === 'file' ? (
-                <video src={teacherUrl} controls preload="metadata" className="w-full max-h-44 rounded-lg bg-black" />
-              ) : teacherPreviewEmbed ? (
-                <div className="aspect-video max-h-44 overflow-hidden rounded-lg bg-black">
-                  <iframe src={teacherPreviewEmbed} title="معاينة فيديو المستر" allowFullScreen className="w-full h-full" loading="lazy" />
-                </div>
-              ) : null}
+              {/* معاينة سريعة — المشغل الموحد (ستريمابل بيتشغل على مشغلنا كمان) */}
+              <div className="aspect-video max-h-44 overflow-hidden rounded-lg bg-black">
+                <ConfigVideoPlayer url={teacherUrl} title="معاينة فيديو المستر" />
+              </div>
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-border p-3 text-xs text-muted-foreground">

@@ -39,15 +39,17 @@ export function vimeoId(u: string): string | null {
 }
 
 /* ============================================================
- * (Z-4) Streamable — لينك صفحة streamable.com/<id> أو embed الحالي
- * streamable.com/e/<id>. ده كان سبب «الفيديو الأسود على 0:00»:
+ * (Z-4) Streamable — لينك صفحة streamable.com/<id> أو صيغ الإembed
+ * streamable.com/e/<id> أو /o/<id>. ده كان سبب «الفيديو الأسود على 0:00»:
  * لينك صفحة HTML بيتحط في <video> فمفيش حاجة بتتقرا.
- * الحل: بيتحول لصيغة الإembed الرسمية streamable.com/e/<id>
- * (iframe) زي اليوتيوب بالظبط.
+ * (Z-5) بطلب المستر: ستريمابل **مش بيتحول لـ embed تبعهم** — بيتخزن
+ * زي ما هو، ووقت العرض /api/resolve-video بيجيب الملف المباشر
+ * والفيديو بيتشغل على المشغل بتاعنا (ConfigVideoPlayer).
+ * الدالة دي لسه مستخدمة في بوابة الفيديو + الاحتياطي.
  * ============================================================ */
 export function streamableId(u: string): string | null {
   if (!u) return null
-  var m = String(u).match(/streamable\.com\/(?:e\/)?([a-z0-9]+)(?:[?&#/]|$)/i)
+  var m = String(u).match(/streamable\.com\/(?:[eo]\/)?([a-z0-9]+)(?:[?&#/]|$)/i)
   return m ? m[1] : null
 }
 
@@ -120,10 +122,10 @@ export function normalizeIntroVideoUrl(raw: string): string {
     if (dv) return 'https://drive.google.com/file/d/' + dv + '/preview'
     var vm = vimeoId(u)
     if (vm) return 'https://player.vimeo.com/video/' + vm
-    /* (Z-4) Streamable + Archive.org — لينك الصفحة بيتحول لصيغة تشغيل
-       جوه المنصة قبل الحفظ، فمفيش «فيديو أسود» تاني */
-    var st = streamableId(u)
-    if (st) return 'https://streamable.com/e/' + st
+    /* (Z-5) ستريمابل بقى بيتخزن زي ما هو — الفك للملف المباشر بيحصل
+       وقت العرض عبر /api/resolve-video والفيديو بيتشغل على مشغلنا
+       (المشغل الموحد ConfigVideoPlayer). أما Archive.org لسه بيتحول
+       لإembed الرسمي بتاعه. */
     var ar = archiveId(u)
     if (ar && !isDirectVideoFile(u)) return 'https://archive.org/embed/' + ar
   }

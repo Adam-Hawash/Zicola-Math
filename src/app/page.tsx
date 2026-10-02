@@ -234,8 +234,6 @@ export default function HomePage() {
           <HeroSection />
           {/* (و70) الفيديو التعريفي في الأعلى + قسم التحديات — طلب المستر */}
           <IntroVideoSection />
-          {/* (Z-4) فيديو تعريف المستر — تحته على طول، وقبل المعرض */}
-          <TeacherVideoSection />
           <FeaturesGuideSection />
           <FeaturesSection />
           <GradesSection />
@@ -243,6 +241,8 @@ export default function HomePage() {
               (و70) زرار أوائل الطلبة اتشال من النافبار بطلب المستر (حاجات الطلاب) */}
           <LessonsSection />
           <ChallengesSection />
+          {/* (Z-5) فيديو تعريف المستر — فوق قسم المعرض بالظبط بطلب المستر */}
+          <TeacherVideoSection />
           <GallerySection />
         </main>
       )}

@@ -3,30 +3,21 @@
 /* ============================================================
    (Z-4) الفيديو التعريفي عن المستر — طلب المستر حرفيًا:
    «عايز فيديو تعريفي تاني تحت اللي بيقول للطلاب ازاي يستخدموا
-   المنصة — يكون عن مستر أحمد شعبان، قبل قسم المعرض، زي معلومات
-   عن المستر».
+   المنصة — يكون عن مستر أحمد شعبان».
+   (Z-5) التعديلات بطلب المستر:
+    • العرض على المشغل الموحد ConfigVideoPlayer — ستريمابل بيتشغل
+      على مشغلنا من غير براندينج (مش iframe ستريمابل).
+    • مكانه بقى فوق قسم المعرض بالظبط (اتنقل في page.tsx).
    - المفتاح في SiteConfig: teacher_video_url (نفس منطق intro_video_url)
-   - لينك (يوتيوب/درايف/فيميو/ستريمابل/أرشايف) → iframe embed
-   - ملف مرفوع → /api/files/<mediaId> — مسموح عام من بوابة الفيديو
-     لإن القيمة متخزنة في teacher_video_url (زي intro بالظبط)
    - فاضي → القسم مش بيظهر خالص من الـ DOM
-   المنطق موحد من src/lib/intro-video.ts — نفس مصدر intro_video.
    ============================================================ */
 
 import { useEffect, useState } from 'react'
 import { GraduationCap } from 'lucide-react'
 import { useAppStore } from '@/stores/app-store'
 import { useT } from '@/lib/i18n'
-import { introVideoKind, introEmbedSrc } from '@/lib/intro-video'
-
-/* نفس حماية مشاهدة الفيديو بتاعة IntroVideoSection (و102) */
-function videoGuardProps() {
-  return {
-    controlsList: 'nodownload noremoteplayback' as const,
-    disablePictureInPicture: true,
-    onContextMenu: function (e: React.MouseEvent) { e.preventDefault() },
-  }
-}
+import { introVideoKind } from '@/lib/intro-video'
+import { ConfigVideoPlayer } from '@/components/landing/ConfigVideoPlayer'
 
 export function TeacherVideoSection() {
   const T = useT()
@@ -40,8 +31,6 @@ export function TeacherVideoSection() {
   /* مفيش فيديو → مفيش سكشن أصلًا في الـ DOM (زي IntroVideoSection) */
   const kind = introVideoKind(url)
   if (kind === 'none') return null
-
-  const embedSrc = introEmbedSrc(url)
 
   return (
     <section id="teacher-video" className="relative py-10 sm:py-14 bg-[#0F0D0A] border-t border-white/5">
@@ -58,18 +47,7 @@ export function TeacherVideoSection() {
 
         <div className="relative rounded-2xl overflow-hidden border-2 border-[#C49A38]/30 shadow-2xl bg-black">
           <div className="aspect-video">
-            {embedSrc ? (
-              <iframe
-                src={embedSrc}
-                title={T('فيديو عن المستر', 'About the Teacher')}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                loading="lazy"
-                className="w-full h-full"
-              />
-            ) : (
-              <video src={url} controls preload="metadata" playsInline {...videoGuardProps()} className="w-full h-full" />
-            )}
+            <ConfigVideoPlayer url={url} title={T('فيديو عن المستر', 'About the Teacher')} />
           </div>
         </div>
       </div>
