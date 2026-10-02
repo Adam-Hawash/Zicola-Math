@@ -1,6 +1,6 @@
 'use client'
 
-import { useAppStore, GRADES, type Student, type Video, type Homework, type Exam, type Announcement, type ExamResult, type GalleryImage, type Stats, gradesFromConfig, type GradeItem } from '@/stores/app-store'
+import { useAppStore, type Student, type Video, type Homework, type Exam, type Announcement, type ExamResult, type GalleryImage, type Stats, gradesFromConfig, type GradeItem } from '@/stores/app-store'
 import { chunkedUpload } from '@/lib/chunked-upload'
 /* (2026-و95) لودر رموز الرياضيات الموحد */
 import { PlatformLoader } from '@/components/PlatformLoader'

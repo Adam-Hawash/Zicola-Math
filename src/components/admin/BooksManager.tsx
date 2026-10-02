@@ -11,7 +11,7 @@
 // (الكتب الكبيرة 200MB+ مش بتتخزن في قاعدة البيانات خالص — sourceUrl بس).
 // ============================================================
 
-import { useAppStore, GRADES } from '@/stores/app-store'
+import { useAppStore, gradesFromConfig } from '@/stores/app-store'
 import { chunkedUpload } from '@/lib/chunked-upload'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -36,6 +36,8 @@ function formatBookSize(bytes: number): string {
 
 export function BooksManager() {
   const adminId = useAppStore(function (s) { return s.currentAdmin?.id || '' })
+  /* (Z-1) القايمة من grades_data (مصدر واحد) — زي باقي لوحات الأدمن */
+  const gradeOptions = gradesFromConfig(useAppStore(function (s) { return s.siteConfig }))
   const [books, setBooks] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -210,7 +212,7 @@ export function BooksManager() {
               <Label className="text-xs font-medium">الصف (اختياري)</Label>
               <select value={grade} onChange={function (e) { setGrade(e.target.value) }} className="w-full h-10 rounded-lg border border-input bg-transparent px-3 text-sm">
                 <option value="">كل الصفوف</option>
-                {GRADES.map(function (g) { return <option key={g} value={g}>{g}</option> })}
+                {gradeOptions.map(function (g) { return <option key={g.ar} value={g.ar}>{(g.emoji ? g.emoji + ' ' : '') + g.ar}</option> })}
               </select>
             </div>
           </div>
@@ -263,7 +265,7 @@ export function BooksManager() {
               <Label className="text-xs font-medium">الصف (اختياري)</Label>
               <select value={grade} onChange={function (e) { setGrade(e.target.value) }} className="w-full h-10 rounded-lg border border-input bg-transparent px-3 text-sm">
                 <option value="">كل الصفوف</option>
-                {GRADES.map(function (g) { return <option key={g} value={g}>{g}</option> })}
+                {gradeOptions.map(function (g) { return <option key={g.ar} value={g.ar}>{(g.emoji ? g.emoji + ' ' : '') + g.ar}</option> })}
               </select>
             </div>
           </div>

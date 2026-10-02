@@ -19,9 +19,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent } from '@/components/ui/card'
-import { Trophy, Plus, Loader2, Trash2, Power, RefreshCw, Video, Film, Link2, Eye } from 'lucide-react'
+import { Trophy, Plus, Loader2, Trash2, Power, RefreshCw, Video, Film, Link2, Eye, Upload, CalendarDays } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { chunkedUpload } from '@/lib/chunked-upload'
+import { normalizeIntroVideoUrl, introMediaId, introVideoKind, introEmbedSrc } from '@/lib/intro-video'
 
 interface ChallengeRow {
   id: string
@@ -71,9 +72,24 @@ export function ChallengesPanel() {
   const [solutions, setSolutions] = useState<SolutionRow[]>([])
   const [solutionsLoading, setSolutionsLoading] = useState(false)
 
-  /* الفيديو التعريفي */
+  /* ============================================================
+     (Z-1) الفيديو التعريفي — إزاي تستخدم المنصة
+     خيارين مع بعض من نفس المصدر (SiteConfig: intro_video_url):
+      • لينك: يوتيوب / جوجل درايف / فيميو — بيتطبّع لصيغة embed قبل الحفظ
+      • رفع من الجهاز: mp4 عبر بنية chunk الموجودة (/api/upload/chunk)
+     + عرض الحالة الحالية (لينك ولا ملف + اسمه/تاريخه) + حذف الفيديو
+     (الحذف بيفضّي القيمة وبيمسح ملف الـ Media اليتيم لو موجود)
+     ============================================================ */
   const [introUrl, setIntroUrl] = useState('')
   const [introSaving, setIntroSaving] = useState(false)
+  const [introUploading, setIntroUploading] = useState(false)
+  const [introStatus, setIntroStatus] = useState('')
+  const [introMeta, setIntroMeta] = useState<{ filename: string; createdAt: string | null; fileSize: number } | null>(null)
+  const introFileRef = useRef<HTMLInputElement>(null)
+  /* (Z-1) آخر قيمة محفوظة فعليًا على السيرفر — بتفرق عن introUrl (اللي بيتغير
+     لحظة الكتابة في الخانة) عشان مسح الملف اليتيم يبص على القيمة المخزنة القديمة:
+     المستر يكتب لينك جديد فوق ملف مرفوع → الملف القديم بيتمسح مش يفضل يتيم */
+  const savedIntroRef = useRef('')
 
   const load = useCallback(async function () {
     if (!adminId) return
@@ -86,13 +102,132 @@ export function ChallengesPanel() {
     setLoading(false)
   }, [adminId])
 
+  /* ميتاداتا الملف الحالي (اسم/تاريخ) — من /api/files/<id>?meta=1 */
+  const refreshIntroMeta = useCallback(function (value: string) {
+    var mediaId = introMediaId(value)
+    if (!mediaId) { setIntroMeta(null); return }
+    var adminIdNow = useAppStore.getState().currentAdmin?.id || ''
+    fetch('/api/files/' + mediaId + '?meta=1&adminId=' + encodeURIComponent(adminIdNow))
+      .then(function (r) { return r.ok ? r.json() : null })
+      .then(function (d) {
+        if (d && d.filename) setIntroMeta({ filename: d.filename, createdAt: d.createdAt || null, fileSize: Number(d.fileSize || 0) })
+        else setIntroMeta(null)
+      })
+      .catch(function () { setIntroMeta(null) })
+  }, [])
+
   /* تحميل الفيديو التعريفي من الكونفيج */
   useEffect(function () {
     fetch('/api/config')
       .then(function (r) { return r.json() })
-      .then(function (d) { if (d && typeof d.intro_video_url === 'string') setIntroUrl(d.intro_video_url) })
+      .then(function (d) {
+        var v = d && typeof d.intro_video_url === 'string' ? d.intro_video_url : ''
+        savedIntroRef.current = v
+        setIntroUrl(v)
+        refreshIntroMeta(v)
+      })
       .catch(function () {})
-  }, [])
+  }, [refreshIntroMeta])
+
+  /* مسح ملف الـ Media اليتيم (لينك/ملف جديد استبدل ملف قديم) — زي ما /api/files/[id] بيمسح */
+  function removeIntroMediaIfOrphan(oldValue: string) {
+    var oldId = introMediaId(oldValue)
+    if (!oldId) return
+    var adminIdNow = useAppStore.getState().currentAdmin?.id || ''
+    fetch('/api/files/' + oldId + '?adminId=' + encodeURIComponent(adminIdNow), { method: 'DELETE' })
+      .catch(function () {})
+  }
+
+  /* حفظ قيمة جديدة في المفتاح الواحد intro_video_url (القيمة الجديدة تغيب القديمة) */
+  async function writeIntroConfig(value: string): Promise<boolean> {
+    const res = await fetch('/api/config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ intro_video_url: value }),
+    })
+    return res.ok
+  }
+
+  async function saveIntroLink() {
+    if (introSaving || introUploading) return
+    var raw = introUrl.trim()
+    var normalized = normalizeIntroVideoUrl(raw)
+    setIntroSaving(true)
+    try {
+      var ok = await writeIntroConfig(normalized)
+      if (!ok) { toast.error('فشل الحفظ'); return }
+      /* لو كان ملف مرفوع واتستبدل بلينك/ملف تاني → نمسح الملف اليتيم
+         (المقارنة ضد آخر قيمة محفوظة على السيرفر — مش نص الخانة) */
+      var prevSaved = savedIntroRef.current
+      if (normalized !== prevSaved) removeIntroMediaIfOrphan(prevSaved)
+      savedIntroRef.current = normalized
+      setIntroUrl(normalized)
+      refreshIntroMeta(normalized)
+      if (!normalized) {
+        toast.success('الفيديو التعريفي اتشال — القسم اختفى من الصفحة الرئيسية')
+      } else {
+        toast.success('الفيديو التعريفي اتسجل ✅ — هيظهر فوق في الصفحة الرئيسية')
+      }
+    } catch { toast.error('فشل الاتصال') }
+    setIntroSaving(false)
+  }
+
+  /* رفع فيديو من الجهاز — نفس بنية chunk الموجودة بالظبط */
+  async function uploadIntroFile(file: File) {
+    if (!file) return
+    if (file.type && file.type.indexOf('video/') !== 0) {
+      toast.error('اختار ملف فيديو (mp4 / webm / mov)')
+      return
+    }
+    setIntroUploading(true)
+    setIntroStatus('جاري الرفع...')
+    try {
+      const result = await chunkedUpload(file, 'videos', function (pct) {
+        setIntroStatus('جاري الرفع... ' + pct + '%')
+      }, function (msg) { setIntroStatus(msg) })
+      setIntroStatus('جاري الحفظ...')
+      var ok = await writeIntroConfig(result.filePath)
+      if (!ok) { toast.error('الفيديو اترفع لكن الحفظ فشل — جرب تاني'); return }
+      /* ملف جديد فوق ملف/لينك قديم → القديم يتسحب لو كان ملف مرفوع */
+      var prevSavedFile = savedIntroRef.current
+      if (result.filePath !== prevSavedFile) removeIntroMediaIfOrphan(prevSavedFile)
+      savedIntroRef.current = result.filePath
+      setIntroUrl(result.filePath)
+      setIntroMeta({ filename: result.filename || file.name, createdAt: new Date().toISOString(), fileSize: result.size || file.size })
+      toast.success('الفيديو اترفع وبقى ظاهر للطلاب ✅')
+    } catch (e: any) {
+      toast.error(e?.message || 'فشل رفع الفيديو — حاول تاني')
+    }
+    setIntroUploading(false)
+    setIntroStatus('')
+  }
+
+  async function deleteIntro() {
+    if (introSaving || introUploading) return
+    if (!introUrl) return
+    if (!window.confirm('حذف الفيديو التعريفي؟ القسم هيختفي من الصفحة الرئيسية.')) return
+    setIntroSaving(true)
+    try {
+      var ok = await writeIntroConfig('')
+      if (!ok) { toast.error('فشل الحذف'); return }
+      /* القيمة المحفوظة على السيرفر هي اللي بيتشال منها الملف اليتيم */
+      removeIntroMediaIfOrphan(savedIntroRef.current)
+      savedIntroRef.current = ''
+      setIntroUrl('')
+      setIntroMeta(null)
+      toast.success('الفيديو التعريفي اتمسح ✅')
+    } catch { toast.error('فشل الاتصال') }
+    setIntroSaving(false)
+  }
+
+  const introKind = introVideoKind(introUrl)
+  const introKindLabel = introKind === 'youtube' ? 'لينك يوتيوب'
+    : introKind === 'drive' ? 'لينك جوجل درايف'
+    : introKind === 'vimeo' ? 'لينك فيميو'
+    : introKind === 'file' ? 'ملف مرفوع من الجهاز'
+    : introKind === 'link' ? 'لينك خارجي'
+    : ''
+  const introPreviewEmbed = (introKind === 'file' || introKind === 'link' || introKind === 'none') ? null : introEmbedSrc(introUrl)
 
   useEffect(function () { load() }, [load])
 
@@ -182,44 +317,125 @@ export function ChallengesPanel() {
     } catch { toast.error('فشل الاتصال') }
   }
 
-  async function saveIntro() {
-    setIntroSaving(true)
-    try {
-      const res = await fetch('/api/config', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ intro_video_url: introUrl.trim() }),
-      })
-      if (!res.ok) { toast.error('فشل الحفظ'); return }
-      toast.success('الفيديو التعريفي اتسجل ✅ — هيظهر فوق في الصفحة الرئيسية')
-    } catch { toast.error('فشل الاتصال') }
-    setIntroSaving(false)
-  }
-
   const activeChallenge = challenges.find(function (c) { return c.active })
 
   return (
     <div className="space-y-6">
-      {/* الفيديو التعريفي */}
+      {/* ============================================================ */}
+      {/* (Z-1) الفيديو التعريفي — إزاي تستخدم المنصة */}
       <Card>
-        <CardContent className="p-4 sm:p-6 space-y-3">
-          <h3 className="flex items-center gap-2 font-bold text-base sm:text-lg">
-            <Eye className="h-5 w-5 text-primary" />
-            الفيديو التعريفي (فوق في الصفحة الرئيسية)
-          </h3>
-          <p className="text-xs text-muted-foreground">حط لينك يوتيوب أو ارفع ملف فيديو — لو فاضي القسم مش هيظهر للطلاب.</p>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Input
-              value={introUrl}
-              onChange={function (e) { setIntroUrl(e.target.value); }}
-              placeholder="https://www.youtube.com/watch?v=... أو مسار ملف مرفوع"
-              className="min-h-[44px]"
-              dir="ltr"
+        <CardContent className="p-4 sm:p-6 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="flex items-center gap-2 font-bold text-base sm:text-lg">
+              <Eye className="h-5 w-5 text-primary" />
+              الفيديو التعريفي — إزاي تستخدم المنصة
+            </h3>
+            {introKind !== 'none' ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={deleteIntro}
+                disabled={introSaving || introUploading}
+                className="min-h-[36px] hover:bg-red-500/10 text-red-600 border-red-200"
+              >
+                {introSaving && !introUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                حذف الفيديو
+              </Button>
+            ) : null}
+          </div>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            خيارين — لينك أو رفع من الجهاز. لو فاضي الاتنين القسم مش هيظهر للطلاب خالص.
+          </p>
+
+          {/* الحالة الحالية */}
+          {introKind !== 'none' ? (
+            <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/5 p-3 space-y-2">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 text-white text-[11px] font-black px-2 py-0.5">
+                  ● الحالة الحالية
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted text-muted-foreground text-[11px] font-bold px-2 py-0.5">
+                  {introKind === 'file' ? <Film className="h-3 w-3" /> : <Link2 className="h-3 w-3" />}
+                  {introKindLabel}
+                </span>
+                {introKind === 'file' ? (
+                  <span className="text-xs font-bold truncate max-w-full">
+                    {introMeta?.filename || 'فيديو مرفوع'}
+                    {introMeta?.createdAt ? <span className="text-muted-foreground font-normal"> — {new Date(introMeta.createdAt).toLocaleDateString('ar-EG')}</span> : null}
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground truncate max-w-full" dir="ltr">{introUrl}</span>
+                )}
+              </div>
+              {/* معاينة سريعة — ملف مرفوع بيتعرض بلبل مشغل صغير */}
+              {introKind === 'file' ? (
+                <video src={introUrl} controls preload="metadata" className="w-full max-h-44 rounded-lg bg-black" />
+              ) : introPreviewEmbed ? (
+                <div className="aspect-video max-h-44 overflow-hidden rounded-lg bg-black">
+                  <iframe src={introPreviewEmbed} title="معاينة الفيديو التعريفي" allowFullScreen className="w-full h-full" loading="lazy" />
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-border p-3 text-xs text-muted-foreground">
+              مفيش فيديو حاليًا — القسم مخفي تمامًا عن الطلاب. حط لينك أو ارفع ملف وسيبه يظهر.
+            </div>
+          )}
+
+          {/* الخيار الأول: لينك */}
+          <div className="rounded-xl border border-border/60 bg-muted/20 p-3 sm:p-4 space-y-2">
+            <Label className="flex items-center gap-1.5 text-sm font-bold">
+              <Link2 className="h-4 w-4 text-primary" />
+              الخيار الأول: لينك (يوتيوب / جوجل درايف / فيميو)
+            </Label>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Input
+                value={introUrl}
+                onChange={function (e) { setIntroUrl(e.target.value) }}
+                placeholder="https://www.youtube.com/watch?v=... أو لينك درايف أو فيميو"
+                className="min-h-[44px]"
+                dir="ltr"
+              />
+              <Button onClick={saveIntroLink} disabled={introSaving || introUploading} className="min-h-[44px] font-bold shrink-0">
+                {introSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                حفظ اللينك
+              </Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground">لينك اليوتيوب/الدرايف/فيميو بيتحول أوتوماتيك لصيغة تشغيل جوه المنصة.</p>
+          </div>
+
+          {/* الخيار التاني: رفع من الجهاز */}
+          <div className="rounded-xl border border-border/60 bg-muted/20 p-3 sm:p-4 space-y-2">
+            <Label className="flex items-center gap-1.5 text-sm font-bold">
+              <Upload className="h-4 w-4 text-primary" />
+              الخيار التاني: رفع فيديو من الجهاز (mp4)
+            </Label>
+            <input
+              ref={introFileRef}
+              type="file"
+              accept="video/mp4,video/webm,video/quicktime,video/x-m4v"
+              className="hidden"
+              onChange={function (e) { const f = e.target.files?.[0]; if (f) uploadIntroFile(f); e.target.value = '' }}
             />
-            <Button onClick={saveIntro} disabled={introSaving} className="min-h-[44px] font-bold">
-              {introSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              حفظ
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={function () { introFileRef.current?.click() }}
+                disabled={introUploading || introSaving}
+                className="min-h-[44px]"
+              >
+                {introUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Film className="h-4 w-4" />}
+                {introUploading ? (introStatus || 'جاري الرفع...') : 'اختار فيديو وارفعه'}
+              </Button>
+              {introKind === 'file' && !introUploading ? <span className="text-xs text-emerald-600 font-bold">✅ الفيديو المرفوع هو المعروض دلوقتي</span> : null}
+            </div>
+            {introUploading && introStatus ? (
+              <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                <CalendarDays className="h-3 w-3" /> {introStatus}
+              </p>
+            ) : null}
+            <p className="text-[11px] text-muted-foreground">الرفع بنفس نظام المنصة (أجزاء 2MB) — يدعم الفيديوهات الكبيرة، والفيديو بيتعرض تحت عنوان «الفيديو التعريفي» فوق في الرئيسية.</p>
           </div>
         </CardContent>
       </Card>

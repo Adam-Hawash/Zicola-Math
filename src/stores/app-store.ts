@@ -199,6 +199,38 @@ export const DEFAULT_GRADES: GradeItem[] = [
 
 // بتفك JSON من siteConfig.grades_data (المفتاح اللي لوحة الأدمن بتكتب فيه)
 // ولو فاشل/فاضي بترجّع DEFAULT_GRADES — كل شاشات العرض بتقرأ من هنا
+// ============================================================
+// (Z-1) حارس توحيد «أولى ثانوي» — نفس قواعد ترحيل ensure-schema بس للعرض:
+//  • أي صف فيه «بكالوريا» ممنوع يظهر في المنصة
+//  • كل صيغ «أول ثانوي/اولي ثانوي/أولى ثانوي» بتشتغل = صف واحد «أولى ثانوي»
+// حماية عرض لو داتابيز لسه ما عدّتش ترحيل التنظيف (idempotent للعرض بس)
+// ============================================================
+function normArGradeName(name: string): string {
+  var g = String(name || '')
+  g = g.replace(/^\s*الصف\s+/, '')
+  g = g.replace(/[أإآٱ]/g, 'ا')
+  g = g.replace(/ى/g, 'ي')
+  g = g.replace(/\s+/g, ' ').trim().toLowerCase()
+  return g
+}
+
+export function isFirstSecondaryGradeName(name: string): boolean {
+  var g = normArGradeName(name)
+  if (!g) return false
+  if (g === 'اولي ثانوي' || g === 'اول ثانوي' || g === 'الاول الثانوي' || g === 'الثانوي الاول') return true
+  if (g === '1 ثانوي' || g === '١ ثانوي' || g === 'ثانوي 1') return true
+  if (g === 'first secondary' || g === 'first secondary grade' || g === 'secondary 1') return true
+  if (g === 'اولي' || g === 'اول') return true
+  return false
+}
+
+export function isBaccalaureateGradeName(name: string): boolean {
+  var g = String(name || '')
+  if (g.indexOf('بكالوريا') !== -1) return true
+  if (/bac{1,2}(ala|alau|cala)/i.test(g)) return true
+  return false
+}
+
 export function gradesFromConfig(siteConfig: SiteConfig | null | undefined): GradeItem[] {
   try {
     var raw = siteConfig ? siteConfig.grades_data : null
@@ -221,6 +253,39 @@ export function gradesFromConfig(siteConfig: SiteConfig | null | undefined): Gra
           if (items[j].ar.trim() !== '') { hasAny = true; break }
         }
         if (hasAny) {
+          /* (Z-1) توحيد «أولى ثانوي» في صف واحد بالظبط + شيل أي صف بكالوريا
+             (نفس قواعد ترحيل ensure-schema) — قبل دمج رابعة/خمسة ابتدائي */
+          var hasNonBacS1 = false
+          for (var hb = 0; hb < items.length; hb++) {
+            var hbAr = items[hb].ar || ''
+            if (hbAr && !isBaccalaureateGradeName(hbAr) && isFirstSecondaryGradeName(hbAr)) { hasNonBacS1 = true; break }
+          }
+          var cleaned: GradeItem[] = []
+          var s1Added = false
+          for (var ci = 0; ci < items.length; ci++) {
+            var cAr = items[ci].ar || ''
+            if (isBaccalaureateGradeName(cAr)) {
+              if (!s1Added && !hasNonBacS1) {
+                /* بكالوريا هي الممثل الوحيد للصف الأول الثانوي → بتتحول بالاسم المعتمد */
+                s1Added = true
+                cleaned.push({ ar: 'أولى ثانوي', en: '1 Bac', emoji: '🅱️', short: '1B' })
+              }
+              continue
+            }
+            if (isFirstSecondaryGradeName(cAr)) {
+              if (s1Added) continue
+              s1Added = true
+              cleaned.push({
+                ar: 'أولى ثانوي',
+                en: items[ci].en || '1 Bac',
+                emoji: items[ci].emoji || '🅱️',
+                short: items[ci].short || '1B',
+              })
+              continue
+            }
+            cleaned.push(items[ci])
+          }
+          items = cleaned
           /* (و71) دمج رابعة وخمسة ابتدائي: لو قاعدة البيانات (أو تخصيص أدمن قديم)
              مفيهوش الصفين الجداد — بندخلهم قبل «السادس الابتدائي» (أول القايمة لو
              مش موجودة) من غير ما نلمس باقي تخصيص الأدمن */

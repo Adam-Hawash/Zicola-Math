@@ -48,6 +48,32 @@ export async function GET(
     var { id } = await params
     const { searchParams } = new URL(request.url)
 
+    /* ===== (Z-1) ميتاداتا الملف للوحة الأدمن — اسم/نوع/حجم/تاريخ بدون البلوب.
+       الفيديو التعريفي بيعرض «الحالة الحالية» (اسم الملف وتاريخه) منها.
+       محمي بـ adminId زي الحذف بالظبط. ===== */
+    if (searchParams.get('meta') === '1') {
+      const adminOkMeta = await isAdmin(searchParams.get('adminId'))
+      if (!adminOkMeta) {
+        return NextResponse.json({ error: 'غير مصرح' }, { status: 403 })
+      }
+      var metaRowsOnly: any[] = await db.$queryRawUnsafe(
+        'SELECT id, filename, fileType, fileSize, category, createdAt FROM Media WHERE id = ? LIMIT 1',
+        id
+      ) as any[]
+      var metaOnly = metaRowsOnly && metaRowsOnly[0]
+      if (!metaOnly) {
+        return NextResponse.json({ error: 'الملف مش موجود' }, { status: 404 })
+      }
+      return NextResponse.json({
+        id: metaOnly.id,
+        filename: metaOnly.filename || '',
+        fileType: metaOnly.fileType || '',
+        fileSize: Number(metaOnly.fileSize || 0),
+        category: metaOnly.category || '',
+        createdAt: metaOnly.createdAt || null,
+      })
+    }
+
     /* ===== (تسريع الفيديو) القراءة بالبايت من غير تحميل الملف كله =====
        القديم: كل طلب — أول كل seek — بيجيب الـ base64 كامل من القاعدة ويفك
        تشفيره كله، فالفيديو الكبير بيقف ومبيجرش.

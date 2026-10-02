@@ -162,7 +162,241 @@ var SCHEMA_FIXES = [
 ]
 
 /* ============================================================
- * 2026-و23 — الفهارس الناقصة (بيئة SQLite مش بتعمل فهارس تلقائية
+ * (Z-1) ترحيل تنظيف الجريدز — طلب المستر:
+ * «شايف أكتر من صف أولى ثانوي بإملاءات مختلفة (أول ثانوي / اولي ثانوي /
+ * أولى ثانوي) + فيه صف أولى بكالوريا المفروض مفيش في المنصة دي».
+ * ------------------------------------------------------------
+ * القواعد:
+ *  1) أي صف في grades_data بيطابق عائلة «أولى ثانوي» بعد تطبيع الهمزات
+ *     والمسافات والـ prefix («الصف») → بيتدمج في **صف واحد بالظبط**
+ *     اسمه «أولى ثانوي» (يحافظ على موضع أول ظهور).
+ *  2) أي صف فيه كلمة «بكالوريا» → يُحذف نهائيًا من القايمة، ومحتواه
+ *     المربوط بالاسم القديم (فيديوهات/امتحانات/واجبات/طلاب/كتب/شكاوى/
+ *     إعلانات/نقاشات/دفعات) بيتنقل لـ «أولى ثانوي» عشان مفيش فيديو يتيم
+ *     (بكالوريا = أولى ثانوي نفس الصف حسب توحيد grade-names).
+ *  3) schedule_data (مواعيد السنتر) بيتنظف بنفس الطريقة.
+ *  - idempotent: بيشتغل مع كل تشغيل لـ ensureSchema (حتى لو بصمة
+ *    السكيما متطابقة) وبيكتب **فقط لو فيه تغيير فعلي**.
+ *  - ما بيلمسش أي صف تاني (سادس ابتدائي، إعدادي...) زي ما هو.
+ * ============================================================ */
+var GRADES_KEY = 'grades_data'
+var SCHEDULE_KEY = 'schedule_data'
+/* الاسم المعتمد الوحيد للصف الأول الثانوي في المنصة كلها */
+var GRADE_S1_CANONICAL = 'أولى ثانوي'
+/* قيم الافتراضي للصف الموحّد (نفس DEFAULT_GRADES في app-store) */
+var GRADE_S1_DEFAULTS = { en: '1 Bac', emoji: '🅱️', short: '1B' }
+
+/* تطبيع اسم الصف: شيل «الصف» + وحّد الهمزات والتاء المربوطة/الألف المقصورة
+   والفاصلة تطويل + اطوي المسافات + lowercase (للأسماء اللاتينية) */
+function normalizeGradeKey(name: any): string {
+  var g = String(name || '')
+  g = g.replace(/^\s*الصف\s+/u, '')
+  g = g.replace(/[\u0623\u0625\u0622\u0671]/g, '\u0627') // أ إ آ ٱ → ا
+  g = g.replace(/\u0649/g, '\u064A')                     // ى → ي
+  g = g.replace(/\u0640/g, '')                           // ـ tatweel
+  g = g.replace(/[\u064B-\u0652]/g, '')                  // التشكيل
+  g = g.replace(/\s+/g, ' ').trim().toLowerCase()
+  return g
+}
+
+/* عائلة «أولى ثانوي» بعد التطبيع: أول ثانوي / اولي ثانوي / أولى ثانوي /
+   1 ثانوي / first secondary / أولى لوحدها (تخزين قديم) */
+function isFirstSecondaryGradeName(name: any): boolean {
+  var g = normalizeGradeKey(name)
+  if (!g) return false
+  if (g === 'اولي ثانوي' || g === 'اول ثانوي') return true
+  if (g === 'الاول الثانوي' || g === 'الثانوي الاول') return true
+  if (g === '1 ثانوي' || g === '١ ثانوي' || g === 'ثانوي 1') return true
+  if (g === 'first secondary' || g === 'first secondary grade' || g === 'secondary 1') return true
+  if (g === 'اولي' || g === 'اول') return true /* «أولى» لوحدها = تخزين قديم لنفس الصف */
+  return false
+}
+
+/* أي اسم فيه «بكالوريا» (بكل الصيغ) — ممنوع نهائيًا في المنصة دي.
+   ملاحظة: en = '1 Bac' (اختصار لاتيني) مش بيتعلم — بس الاسم العربي
+   والـ Baccalaureate الكامل بيتعلموا */
+function isBaccalaureateGradeName(name: any): boolean {
+  var raw = String(name || '')
+  if (raw.indexOf('\u0628\u0643\u0627\u0644\u0648\u0631\u064A\u0627') !== -1) return true /* بكالوريا */
+  var g = normalizeGradeKey(raw)
+  if (g.indexOf('\u0628\u0643\u0627\u0644\u0648\u0631\u064A\u0627') !== -1) return true
+  if (/bac{1,2}(ala|alau|cala)/i.test(g)) return true /* Baccalaureate (مش Bac) */
+  return false
+}
+
+/* كل الجداول اللي بتحفظ الصف بالاسم النصي + عمودها (Payment بـ studentGrade) */
+var GRADE_CONTENT_TABLES: Array<[string, string]> = [
+  ['Video', 'grade'],
+  ['Homework', 'grade'],
+  ['Exam', 'grade'],
+  ['Announcement', 'grade'],
+  ['Discussion', 'grade'],
+  ['Book', 'grade'],
+  ['Student', 'grade'],
+  ['Complaint', 'grade'],
+  ['Payment', 'studentGrade'],
+]
+
+var _gradesMigrationDone = false
+
+/* الترحيل الفعلي — بيرجع ملخص للتشخيص. آمن للاستدعاء المتكرر. */
+export async function migrateGradesData(client: any): Promise<{ changed: boolean; removedNames?: string[]; keptName?: string; scheduleFixed?: boolean }> {
+  if (_gradesMigrationDone) return { changed: false }
+  /* لو المفتاح مش موجود أصلًا (قاعدة جديدة) — الإدخال الافتراضي في
+     SCHEMA_FIXES (cfg_grades_w71) هيتكتب بالقايمة الصح، ومفيش حاجة ننظفها */
+  var rows: any
+  try {
+    rows = await client.execute({ sql: 'SELECT value FROM SiteConfig WHERE key = ? LIMIT 1', args: [GRADES_KEY] })
+  } catch (e) { return { changed: false } }
+  if (!rows || !rows.rows || rows.rows.length === 0) { _gradesMigrationDone = true; return { changed: false } }
+
+  var raw = String(rows.rows[0].value || '')
+  if (!raw.trim()) { _gradesMigrationDone = true; return { changed: false } }
+
+  var parsed: any
+  try { parsed = JSON.parse(raw) } catch (e) { _gradesMigrationDone = true; return { changed: false } }
+  if (!Array.isArray(parsed) || parsed.length === 0) { _gradesMigrationDone = true; return { changed: false } }
+
+  /* بناء القايمة النظيفة: صف واحد بالظبط «أولى ثانوي» من غير بكالوريا.
+     لو «أولى بكالوريا» هي الممثلة الوحيدة للصف الأول الثانوي في القايمة
+     (مفيش أي صف ثانوي تاني) — بيتحول لـ «أولى ثانوي» بدل ما نسيب المنصة
+     من غير الصف ده خالص (نفس الصف بالاسمين حسب توحيد grade-names). */
+  var hasNonBacS1 = false
+  for (var pre = 0; pre < parsed.length; pre++) {
+    var preAr = typeof (parsed[pre] || {}).ar === 'string' ? String(parsed[pre].ar) : ''
+    if (preAr && !isBaccalaureateGradeName(preAr) && isFirstSecondaryGradeName(preAr)) { hasNonBacS1 = true; break }
+  }
+  var out: any[] = []
+  var s1Kept = false
+  var removedNames: string[] = []
+  var changed = false
+  for (var i = 0; i < parsed.length; i++) {
+    var g: any = parsed[i] || {}
+    var ar = typeof g.ar === 'string' ? g.ar : ''
+    if (isBaccalaureateGradeName(ar)) {
+      if (!s1Kept && !hasNonBacS1) {
+        /* الصف ده هو الممثل الوحيد للصف الأول الثانوي → بيتحول بالاسم المعتمد */
+        s1Kept = true
+        out.push({
+          ar: GRADE_S1_CANONICAL,
+          en: typeof g.en === 'string' && g.en.trim() && !isBaccalaureateGradeName(g.en) ? g.en : GRADE_S1_DEFAULTS.en,
+          emoji: typeof g.emoji === 'string' && g.emoji.trim() ? g.emoji : GRADE_S1_DEFAULTS.emoji,
+          short: typeof g.short === 'string' && g.short.trim() ? g.short : GRADE_S1_DEFAULTS.short,
+        })
+        if (ar.trim() && removedNames.indexOf(ar.trim()) === -1) removedNames.push(ar.trim())
+        changed = true
+      } else {
+        /* صف بكالوريا زيادة (فيه أولى ثانوي تاني في القايمة) → محذوف نهائيًا
+           ومحتواه بيتنقل لـ أولى ثانوي */
+        if (ar.trim() && ar.trim() !== GRADE_S1_CANONICAL && removedNames.indexOf(ar.trim()) === -1) removedNames.push(ar.trim())
+        changed = true
+      }
+      continue
+    }
+    if (isFirstSecondaryGradeName(ar) || (isBaccalaureateGradeName(g.en) && !ar)) {
+      if (!s1Kept) {
+        /* أول ظهور — الاسم يبقى الصيغة المعتمدة بالظبط، والباقي بيتحفظ
+           لو الأدمن مخصصه (وبيتكمل من الافتراضي لو ناقص) */
+        s1Kept = true
+        var item = {
+          ar: GRADE_S1_CANONICAL,
+          en: typeof g.en === 'string' && g.en.trim() && !isBaccalaureateGradeName(g.en) ? g.en : GRADE_S1_DEFAULTS.en,
+          emoji: typeof g.emoji === 'string' && g.emoji.trim() ? g.emoji : GRADE_S1_DEFAULTS.emoji,
+          short: typeof g.short === 'string' && g.short.trim() ? g.short : GRADE_S1_DEFAULTS.short,
+        }
+        if (ar !== GRADE_S1_CANONICAL) {
+          if (ar.trim() && removedNames.indexOf(ar.trim()) === -1) removedNames.push(ar.trim())
+          changed = true
+        }
+        if (JSON.stringify(item) !== JSON.stringify({ ar: ar, en: g.en, emoji: g.emoji, short: g.short })) changed = true
+        out.push(item)
+      } else {
+        /* تكرار إضافي — بيتشال ومحتواه (لو الاسم مختلف عن المعتمد) بيتنقل */
+        if (ar.trim() && ar.trim() !== GRADE_S1_CANONICAL && removedNames.indexOf(ar.trim()) === -1) removedNames.push(ar.trim())
+        if (ar !== GRADE_S1_CANONICAL) changed = true
+        changed = true
+      }
+      continue
+    }
+    out.push(g)
+  }
+
+  /* لو مفيش أي صف أولى ثانوي أصلًا مفيش حاجة نعملها للقايمة (الصف مش موجود) */
+
+  if (changed) {
+    /* 1) نقل المحتوى المربوط بالأسماء المصلحية قبل حذفها — مفيش فيديو يتيم */
+    for (var r = 0; r < removedNames.length; r++) {
+      var oldName = removedNames[r]
+      for (var t = 0; t < GRADE_CONTENT_TABLES.length; t++) {
+        try {
+          await client.execute({
+            sql: 'UPDATE ' + GRADE_CONTENT_TABLES[t][0] + ' SET ' + GRADE_CONTENT_TABLES[t][1] + ' = ? WHERE ' + GRADE_CONTENT_TABLES[t][1] + ' = ?',
+            args: [GRADE_S1_CANONICAL, oldName],
+          })
+        } catch (e) { /* جدول ناقص في قاعدة قديمة — الترحيل مكمل */ }
+      }
+    }
+    /* قيم مخزنة بتصيغات غريبة (مسافات/همزات) في جداول المحتوى — بنقرأ
+       DISTINCT ونعيد تسمية أي قيمة بتطابق العائلة دي كمان */
+    for (var t2 = 0; t2 < GRADE_CONTENT_TABLES.length; t2++) {
+      var tbl = GRADE_CONTENT_TABLES[t2][0]
+      var col = GRADE_CONTENT_TABLES[t2][1]
+      try {
+        var dist = await client.execute('SELECT DISTINCT ' + col + ' AS g FROM ' + tbl)
+        if (dist && dist.rows) {
+          for (var d = 0; d < dist.rows.length; d++) {
+            var val = String(dist.rows[d].g || '')
+            var trimmed = val.trim()
+            if (!trimmed || trimmed === GRADE_S1_CANONICAL) continue
+            var matchesFamily = isFirstSecondaryGradeName(trimmed) || isBaccalaureateGradeName(trimmed)
+            if (matchesFamily) {
+              /* تحديث بالقيمة المخزنة زي ما هي (بالمسافات) — لو اتحدث قبل كده
+                 الشرط بيرجع صفر صف = no-op آمن ومكرر التشغيل */
+              try {
+                await client.execute({ sql: 'UPDATE ' + tbl + ' SET ' + col + ' = ? WHERE ' + col + ' = ?', args: [GRADE_S1_CANONICAL, val] })
+              } catch (e2) {}
+            }
+          }
+        }
+      } catch (e3) { /* جدول ناقص */ }
+    }
+    /* 2) كتابة القايمة النظيفة */
+    try {
+      await client.execute({ sql: 'UPDATE SiteConfig SET value = ?, updatedAt = CURRENT_TIMESTAMP WHERE key = ?', args: [JSON.stringify(out), GRADES_KEY] })
+    } catch (e4) { return { changed: false } }
+    /* 3) تنظيف مواعيد السنتر (schedule_data) بنفس القاعدة */
+    try {
+      var schRes = await client.execute({ sql: 'SELECT value FROM SiteConfig WHERE key = ? LIMIT 1', args: [SCHEDULE_KEY] })
+      var schRaw = schRes && schRes.rows && schRes.rows[0] ? String(schRes.rows[0].value || '') : ''
+      if (schRaw.trim()) {
+        var sch = JSON.parse(schRaw)
+        if (Array.isArray(sch)) {
+          var schChanged = false
+          for (var sd = 0; sd < sch.length; sd++) {
+            var day = sch[sd] || {}
+            if (!Array.isArray(day.slots)) continue
+            for (var ss = 0; ss < day.slots.length; ss++) {
+              var slotGrade = String((day.slots[ss] || {}).grade || '')
+              if (slotGrade && slotGrade.trim() !== GRADE_S1_CANONICAL && (isFirstSecondaryGradeName(slotGrade) || isBaccalaureateGradeName(slotGrade))) {
+                day.slots[ss].grade = GRADE_S1_CANONICAL
+                schChanged = true
+              }
+            }
+          }
+          if (schChanged) {
+            await client.execute({ sql: 'UPDATE SiteConfig SET value = ?, updatedAt = CURRENT_TIMESTAMP WHERE key = ?', args: [JSON.stringify(sch), SCHEDULE_KEY] })
+          }
+        }
+      }
+    } catch (e5) { /* schedule_data مش موجود أو مش JSON — تجاهل آمن */ }
+    return { changed: true, removedNames: removedNames, keptName: GRADE_S1_CANONICAL }
+  }
+
+  _gradesMigrationDone = true
+  return { changed: false }
+}
+
+/* (2026-و23) الفهارس الناقصة (بيئة SQLite مش بتعمل فهارس تلقائية
  * للـ Foreign Keys) — لوحة «طلابي» كانت بتعمل count/groupBy على
  * StudentActivity و ExamResult بفل سكان على كل الصفوف. الفهارس دي
  * بتخلي الاستعلامات فورية مهما كبر حجم السجلات.
@@ -270,6 +504,20 @@ export async function ensureSchema(client: any, opts?: { force?: boolean }) {
   if (!force && _schemaVerifiedInProcess) {
     return { missing: [], repaired: false, skipped: true, memo: true, results: [] }
   }
+
+  /* ============================================================
+   * (Z-1) ترحيل تنظيف الجريدز — بيشتغل مع كل تشغيل لضمان إن التكرارات
+   * (أول ثانوي/اولي ثانوي/أولى ثانوي) وصف «أولى بكالوريا» يتشالوا من
+   * grades_data حتى لو بصمة السكيما متطابقة (idempotent — بيكتب فقط
+   * لو فيه تغيير فعلي وينقل المحتوى المربوط قبل حذف أي صف).
+   * ============================================================ */
+  try {
+    var gm = await migrateGradesData(client)
+    if (gm && gm.changed) {
+      results.push({ gradesMigration: gm })
+      console.log('[ensure-schema] grades_data cleanup:', JSON.stringify(gm))
+    }
+  } catch (eGm) { /* الترحيل خدمة تنظيف — فشله ما يمنعش السكيما */ }
 
   /* المسار السريع: البصمة متخزنة ومطابقة → مفيش أي ترميم محتاج
      (استعلام واحد بدل ~70 — ده اللي هيخلي الدخول ولوحة الطلاب فورًا) */
