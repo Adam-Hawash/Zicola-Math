@@ -67,6 +67,13 @@ export var metadata: Metadata = {
       "منصة Zicola In Math — مستر أحمد شعبان: منصة رياضيات متكاملة. تبسيط الرياضيات، واجبات أسبوعية، امتحانات منتظمة، ومتابعة مستمرة للتقدم.",
     images: ["/images/the-scholar-nav.png"],
   },
+  /* (Z-6) PWA — المنصة تتنصّب كتطبيق من كروم على الموبايل
+     باسم المنصة وأيقونة الفافيكون (نفس نمط باقي المنصات) */
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Zicola In Math",
+  },
 };
 
 export default async function RootLayout({
@@ -131,6 +138,22 @@ export default async function RootLayout({
 
         {/* Favicon — user's custom image, NO Z logo */}
         <link rel="icon" href={faviconUrl} />
+
+        {/* (Z-6) PWA — تثبيت المنصة كتطبيق: اسمها Zicola In Math
+            وأيقونتها رسمة الفافيكون (pwa-icon من نفس الصورة بجودات أعلى)،
+            theme-color داكن زي الهيرو، وسپلاش iOS بأيقونة المنصة */}
+        <meta name="theme-color" content="#0F0D0A" />
+        {/* (Z-6) سفاري/iOS لسه بيقرا النسخة بـ apple- prefix — Next 16 مش بيطلعها */}
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <link rel="apple-touch-startup-image" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)" href="/splash-1290x2796.png" />
+        <link rel="apple-touch-startup-image" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3)" href="/splash-1284x2778.png" />
+        <link rel="apple-touch-startup-image" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)" href="/splash-1179x2556.png" />
+        <link rel="apple-touch-startup-image" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)" href="/splash-1170x2532.png" />
+        <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)" href="/splash-1125x2436.png" />
+        <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)" href="/splash-828x1792.png" />
+        <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)" href="/splash-750x1334.png" />
 
         {/* (و98) تحميل صورة المستر يبدأ فورًا مع الـ HTML — مش بعد الهيدريشن */}
         <link rel="preload" as="image" href={heroPhotoUrl} fetchPriority="high" />
