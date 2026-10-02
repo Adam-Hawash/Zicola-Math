@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { gradeVariants } from '@/lib/grade-names'
 
 // Normalize grade names
 function normalizeGrade(grade: string): string {
@@ -39,11 +40,8 @@ export async function GET(request: NextRequest) {
     // Get all active students in this grade (approved or paid) with fuzzy matching
     const students = await db.student.findMany({
       where: {
-        OR: [
-          { grade: grade },
-          { grade: normalizedGrade },
-          { grade: { contains: normalizedGrade.split(' ')[0] } },
-        ],
+        /* (2026-ص3) مطابقة تساوي حرفية — مفيش contains بكلمة واحدة (تسريب بين الصفوف) */
+        grade: { in: gradeVariants(grade) },
         status: { in: ['approved', 'paid'] }
       },
       orderBy: { name: 'asc' },
@@ -64,11 +62,8 @@ export async function GET(request: NextRequest) {
     // Get all videos for this grade (with fuzzy matching)
     const gradeVideos = await db.video.findMany({
       where: {
-        OR: [
-          { grade: grade },
-          { grade: normalizedGrade },
-          { grade: { contains: normalizedGrade.split(' ')[0] } },
-        ]
+        /* (2026-ص3) مطابقة تساوي حرفية — مفيش contains بكلمة واحدة (تسريب بين الصفوف) */
+        grade: { in: gradeVariants(grade) }
       },
       select: { id: true, title: true },
     })
@@ -78,11 +73,8 @@ export async function GET(request: NextRequest) {
     // Get all exams for this grade (with fuzzy matching)
     const gradeExams = await db.exam.findMany({
       where: {
-        OR: [
-          { grade: grade },
-          { grade: normalizedGrade },
-          { grade: { contains: normalizedGrade.split(' ')[0] } },
-        ]
+        /* (2026-ص3) مطابقة تساوي حرفية — مفيش contains بكلمة واحدة (تسريب بين الصفوف) */
+        grade: { in: gradeVariants(grade) }
       },
       select: { id: true, title: true, passScore: true },
     })
@@ -91,11 +83,8 @@ export async function GET(request: NextRequest) {
     // Get all homework for this grade (with fuzzy matching)
     const gradeHomework = await db.homework.findMany({
       where: {
-        OR: [
-          { grade: grade },
-          { grade: normalizedGrade },
-          { grade: { contains: normalizedGrade.split(' ')[0] } },
-        ]
+        /* (2026-ص3) مطابقة تساوي حرفية — مفيش contains بكلمة واحدة (تسريب بين الصفوف) */
+        grade: { in: gradeVariants(grade) }
       },
       select: { id: true, title: true },
     })

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { normalizeGrade, gradeWhere, storeGrade, displayGrade } from '@/lib/grade-names'
+import { normalizeGrade, gradeWhere, gradeVariants, storeGrade, displayGrade } from '@/lib/grade-names'
 import { db, safeWrite } from '@/lib/db'
 import { notifyStudents } from '@/lib/notify'
 import { isAdmin } from '@/lib/video-guard'
@@ -113,10 +113,11 @@ export async function GET(request: NextRequest) {
 
     const where: Record<string, unknown> = {}
     if (grade) {
+      /* (2026-ص3) مطابقة تساوي حرفية لكل صيغ نفس الصف — مفيش contains بكلمة
+         واحدة: «أولى ثانوي» كانت بتلحق «أولى إعدادي» وده اللي كان بيخلي
+         الامتحان يظهر لكل الصفوف */
       where.OR = [
-        { grade: grade },
-        { grade: gradeWhere(grade) },  // «أولى ثانوي» بتجيب «أولى بكالوريا» كمان — نفس الصف
-        { grade: { contains: normalizeGrade(grade).split(' ')[0] } },
+        { grade: { in: gradeVariants(grade) } },
       ]
     }
     if (keyword) {
