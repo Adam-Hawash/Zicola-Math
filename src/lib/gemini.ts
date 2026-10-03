@@ -163,8 +163,12 @@ async function discoverModels(): Promise<string[]> {
       try {
         var controller = new AbortController()
         var to = setTimeout(function () { controller.abort() }, 8000)
-        var res = await fetch(GEMINI_BASE + '/v1beta/models?pageSize=200&key=' + keys[i], {
+        /* (و104) المفتاح بيتبعت في الهيدر مش في الـ URL — الصيغة الجديدة
+           من AI Studio (بتبدأ بـ AQ.…) بتترفض 401 لو اتبعتت ?key= —
+           الهيدر x-goog-api-key شغال مع الصيغتين (AIza القديمة + AQ الجديدة) */
+        var res = await fetch(GEMINI_BASE + '/v1beta/models?pageSize=200', {
           method: 'GET',
+          headers: { 'x-goog-api-key': keys[i] },
           signal: controller.signal,
         })
         clearTimeout(to)
@@ -269,11 +273,12 @@ async function attempt(model: string, apiKey: string, parts: any[], generationCo
   var controller = new AbortController()
   var timeoutHandle = setTimeout(function () { controller.abort() }, timeoutMs)
   try {
-    var modelUrl = GEMINI_BASE + '/v1beta/models/' + model + ':generateContent?key=' + apiKey
+    /* (و104) المفتاح في الهيدر — بيدعم الصيغة القديمة AIza والجديدة AQ */
+    var modelUrl = GEMINI_BASE + '/v1beta/models/' + model + ':generateContent'
     var withThinking = mergeConfig(generationConfig, buildThinkingConfig(model, thinkingMode))
     var res = await fetch(modelUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify({ contents: [{ parts: parts }], generationConfig: withThinking }),
       signal: controller.signal,
     })
@@ -293,7 +298,7 @@ async function attempt(model: string, apiKey: string, parts: any[], generationCo
         try {
           var res2 = await fetch(modelUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
             body: JSON.stringify({ contents: [{ parts: parts }], generationConfig: withThinking2 }),
             signal: controller2.signal,
           })
@@ -447,10 +452,11 @@ async function streamAttempt(model: string, apiKey: string, parts: any[], genera
     var controller = new AbortController()
     var timeoutHandle = setTimeout(function () { controller.abort() }, timeoutMs)
     try {
-      var modelUrl = GEMINI_BASE + '/v1beta/models/' + model + ':streamGenerateContent?alt=sse&key=' + apiKey
+      /* (و104) المفتاح في الهيدر — بيدعم الصيغة القديمة AIza والجديدة AQ */
+      var modelUrl = GEMINI_BASE + '/v1beta/models/' + model + ':streamGenerateContent?alt=sse'
       var res = await fetch(modelUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
         body: JSON.stringify({ contents: [{ parts: parts }], generationConfig: cfg }),
         signal: controller.signal,
       })

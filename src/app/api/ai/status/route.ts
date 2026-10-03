@@ -25,7 +25,11 @@ async function listGoogleModels(key: string): Promise<{ ok: boolean; models?: st
   try {
     var controller = new AbortController()
     var to = setTimeout(function () { controller.abort() }, 10000)
-    var res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=' + key, { signal: controller.signal })
+    /* (و104) المفتاح في الهيدر — بيدعم الصيغة القديمة AIza والجديدة AQ */
+    var res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', {
+      headers: { 'x-goog-api-key': key },
+      signal: controller.signal,
+    })
     clearTimeout(to)
     if (!res.ok) {
       var body = ''
