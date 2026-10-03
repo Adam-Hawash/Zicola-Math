@@ -147,7 +147,7 @@ export function ChallengesPanel() {
 
   /* تحميل الفيديو التعريفي من الكونفيج */
   useEffect(function () {
-    fetch('/api/config')
+    fetch('/api/config?fresh=' + Date.now())
       .then(function (r) { return r.json() })
       .then(function (d) {
         var v = d && typeof d.intro_video_url === 'string' ? d.intro_video_url : ''
