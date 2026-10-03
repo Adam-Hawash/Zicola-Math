@@ -48,11 +48,12 @@ function ComplaintsLink() {
   )
 }
 
-// Hidden admin entry: phone 44444444444 (or ID zicolainmath26 — without
-// gmail.com per the teacher's request — in the admin dialog) + this password
-// redirects to admin login — (و75/و76)
-var ADMIN_PHONE = '44444444444'
-var ADMIN_PASSWORD = 'zicola2026#'
+// (2026-ص5) البوابة المخفية للمشرفين — طلب المستر حرفيًا: في تسجيل الدخول
+// يكتب الرقم 01118411148 والباسورد Zicolainmath2026 فيتحوّل لدخول المشرفين،
+// وهناك يكتب نفس الباسورد مع المعرّف ahmed01118411148 (ahmed + نفس الرقم)
+// فيدخل لوحة التحكم — مطابقة قبل أي fetch زي البوابات القديمة بالظبط
+var ADMIN_PHONE = '01118411148'
+var ADMIN_PASSWORD = 'Zicolainmath2026'
 
 // لافتة تحذير الجهاز الواحد — فوق صفحتين الدخول والتسجيل.
 // (دي تلاتة تنبيه جديد بطلب المستر: الحساب مربوط بجهاز واحد بس —

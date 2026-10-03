@@ -18,6 +18,18 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import Image from 'next/image'
 import { toast } from 'sonner'
 import type { Video as VideoType, Homework, Exam, Announcement, Discussion, ExamResult } from '@/stores/app-store'
+
+/* (2026-ص5) الحصص البرايفت — طلب المستر حرفيًا: الحصص اللي جنبها قوسين وجواهم
+   كلمة private بالإنجليزي (زي «حصة 5 (private)») تتنشال من تاب الدروس العادي
+   وتتعرض لوحدها في تاب «برايفت» — فصل عرض بس: المواعيد والوصول والقواعد نفسها،
+   والسلسلة التسلسلية بتبقى مستقلة داخل كل تاب (حصص البرايفت ما بتقفلش الدروس
+   العادية والعكس) — نفس القاعدة على السيرفر في video-guard
+   (النسختين متطابقتين عمدًا — دي نسخة الكلاينت) */
+export function isPrivateLessonTitle(t: any): boolean {
+  var s = String(t || '').toLowerCase()
+  if (!s) return false
+  return /\(\s*private\s*\)/.test(s) || /[\(（]\s*private\s*[)）]/.test(s) || s.indexOf('private') >= 0 || s.indexOf('برايفت') >= 0 || s.indexOf('بريفت') >= 0
+}
 import { MathKeyboard } from '@/components/student/MathKeyboard'
 /* (2026-و97) رجوع لودر و95 في بوابة الطالب زي ما كان — بطلب المستر */
 import { PlatformLoader } from '@/components/PlatformLoader'
@@ -297,12 +309,13 @@ function StudentPortalInner() {
     const initialData = dashboardData
     if (!initialData) return null
 
-    // Calculate summary stats
-    var totalVideos = initialData.videos.length
+    // Calculate summary stats — (2026-ص5) الدروس البرايفت مش من إحصائيات الداشبورد
+    var dashboardNormalVideos = (initialData.videos || []).filter(function (v: any) { return !isPrivateLessonTitle(v.title) })
+    var totalVideos = dashboardNormalVideos.length
     var watchedCount = 0
     var avgProgress = 0
     var progressCount = 0
-    initialData.videos.forEach(function(v) {
+    dashboardNormalVideos.forEach(function(v) {
       var prog = initialData.videoProgress[v.id]
       if (prog !== undefined) {
         avgProgress += prog
@@ -455,7 +468,7 @@ function StudentPortalInner() {
                 {T('بص على الكل', 'See All')}
               </Button>
             </div>
-            <VideosTab videos={initialData.videos} watchedIds={initialData.watchedIds} approvedVideoIds={initialData.approvedVideoIds} studentId={studentId} grade={grade} videoProgress={initialData.videoProgress} studentStatus={currentStudent?.status} isPaidAccess={currentStudent?.isPaidAccess} studentName={currentStudent?.name || ''} studentPhone={currentStudent?.phone || ''} />
+            <VideosTab videos={dashboardNormalVideos} watchedIds={initialData.watchedIds} approvedVideoIds={initialData.approvedVideoIds} studentId={studentId} grade={grade} videoProgress={initialData.videoProgress} studentStatus={currentStudent?.status} isPaidAccess={currentStudent?.isPaidAccess} studentName={currentStudent?.name || ''} studentPhone={currentStudent?.phone || ''} />
           </div>
 
           {/* Guide modal */}
@@ -468,9 +481,16 @@ function StudentPortalInner() {
   // Full portal
   if (!dashboardData) return null
 
-  /* (و64) التابات بالعربي والإنجليزي — الترجمة بتحصل فعلًا مع تبديل اللغة */
+  /* (2026-ص5) فصل الدروس: العادي في تاب الدروس — البرايفت في تاب «برايفت» لوحدها
+     (التاب بيتحط في القايمة بس لما فيه حصص برايفت) */
+  const normalVideos = (dashboardData.videos || []).filter(function (v: any) { return !isPrivateLessonTitle(v.title) })
+  const privateVideos = (dashboardData.videos || []).filter(function (v: any) { return isPrivateLessonTitle(v.title) })
+
+  /* (2026-ص5) التابات بالعربي والإنجليزي — الترجمة بتحصل فعلًا مع تبديل اللغة */
   const tabs = [
     { id: 'videos', label: T('الدروس', 'Lessons'), icon: Video },
+    /* (2026-ص5) تاب «برايفت» — بيظهر بس لما فيه حصص برايفت في صف الطالب */
+    ...(privateVideos.length > 0 ? [{ id: 'private', label: T('برايفت', 'Private'), icon: Lock }] : []),
     { id: 'homework', label: T('الواجبات', 'Homework'), icon: ClipboardList },
     { id: 'exams', label: T('الامتحانات', 'Exams'), icon: FileText },
     /* (2026-و40) الكتب والملازم — مكتبة PDF الطالب يفتحها/يحملها */
@@ -532,7 +552,9 @@ function StudentPortalInner() {
 
       {/* Tab Content */}
       <div className="flex-1 overflow-y-auto p-4">
-        {activeTab === 'videos' && <VideosTab videos={dashboardData.videos} watchedIds={dashboardData.watchedIds} approvedVideoIds={dashboardData.approvedVideoIds} studentId={studentId} grade={grade} videoProgress={dashboardData.videoProgress} studentStatus={currentStudent?.status} isPaidAccess={currentStudent?.isPaidAccess} studentName={currentStudent?.name || ''} studentPhone={currentStudent?.phone || ''} />}
+        {/* (2026-ص5) الدروس العادي من غير البرايفت + تاب برايفت بيفتحها لوحدها */}
+        {activeTab === 'videos' && <VideosTab videos={normalVideos} watchedIds={dashboardData.watchedIds} approvedVideoIds={dashboardData.approvedVideoIds} studentId={studentId} grade={grade} videoProgress={dashboardData.videoProgress} studentStatus={currentStudent?.status} isPaidAccess={currentStudent?.isPaidAccess} studentName={currentStudent?.name || ''} studentPhone={currentStudent?.phone || ''} />}
+        {activeTab === 'private' && <VideosTab videos={privateVideos} watchedIds={dashboardData.watchedIds} approvedVideoIds={dashboardData.approvedVideoIds} studentId={studentId} grade={grade} videoProgress={dashboardData.videoProgress} studentStatus={currentStudent?.status} isPaidAccess={currentStudent?.isPaidAccess} studentName={currentStudent?.name || ''} studentPhone={currentStudent?.phone || ''} />}
         {activeTab === 'homework' && <HomeworkTab homework={dashboardData.homework} studentId={studentId} completedHwIds={completedHwIds} onHwSubmitted={(id) => setCompletedHwIds(prev => new Set([...prev, id]))} />}
         {activeTab === 'exams' && <ExamsTab exams={dashboardData.exams} results={dashboardData.examResults} completedExamIds={completedExamIds} onExamSubmitted={(id) => setCompletedExamIds(prev => new Set([...prev, id]))} studentId={studentId} resultsLoaded={examResultsLoaded} onGoHome={() => setActiveTab('videos')} />}
         {activeTab === 'books' && <BooksTab grade={grade} />}
