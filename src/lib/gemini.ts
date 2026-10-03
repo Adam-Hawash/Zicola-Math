@@ -108,6 +108,110 @@ export interface GeminiResult {
 }
 
 /* ============================================================
+ * (و105) Interactions API — المسار الجديد لمفاتيح الـ auth
+ * ============================================================
+ * من 28 مايو 2026 Google AI Studio بيفرد مفاتيح "auth keys"
+ * بصيغة جديدة بتبدأ بـ AQ.… (مرتبطة بحساب خدمة بدل مشروع Cloud).
+ * المفاتيح دي بتترفض 401 UNAUTHENTICATED على المسار القديم
+ * v1beta/models/…:generateContent حتى لو اتبعتت في الهيدر —
+ * لكنها شغالة على الـ Interactions API الجديد (/v1beta/interactions).
+ *
+ * الاستراتيجية: نجرب المسار القديم الأول (يغطي المفاتيح القياسية
+ * AIza)، ولو رجع 401/ACCESS_TOKEN_TYPE_UNSUPPORTED نحوّل نفس
+ * الطلب تلقائيًا للمسار الجديد — فالمفتاحين بيتغطوا بدون أي تدخل.
+ * ============================================================ */
+
+function isAuthKey(key: string): boolean {
+  return typeof key === 'string' && key.indexOf('AQ.') === 0
+}
+
+/* تحويل أجزاء generateContent القديمة ([{text}|{inlineData:{mimeType,data}}])
+   إلى بلوكات Interactions ([{type:'text',text}|{type:'image',mime_type,data}]) */
+function partsToInteractionBlocks(parts: any[]): any[] {
+  var out: any[] = []
+  for (var i = 0; i < parts.length; i++) {
+    var p = parts[i] || {}
+    if (p.text) out.push({ type: 'text', text: String(p.text) })
+    else if (p.inlineData || p.inline_data) {
+      var il = p.inlineData || p.inline_data
+      out.push({ type: 'image', mime_type: il.mimeType || il.mime_type || 'image/png', data: il.data })
+    }
+  }
+  if (out.length === 0) out.push({ type: 'text', text: ' ' })
+  return out
+}
+
+/* استخراج الرد من Interaction resource:
+   steps[] (type=model_output) → content[] (type=text) → text */
+function extractInteractionText(data: any): string {
+  var text = ''
+  try {
+    var steps = data.steps || []
+    for (var i = 0; i < steps.length; i++) {
+      if (steps[i].type && steps[i].type !== 'model_output') continue
+      var blocks = steps[i].content || []
+      for (var j = 0; j < blocks.length; j++) {
+        if (blocks[j].type === 'text' && blocks[j].text) text += blocks[j].text
+      }
+    }
+  } catch (e) {}
+  return text.trim()
+}
+
+/* نداء واحد على Interactions API — model name نفسه بيتمرر زي ما هو */
+async function attemptInteractions(model: string, apiKey: string, parts: any[], generationConfig: any, timeoutMs: number, thinkingMode: 'low' | 'off' | 'default'): Promise<GeminiResult> {
+  var controller = new AbortController()
+  var timeoutHandle = setTimeout(function () { controller.abort() }, timeoutMs)
+  try {
+    var gc: any = {}
+    if (generationConfig) {
+      if (generationConfig.maxOutputTokens) gc.max_output_tokens = generationConfig.maxOutputTokens
+      if (generationConfig.temperature != null) gc.temperature = generationConfig.temperature
+    }
+    /* thinking_level — المسار الجديد بيستخدم thinking_level مش thinkingConfig */
+    if (thinkingMode === 'low') gc.thinking_level = 'low'
+    else if (thinkingMode === 'off') gc.thinking_level = 'minimal'
+
+    var body: any = {
+      model: model,
+      input: partsToInteractionBlocks(parts),
+      generation_config: gc,
+      store: false,
+      stream: false,
+    }
+
+    var res = await fetch(GEMINI_BASE + '/v1beta/interactions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+    var errBody = ''
+    if (!res.ok) {
+      try { errBody = await res.text() } catch (e) {}
+      return { ok: false, error: 'interactions/' + model + ': ' + res.status + ' ' + (errBody || '').substring(0, 250), status: res.status }
+    }
+    var data = await res.json()
+    var text = extractInteractionText(data)
+    if (text) return { ok: true, text: text, model: model }
+    return { ok: false, error: 'interactions/' + model + ': response had no text', status: 200 }
+  } catch (e: any) {
+    var msg = (e && e.name === 'AbortError') ? 'timeout after ' + timeoutMs + 'ms' : ((e && e.message) || 'network error')
+    return { ok: false, error: 'interactions/' + model + ': ' + msg }
+  } finally {
+    clearTimeout(timeoutHandle)
+  }
+}
+
+/* هل الخطأ ده معناه إن المفتاح auth (AQ.) فاشل على المسار القديم؟ */
+function isAuthKeyPathError(status: number, errBody: string): boolean {
+  if (status === 401) return true
+  if (status === 400 && (errBody.indexOf('ACCESS_TOKEN_TYPE_UNSUPPORTED') >= 0 || errBody.indexOf('API key not valid') >= 0)) return true
+  return false
+}
+
+
+/* ============================================================
  * Dynamic model discovery — ListModels, cached 10 minutes.
  * Ranks models: gemini-3.6-flash first, then other 3.6 models,
  * then latest aliases, then any flash, then any pro.
@@ -270,6 +374,11 @@ function extractText(data: any): string {
 
 // Single attempt against one model + one key
 async function attempt(model: string, apiKey: string, parts: any[], generationConfig: any, timeoutMs: number, thinkingMode: 'low' | 'off' | 'default'): Promise<GeminiResult> {
+  /* (و105) مفتاح auth (AQ.)؟ المسار القديم بيرفضه 401 غالبًا — روح
+     للمسار الجديد (interactions) على طول بدون ما نضيّع محاولة فاشلة */
+  if (isAuthKey(apiKey)) {
+    return attemptInteractions(model, apiKey, parts, generationConfig, timeoutMs, thinkingMode)
+  }
   var controller = new AbortController()
   var timeoutHandle = setTimeout(function () { controller.abort() }, timeoutMs)
   try {
@@ -323,7 +432,7 @@ async function attempt(model: string, apiKey: string, parts: any[], generationCo
       try {
         var res3 = await fetch(modelUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
           body: JSON.stringify({ contents: [{ parts: parts }], generationConfig: generationConfig }),
           signal: controller3.signal,
         })
@@ -333,6 +442,13 @@ async function attempt(model: string, apiKey: string, parts: any[], generationCo
           if (text3) return { ok: true, text: text3, model: model }
         }
       } catch (e) {} finally { clearTimeout(timeoutHandle3) }
+    }
+
+    /* (و105) مفاتيح الـ auth الجديدة بترفض 401/ACCESS_TOKEN_TYPE_UNSUPPORTED
+       على المسار القديم — جرّب المسار الجديد بنفس المفتاح قبل ما نستسلم */
+    if (isAuthKeyPathError(res.status, errBody) && !isAuthKey(apiKey)) {
+      var inter = await attemptInteractions(model, apiKey, parts, generationConfig, timeoutMs, thinkingMode)
+      if (inter.ok) return inter
     }
 
     return { ok: false, error: model + ': ' + res.status + ' ' + (errBody || '').substring(0, 300), status: res.status }
@@ -448,6 +564,12 @@ export async function callGemini(opts: {
 async function streamAttempt(model: string, apiKey: string, parts: any[], generationConfig: any, timeoutMs: number, thinkingMode: 'low' | 'off' | 'default', onDelta?: (d: string) => void): Promise<GeminiResult> {
   var emitted = 0
 
+  /* (و105) مفتاح auth (AQ.)؟ الاستريم القديم بيرفضه — المسار الجديد
+     دلوقتي non-streaming بس، والراوت بيعمل typewriter محلي في الحالة دي */
+  if (isAuthKey(apiKey)) {
+    return attemptInteractions(model, apiKey, parts, generationConfig, timeoutMs, thinkingMode)
+  }
+
   var runStream = async function (cfg: any): Promise<GeminiResult> {
     var controller = new AbortController()
     var timeoutHandle = setTimeout(function () { controller.abort() }, timeoutMs)
@@ -517,6 +639,13 @@ async function streamAttempt(model: string, apiKey: string, parts: any[], genera
     var second = await runStream(generationConfig)
     if (second.ok) return second
     return second
+  }
+  /* (و105) مفتاح auth اترفض على المسار القديم ومفيش أي دلتا اتبعت —
+     جرّب المسار الجديد (interactions). النتيجة هترجع نص كامل
+     والراوت بيعيد تشغيله typewriter فمافيش أي تأثير على الطالب */
+  if (first.status && isAuthKeyPathError(first.status, first.error || '') && emitted === 0) {
+    var inter = await attemptInteractions(model, apiKey, parts, generationConfig, timeoutMs, thinkingMode)
+    if (inter.ok) return inter
   }
   return first
 }
