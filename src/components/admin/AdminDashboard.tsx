@@ -1317,26 +1317,47 @@ function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
     return result.filePath
   }
 
-  /* (و104) تبديل ترتيب جزأين في الدرس المتعدد — PATCH للاتنين + تحديث محلي */
+  /* (و106) تبديل ترتيب جزأين في الدرس المتعدد — إعادة ترقيم كاملة 1..N
+     ليه مش تبديل قيم زي زمان؟ لأن لو جزأين ماخدين نفس orderIndex (حصل
+     فعلًا في الإنتاج — فيديوهين رقمهم 4)، تبديل القيم بينهم بيبقى بيرجّع
+     نفس الأرقام = الضغطة بتبقى بلا تأثير خالص («ما بيتحفظش»).
+     الحل: نبدّل المواضع في القايمة المعروضة ونبعت الترتيب الجديد كامل
+     للسيرفر وهو بيرقّم من الأول — والتكرار القديم بيتصلّح لوحده من
+     أول ضغطة سهم. وبرضه بنفحص res.ok — زمان الفشل بيتقنع نجاح! */
   const swapGroupOrder = async function (a: Video, b: Video) {
     if (reordering) return
     setReordering(true)
     try {
-      var oa = a.orderIndex || 0, ob = b.orderIndex || 0
-      await Promise.all([
-        fetch('/api/videos/' + a.id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ adminId: currentAdminId, orderIndex: ob }) }),
-        fetch('/api/videos/' + b.id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ adminId: currentAdminId, orderIndex: oa }) }),
-      ])
-      /* تحديث محلي فوري — في الكروت وفي شريط الفورم */
+      /* القايمة الحالية بالعرض — نبدّل موضع a و b فيها */
+      var current = sortedGroupParts.slice()
+      var ia = current.findIndex(function (v) { return v.id === a.id })
+      var ib = current.findIndex(function (v) { return v.id === b.id })
+      if (ia < 0 || ib < 0) { toast.error('مفيش بيانات للترتيب — حدّث الصفحة وجرب تاني'); setReordering(false); return }
+      var tmp = current[ia]; current[ia] = current[ib]; current[ib] = tmp
+
+      var gk = String((current[0] as any).groupKey || (a as any).groupKey || '')
+      var res = await fetch('/api/videos/reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminId: currentAdminId,
+          orders: current.map(function (v, i) { return { id: v.id, orderIndex: i + 1 } }),
+        }),
+      })
+      if (!res.ok) {
+        var d: any = null; try { d = await res.json() } catch {}
+        toast.error('فشل حفظ الترتيب: ' + ((d && d.error) || 'خطأ غير معروف'))
+        setReordering(false)
+        return
+      }
+      /* تحديث محلي فوري بالأرقام الجديدة — في الكروت وفي شريط الفورم */
+      var newOrder: Record<string, number> = {}
+      current.forEach(function (v, i) { newOrder[v.id] = i + 1 })
       setVideos(function (prev) { return prev.map(function (v) {
-        if (v.id === a.id) return { ...v, orderIndex: ob }
-        if (v.id === b.id) return { ...v, orderIndex: oa }
-        return v
+        return newOrder[v.id] !== undefined ? { ...v, orderIndex: newOrder[v.id] } : v
       }) })
       setGroupParts(function (prev) { return prev.map(function (v) {
-        if (v.id === a.id) return { ...v, orderIndex: ob }
-        if (v.id === b.id) return { ...v, orderIndex: oa }
-        return v
+        return newOrder[v.id] !== undefined ? { ...v, orderIndex: newOrder[v.id] } : v
       }) })
       toast.success('اتغير الترتيب بنجاح')
     } catch { toast.error('حصل خطأ في تغيير الترتيب — جرب تاني') }

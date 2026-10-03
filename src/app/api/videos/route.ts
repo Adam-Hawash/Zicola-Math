@@ -210,8 +210,16 @@ export async function POST(request: NextRequest) {
     if (!finalGroupKey && body.isMulti) {
       finalGroupKey = 'les_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
     }
-    const rawOrder = Number(body.orderIndex)
-    const finalOrder = Number.isFinite(rawOrder) && rawOrder > 0 ? Math.floor(rawOrder) : 0
+    /* (و106) الترقيم من السيرفر مش من العميل — القيمة اللي جاية من الفورم
+       كانت length+1 ولو الفورم فاتح من جلسة قديمة أو متزامنتش مع الداتابيز
+       بتدي رقم مكرر (حصل فعلًا: فيديوهين رقمهم 4 في نفس الدرس → السهم
+       بيبقى بلا تأثير). max(orderIndex) + 1 مضمونة ضد التكرار دايمًا */
+    let finalOrder = 0
+    if (finalGroupKey) {
+      const aggOrder = await db.video.aggregate({ _max: { orderIndex: true }, where: { groupKey: finalGroupKey } })
+      const maxOrder = Number((aggOrder._max && (aggOrder._max as { orderIndex: number | null }).orderIndex) || 0)
+      finalOrder = maxOrder + 1
+    }
 
     /* (و45) الصورة المصغرة الأوتوماتيكية — لو الأدمن ماحطش صورة وفيه لينك
        يوتيوب: بنخزّن صورة الفيديو من i.ytimg.com على السيرفر كمان
