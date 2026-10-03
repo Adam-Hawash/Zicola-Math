@@ -307,7 +307,7 @@ export function GradesSchedulePanel() {
   useEffect(function () {
     if (configLoaded || configFetchStarted) return
     setConfigFetchStarted(true)
-    fetch('/api/config')
+    fetch('/api/config?fresh=' + Date.now())
       .then(function (r) { return r.json() })
       .then(function (data) {
         useAppStore.getState().setSiteConfig(data || {})

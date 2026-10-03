@@ -229,8 +229,12 @@ function StudentPortalInner() {
       } catch (e) { /* صامت — الشارات مش سبب لكسر حاجة */ }
     }
     check()
-    var t = setInterval(check, 60000)
-    return function () { alive = false; clearInterval(t) }
+    /* (توفير الباك إند — ص8) شارات الجديد مش بتتحدث وانتا في تاب مخفي —
+       أول ما ترجع للتاب بنتحدّث فورًا */
+    var t = setInterval(function () { if (!document.hidden) check() }, 60000)
+    function onVis() { if (!document.hidden) check() }
+    document.addEventListener('visibilitychange', onVis)
+    return function () { alive = false; clearInterval(t); document.removeEventListener('visibilitychange', onVis) }
   /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [studentId, grade, activeTab])
   /* فتح التاب فورًا = صفر الشارة (من غير استنى الدورة) */
@@ -1524,6 +1528,7 @@ function HomeworkTab({ homework, studentId, completedHwIds, onHwSubmitted }: { h
     if (hwPollTimers.current[hwId]) clearInterval(hwPollTimers.current[hwId])
     var tries = 0
     hwPollTimers.current[hwId] = setInterval(async function() {
+      if (document.hidden) return /* (توفير الباك إند — ص8) مفيش نداءات وانتا في تاب مخفي — التقييم بيكمل أول ما ترجع */
       tries++
       if (tries > 45) { clearInterval(hwPollTimers.current[hwId]); delete hwPollTimers.current[hwId]; return }
       try {

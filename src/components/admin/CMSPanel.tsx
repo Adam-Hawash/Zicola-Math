@@ -221,7 +221,7 @@ export function CMSPanel() {
   var loadConfig = async function() {
     setLoading(true)
     try {
-      var res = await fetch('/api/config')
+      var res = await fetch('/api/config?fresh=' + Date.now())
       if (!res.ok) {
         var errText = ''
         try { errText = await res.text() } catch(x) {}
