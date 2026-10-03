@@ -188,6 +188,16 @@ export async function computePlayback(videoId: string, studentId: string | null 
 // ============================================================
 export const SEQ_UNLOCK_RATIO = 0.99
 
+/* (2026-ص5) الحصص البرايفت — نفس قاعدة الكلاينت في StudentPortal حرفيًا:
+   العنوان فيه قوسين وجواهم private بالإنجليزي (أو برايفت/بريفت) = برايفت.
+   السلسلة التسلسلية على السيرفر بتبقى مستقلة لكل نوع — حصص البرايفت
+   (اللي بتتعرض في تاب لوحدها) ما بتقفلش الدروس العادية والعكس */
+export function isPrivateLessonTitleServer(t: any): boolean {
+  var s = String(t || '').toLowerCase()
+  if (!s) return false
+  return /\(\s*private\s*\)/.test(s) || /[\(（]\s*private\s*[)）]/.test(s) || s.indexOf('private') >= 0 || s.indexOf('برايفت') >= 0 || s.indexOf('بريفت') >= 0
+}
+
 export async function checkSequentialUnlock(
   videoId: string,
   studentId: string | null | undefined
@@ -197,11 +207,16 @@ export async function checkSequentialUnlock(
   try {
     const video = await db.video.findUnique({ where: { id: videoId } })
     if (!video) return { ok: true }
-    const gradeVideos = await db.video.findMany({
+    const gradeVideosAll = await db.video.findMany({
       where: { grade: video.grade },
       orderBy: { createdAt: 'asc' },
-      select: { id: true, url: true, filePath: true, fileType: true, groupKey: true, orderIndex: true, createdAt: true },
+      select: { id: true, title: true, url: true, filePath: true, fileType: true, groupKey: true, orderIndex: true, createdAt: true },
     })
+    /* (2026-ص5) سلسلة مستقلة لكل نوع: الفيديو المطلوب برايفت → السلسلة برايفت بس،
+       عادي → السلسلة العادية بس — تاب «برايفت» ما بيبوّظش قفل الدروس العادية */
+    const privSelf = isPrivateLessonTitleServer(video.title)
+    const gradeVideos = gradeVideosAll.filter(function (v: any) { return isPrivateLessonTitleServer(v.title) === privSelf })
+    if (gradeVideos.length === 0) return { ok: true }
     /* (و104) ترتيب واعي بالدروس متعددة الفيديوهات:
        - فيديو مفرد → مرساه createdAt بتاعته
        - فيديو جوه درس متعدد (groupKey) → مرساه createdAt لأول جزء في الدرس،

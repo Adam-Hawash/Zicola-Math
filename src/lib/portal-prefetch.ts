@@ -22,7 +22,10 @@ export function buildPortalUrls(grade: string, studentId: string): string[] {
   var g = encodeURIComponent(String(grade || ''))
   var sid = String(studentId || '')
   return [
-    '/api/videos?grade=' + g + '&pageSize=100',
+    /* (2026-ص5) studentId في رابط الفيديوهات — عشان السيرفر يفرق الطالب عن
+       الزائر: الطالب يشوف الحصص البرايفت بتاعته (تاب «برايفت»)، والزائر
+       الحقيقي (من غير studentId) بيفضل من غير البرايفت خالص */
+    '/api/videos?grade=' + g + '&pageSize=100&studentId=' + encodeURIComponent(sid),
     '/api/homework?grade=' + g + '&pageSize=50&studentId=' + encodeURIComponent(sid),
     '/api/exams?grade=' + g + '&pageSize=50&studentId=' + encodeURIComponent(sid),
     '/api/announcements?grade=' + g + '&pageSize=10',

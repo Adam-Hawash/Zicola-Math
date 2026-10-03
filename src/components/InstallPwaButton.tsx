@@ -29,8 +29,25 @@ function usePwaInstall() {
   const [isIos, setIsIos] = useState(false)
   const [standalone, setStandalone] = useState(false)
   const [showHint, setShowHint] = useState(false)
+  /* (2026-ص5) زراير التطبيق على الموبايل بس — طلب المستر حرفيًا:
+     «تمنع لي التطبيق بتاع بس من اللابتوب... تظهر على الموبايل بس».
+     الموبايل/التابلت (شاشة لمس أساسية أو UA موبايل) يقدرون يشوفوا —
+     اللابتوب والديسكتوب الزراير مختفية عنهم خالص. SSR آمن:
+     أول ريندر مخفي زي السيرفر وبينوار بعد الهيدريشن */
+  const [isMobileDevice, setIsMobileDevice] = useState(false)
 
   useEffect(function () {
+    var mobile = false
+    try {
+      var ua = String(window.navigator.userAgent || '')
+      var uaMobile = /android|iphone|ipod|ipad|mobile|silk|kindle/i.test(ua)
+      var coarse = false
+      try { coarse = window.matchMedia('(pointer: coarse)').matches } catch (e0) {}
+      var touch = ('ontouchstart' in window) || ((window.navigator && window.navigator.maxTouchPoints) || 0) > 0
+      mobile = uaMobile || (coarse && touch)
+    } catch (e) {}
+    setIsMobileDevice(mobile)
+
     var alone = false
     try {
       alone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true
@@ -90,7 +107,7 @@ function usePwaInstall() {
     setShowHint(true)
   }
 
-  return { isIos: isIos, standalone: standalone, showHint: showHint, setShowHint: setShowHint, install: install }
+  return { isIos: isIos, standalone: standalone, showHint: showHint, setShowHint: setShowHint, install: install, isMobileDevice: isMobileDevice }
 }
 
 /* مودال التعليمات — بيظهر بس لما المتصفح مش قادر يفتح نافذة التثبيت بنفسه */
@@ -128,6 +145,8 @@ function InstallHintModal({ isIos, onClose }: { isIos: boolean; onClose: () => v
 export function InstallPwaButton({ variant = 'default', size, className = '', label }: { variant?: 'default' | 'outline' | 'ghost' | 'secondary'; size?: 'default' | 'sm' | 'lg' | 'icon'; className?: string; label?: string }) {
   var pwa = usePwaInstall()
   var T = useT()
+  /* (2026-ص5) على اللابتوب/الديسكتوب مفيش زرار خالص — الموبايل بس */
+  if (!pwa.isMobileDevice) return null
   var finalLabel = label !== undefined && label !== null && label !== '' ? label : T('التطبيق', 'App')
   return (
     <>
@@ -145,6 +164,8 @@ export function InstallPwaButton({ variant = 'default', size, className = '', la
 export function FloatingInstallButton() {
   var pwa = usePwaInstall()
   var T = useT()
+  /* (2026-ص5) على اللابتوب/الديسكتوب مفيش زرار عايم خالص — الموبايل بس */
+  if (!pwa.isMobileDevice) return null
   return (
     <>
       <button

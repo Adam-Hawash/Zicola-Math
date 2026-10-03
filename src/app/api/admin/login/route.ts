@@ -14,6 +14,17 @@ var DEFAULT_PASSWORD = 'zicola2026#'
 var ADMIN_PHONE = '44444444444'
 var ADMIN_NAME = 'Zicola In Math'
 
+/* (2026-ص5) بيانات المشرف الجديدة — طلب المستر حرفيًا:
+   «هسجل دخول بالرقم والباسورد اللي عملتهم لك، وبعد كده دخول المشرفين
+   هيطلب مني بريد الكتروني... فهحط كلمة ahmed بالانجليزي بعد كده الرقم
+   اللي قلت لك عليه والباسورد هي هي»
+   المعرّف = ahmed01118411148 (المسافات بتتشال بالسقاش فـ ahmed 01118411148
+   بتشتغل كمان) والباسورد Zicolainmath2026 — وأول دخول بالبيانات دي
+   بيترحّل صف الأدمن عليها (مصدر حقيقة واحد) — والبيانات القديمة بتفضل
+   شغالة لحد المزامنة زي ما هي */
+var MASTER_EMAIL = 'ahmed01118411148'
+var MASTER_PASSWORD = 'Zicolainmath2026'
+
 /* (و76) شفاء ذاتي: لو جدول Admin مش موجود في قاعدة جديدة (زي ما حصل في
    الإنتاج وسبب «خطأ في السيرفر» عند كل محاولة دخول) — نعمل السكيما كاملة
    ونجرب تاني بدل ما نرجّع 500 */
@@ -56,9 +67,10 @@ export async function POST(request) {
 
   /* (و76) المعرّفات المقبولة للدخول: zicolainmath26 (بدون gmail.com — طلب المستر)
      أو الإيميل الكامل القديم zicolainmath26@gmail.com (توافقية) أو الهاتف
-     44444444444 — كلهم بنفس كلمة المرور */
+     44444444444 — أو معرّف المشرف الجديد ahmed01118411148 (2026-ص5) —
+     كلهم بنفس كلمة المرور المخزّنة أو الباسورد الجديد */
   var emailMatch = function (id: string): boolean {
-    return id === squash(DEFAULT_EMAIL) || id === squash(LEGACY_EMAIL) || id === squash(ADMIN_PHONE)
+    return id === squash(DEFAULT_EMAIL) || id === squash(LEGACY_EMAIL) || id === squash(ADMIN_PHONE) || id === squash(MASTER_EMAIL)
   }
 
   try {
@@ -91,7 +103,7 @@ export async function POST(request) {
           { status: 503 }
         )
       }
-      if (!emailMatch(cleanEmail) || cleanPassword !== squash(DEFAULT_PASSWORD)) {
+      if (!emailMatch(cleanEmail) || (cleanPassword !== squash(DEFAULT_PASSWORD) && cleanPassword !== squash(MASTER_PASSWORD))) {
         return NextResponse.json({ error: 'البريد أو كلمة المرور غلط' }, { status: 401 })
       }
       admin = await safeWrite(function() {
@@ -101,10 +113,25 @@ export async function POST(request) {
       })
     } else {
       /* (و75) بيقبل: معرّف الأدمن المخزّن (لو اتغير من الإعدادات) أو zicolainmath26
-         أو الإيميل الكامل القديم أو رقم الهاتف — وكلمة المرور بتتقارن بالمخزّنة دايمًا */
+         أو الإيميل الكامل القديم أو رقم الهاتف أو ahmed01118411148 (2026-ص5) —
+         وكلمة المرور: المخزّنة أو الجديدة Zicolainmath2026 */
       var storedOk = cleanEmail === squash(admin.email)
-      if ((!storedOk && !emailMatch(cleanEmail)) || cleanPassword !== squash(admin.password)) {
+      var masterPwOk = cleanPassword === squash(MASTER_PASSWORD)
+      if ((!storedOk && !emailMatch(cleanEmail)) || (cleanPassword !== squash(admin.password) && !masterPwOk)) {
         return NextResponse.json({ error: 'البريد أو كلمة المرور غلط' }, { status: 401 })
+      }
+
+      /* (2026-ص5) مزامنة بيانات المشرف الجديدة: أول دخول بـ ahmed01118411148 /
+         Zicolainmath2026 وصف القاعدة لسه شايل بيانات تانية → نرحّل الصف عليهم
+         (مصدر حقيقة واحد — نفس نمط ترحيلة و76) — الاسم بيفضل زي ما هو */
+      if (cleanEmail === squash(MASTER_EMAIL) && masterPwOk && (squash(admin.email) !== squash(MASTER_EMAIL) || squash(admin.password) !== squash(MASTER_PASSWORD))) {
+        try {
+          await safeWrite(function() {
+            return db.admin.update({ where: { id: admin.id }, data: { email: MASTER_EMAIL, password: MASTER_PASSWORD } })
+          })
+          admin.email = MASTER_EMAIL
+          admin.password = MASTER_PASSWORD
+        } catch (eSync) {}
       }
 
       /* (و76) ترحيلة لمرة واحدة: لو الحساب المخزّن لسه شايل الإيميل القديم

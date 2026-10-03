@@ -51,8 +51,21 @@ export async function GET(request: NextRequest) {
         { title: { contains: keyword } },
       ]
     }
-    // زائر بدون حساب → الفيديوهات المجانية بس (ومن غير أي لينكات)
-    if (!admin && !student) where.price = 0
+    // زائر بدون حساب أو طالب في بوابته → الفيديوهات المجانية بس في القايمة
+    // (السلوك القديم — المدفوع بيتحكم فيه من video-access/المدفوعات زي ما هو)
+    if (!admin) {
+      where.price = 0
+      /* (2026-ص5) الحصص البرايفت مستبعدة من **الزائر الحقيقي فقط** (من غير
+         studentId) — أما الطالب اللي بيبعت studentId من بوابته بيشوف
+         البرايفت المجانية بتاعته في تاب «برايفت» جوه البورتال */
+      if (!studentId) {
+        where.AND = [
+          { title: { not: { contains: 'private' } } },
+          { title: { not: { contains: 'برايفت' } } },
+          { title: { not: { contains: 'بريفت' } } },
+        ]
+      }
+    }
 
     const [videos, total] = await Promise.all([
       db.video.findMany({
