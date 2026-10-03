@@ -24,6 +24,16 @@ import { checkHwSequential } from '@/lib/sequential-guard'
 import { isWritingQuestion } from '@/lib/question-figures'
 /* (2026-و87) إشعار ولي الأمر بعد التسليم — القوالب من lib/parent-notify */
 import { notifyParentsOfResult, notifyParentsOfSubmission } from '@/lib/parent-notify'
+/* (ص7) إشعار الطالب نفسه بالنتيجة — طلب المستر: النتيجة توصل ولي الأمر والطالب */
+import { notifyStudent } from '@/lib/notify'
+
+/* (ص7) رسالة نتيجة الواجب للطالب — نفس الصيغة في النقطتين (فوري/خلفي) */
+function hwStudentResultBody(title: string, score: number, maxScore: number): string {
+  var s = Number(score) || 0
+  var m = Number(maxScore) || 0
+  var pct = m > 0 ? Math.round((s / m) * 100) : 0
+  return 'واجب «' + String(title || 'واجب') + '» — درجتك: ' + s + ' من ' + m + ' (' + pct + '%) — افتح تاب الواجبات وشوف تفاصيل إجاباتك'
+}
 
 export const runtime = 'nodejs'
 export const maxDuration = 300
@@ -378,6 +388,15 @@ export async function POST(request) {
             siteUrl: requestOrigin,
           })
         } catch (pnErr) { console.error('[hw-submit] parent notify error (ignored):', pnErr) }
+        /* (ص7) وإشعار للطالب نفسه في جرس المنصة — نفس اللحظة */
+        try {
+          await notifyStudent(
+            studentId,
+            'homework_result',
+            '✅ نتيجة واجبك ظهرت',
+            hwStudentResultBody(String((homework as any).title || 'واجب'), Number(score) || 0, Number(maxScore) || 0)
+          )
+        } catch (snErr) { console.error('[hw-submit] student notify error (ignored):', snErr) }
       })
     }
 
@@ -696,6 +715,15 @@ export async function POST(request) {
           maxScore: Number(maxScore) || 0,
           siteUrl: requestOriginBg,
         })
+        /* (ص7) وإشعار الطالب نفسه بالدرجة النهائية بعد اكتمال تصحيح المقالي */
+        try {
+          await notifyStudent(
+            studentId,
+            'homework_result',
+            '✅ نتيجة واجبك ظهرت',
+            hwStudentResultBody(String((homework as any).title || 'واجب'), mcqScore + writingScore, Number(maxScore) || 0)
+          )
+        } catch (snErrBg) { console.error('[hw-submit] student notify bg error (ignored):', snErrBg) }
       } catch (pnErr) {
         console.error('w-submit] parent notify bg error (ignored):', pnErr)
       }

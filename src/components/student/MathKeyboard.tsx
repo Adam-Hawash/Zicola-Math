@@ -6,6 +6,27 @@ import { chunkedUpload } from '@/lib/chunked-upload'
 import { FractionText, hasMathMarkup } from '@/components/FractionText'
 /* (2026-و73) إعفاء نافذة الرفع/الكاميرا من عدّاد مغادرة الامتحان */
 import { notifyPickerOpen } from '@/components/student/useAntiCheat'
+/* (ص7) رسالة الإذن — طلب المستر: أول ما الطالب يدوس زرار الرفع/الكاميرا
+   تظهرله رسالة الإذن ولو سمح الكاميرا تفتح على طول من غير «حاجات لازم» */
+import { toast } from 'sonner'
+
+/* (ص7) تدفئة إذن الكاميرا — لو الإذن «prompt» بنطلبه فعليًا عشان رسالة
+   السماح تظهر للطالب في اللحظة اللي هو داس فيها على الزرار، وبعد ما
+   يسمح مرة واحدة الكاميرا بتفتح على طول في كل مرة جاية */
+async function warmCameraPermission(): Promise<boolean> {
+  try {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return true
+    var st: any = null
+    try { st = await (navigator as any).permissions.query({ name: 'camera' }) } catch (e) {}
+    if (st && st.state === 'granted') return true
+    if (st && st.state === 'denied') return false
+    try {
+      var stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      try { stream.getTracks().forEach(function (t) { t.stop() }) } catch (e2) {}
+      return true
+    } catch (e3) { return false }
+  } catch (e) { return true }
+}
 
 interface MathKeyboardProps {
   value: string
@@ -446,6 +467,18 @@ export function MathKeyboard({ value, onChange, placeholder = 'Type your answer 
           onClick={function () {
             /* (و73) الرفع مش خروج من المنصة — إعفاء عدّاد المغادرة */
             notifyPickerOpen()
+            /* (ص7) رسالة الإذن الصريحة — طلب المستر حرفيًا: أول ما الطالب يدوس
+               زرار الكاميرا/الرفع تظهرله رسالة، ولو سمح الكاميرا تفتح على طول */
+            try {
+              toast.info('📸 لو ظهرلك طلب إذن الكاميرا أو الملفات اضغط «سماح / Allow» — عشان تقدر تصور ورقة الحل وترفعها', { duration: 5000 })
+            } catch (eT) {}
+            warmCameraPermission().then(function (ok) {
+              if (!ok) {
+                try {
+                  toast.error('إذن الكاميرا مقفول من المتصفح — افتح إعدادات الموقع (الأيقونة جنب اللينك) واسمح بالكاميرا والملفات', { duration: 6000 })
+                } catch (eT2) {}
+              }
+            })
             fileInputRef.current?.click()
           }}
           disabled={uploading}

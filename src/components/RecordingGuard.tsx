@@ -114,9 +114,94 @@ export function RecordingGuard() {
     document.head.appendChild(styleEl)
     window.addEventListener('keydown', onKey, true)
     document.addEventListener('contextmenu', onCtx, true)
+
+    /* ============================================================
+       (ص7) كشف أدوات المطوّر — طلب المستر: «بيفتح التلات نقط اللي فوق
+       وبقدر أعمل حاجات — منعها لو ينفع».
+       الحقيقة التقنية الصادقة: قايمة التلات نقط نفسها جزء من المتصفح
+       مش من الصفحة — مفيش أي موقع في العالم يقدر يمنعها — لكن اللي
+       بيتعمل من جواها (أدوات المطوّر) بنكشفه ونقفل المحتوى لحد ما
+       تتقفل. الكشف هنا بدقة عالية ومن غير فولس بوسيتيف:
+       • ديسكتوب بس (الماوس دقيق + شاشة واسعة) — على الموبايل مفيش أدوات مطوّر أصلًا
+       • بناخذ خط أساس (الفرق بين مقاس النافذة من بره ومن جوه) بعد التحميل
+       • أدوات المطوّر المثبتة (يمين/تحت) بتزود محور **واحد بس** بمقدار كبير،
+         بينما الزووم بيغير المحورين مع بعض — فبنمنع الزووم من يفتش إنذار كاذب
+       ============================================================ */
+    var devtoolsLocked = false
+    var overlayEl: HTMLElement | null = null
+    var baseW = 0
+    var baseH = 0
+    var baselineReady = false
+    var isDesktop = false
+    try {
+      isDesktop = window.matchMedia('(pointer: fine)').matches && window.outerWidth >= 1024
+    } catch (eM) { isDesktop = window.outerWidth >= 1024 }
+
+    function ensureOverlay() {
+      if (overlayEl) return
+      overlayEl = document.createElement('div')
+      overlayEl.id = 'rg-devtools-lock'
+      overlayEl.setAttribute('role', 'alert')
+      overlayEl.style.cssText =
+        'position:fixed;inset:0;z-index:2147483647;background:rgba(8,10,14,.97);' +
+        'display:flex;align-items:center;justify-content:center;direction:rtl;' +
+        'font-family:system-ui,-apple-system,sans-serif'
+      overlayEl.innerHTML =
+        '<div style="text-align:center;padding:32px;max-width:420px">' +
+        '<div style="font-size:56px;margin-bottom:12px">🛡️</div>' +
+        '<div style="color:#fff;font-size:20px;font-weight:800;margin-bottom:10px">أدوات المطوّر ممنوعة في المنصة</div>' +
+        '<div style="color:rgba(255,255,255,.75);font-size:14px;line-height:1.8">اقفل نافذة أدوات المطوّر (DevTools) عشان تكمل تستخدم المنصة طبيعي.</div>' +
+        '</div>'
+      document.body.appendChild(overlayEl)
+    }
+
+    function removeOverlay() {
+      if (overlayEl && overlayEl.parentNode) overlayEl.parentNode.removeChild(overlayEl)
+      overlayEl = null
+    }
+
+    function sampleDiff() {
+      return {
+        w: window.outerWidth - window.innerWidth,
+        h: window.outerHeight - window.innerHeight,
+      }
+    }
+
+    /* خط الأساس بعد ثانية ونص من التحميل (المفروض أدوات المطوّر مقفولة) */
+    var baselineTimer = setTimeout(function () {
+      if (!isDesktop) return
+      var d = sampleDiff()
+      baseW = d.w
+      baseH = d.h
+      baselineReady = true
+    }, 1500)
+
+    var devtoolsWatcher = setInterval(function () {
+      try {
+        if (!isDesktop || !baselineReady) return
+        var d = sampleDiff()
+        /* محور واحد بس اتزود بشكل كبير = أدوات مطوّر مثبتة (يمين/تحت).
+           المحورين اتغيروا = زووم (مش إنذار) */
+        var wGrow = d.w - baseW
+        var hGrow = d.h - baseH
+        var open = (wGrow > 170 && hGrow < 170) || (hGrow > 170 && wGrow < 170)
+        if (open && !devtoolsLocked) {
+          devtoolsLocked = true
+          ensureOverlay()
+          toast('🛡️ أدوات المطوّر ممنوعة — اقفلها عشان تكمل')
+        } else if (!open && devtoolsLocked) {
+          devtoolsLocked = false
+          removeOverlay()
+        }
+      } catch (eW) {}
+    }, 900)
+
     return function () {
       window.removeEventListener('keydown', onKey, true)
       document.removeEventListener('contextmenu', onCtx, true)
+      clearInterval(devtoolsWatcher)
+      clearTimeout(baselineTimer)
+      removeOverlay()
       if (toastTimer) clearTimeout(toastTimer)
       var t = document.getElementById('rg-toast')
       if (t && t.parentNode) t.parentNode.removeChild(t)

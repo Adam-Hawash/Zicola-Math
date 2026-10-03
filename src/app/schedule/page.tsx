@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { useAppStore } from '@/stores/app-store'
 import { useEffect, useState } from 'react'
-import { CalendarClock, Clock, GraduationCap, ArrowRight, BookOpen } from 'lucide-react'
+import { CalendarClock, Clock, GraduationCap, ArrowRight, BookOpen, Lock, ChevronDown } from 'lucide-react'
 import { PlatformLoader } from '@/components/PlatformLoader'
 /* (و64) زراير الثيم + اللغة الموحدة في كل المنصة */
 import { PlatformToggles } from '@/components/platform-toggles'
@@ -79,6 +79,8 @@ function slotCountLabel(count: number, lang: string): string {
 export default function SchedulePage() {
   const { siteConfig, setSiteConfig, configLoaded } = useAppStore()
   const [loading, setLoading] = useState(true)
+  /* (ص7) فتح/قفل قسم حصص البرايفت — بالضغط على الكلمة في آخر الصفحة */
+  const [showPrivate, setShowPrivate] = useState(false)
   /* (10-b) الاتجاه بيتبع اللغة — الإنجليزي افتراضي LTR والعربي RTL */
   var lang = useLangStore(function (s) { return s.lang })
   var T = useT()
@@ -102,6 +104,9 @@ export default function SchedulePage() {
   // Parse schedule from siteConfig.schedule_data (JSON string) or use default
   // (و71) العناوين حسب لغة الزائر — الأدمن يكتب عربي/إنجليزي
   let schedule: DaySchedule[] = DEFAULT_SCHEDULE
+  /* (ص7) حصص البرايفت — نفس الشكل، من private_schedule_data، من غير افتراضي
+     (لو مفيش بيانات القسم بيظهر برسالة لطيفة) */
+  let privateSchedule: DaySchedule[] = []
   let scheduleTitle = pickConfig(siteConfig, 'schedule_title', lang, 'مواعيد السنتر', 'Center Schedule')
   let scheduleSubtitle = pickConfig(siteConfig, 'schedule_subtitle', lang, 'جدول مواعيد الحصص الأسبوعية لكل الصفوف الدراسية — اختر اليوم المناسب لك وتابع موعد حصتك', 'Weekly class schedule for all grades — pick the day that suits you and catch your class on time')
   let scheduleBadge = pickConfig(siteConfig, 'schedule_badge', lang, 'جدول الحصص الأسبوعي', 'Weekly Class Schedule')
@@ -113,6 +118,24 @@ export default function SchedulePage() {
       const parsed = JSON.parse(siteConfig.schedule_data)
       if (Array.isArray(parsed) && parsed.length > 0) {
         schedule = parsed
+      }
+    }
+    /* (ص7) قراءة حصص البرايفت — نفس الشكل، والفشل = فاضي بأمان */
+    if (siteConfig.private_schedule_data) {
+      const parsedPriv = JSON.parse(siteConfig.private_schedule_data)
+      if (Array.isArray(parsedPriv) && parsedPriv.length > 0) {
+        privateSchedule = parsedPriv
+          .map(function (d: any) {
+            return {
+              day: String((d && d.day) || ''),
+              slots: (Array.isArray(d && d.slots) ? d.slots : [])
+                .map(function (s: any) {
+                  return { time: String((s && s.time) || ''), grade: String((s && s.grade) || '') }
+                })
+                .filter(function (s: ScheduleSlot) { return s.time || s.grade }),
+            }
+          })
+          .filter(function (d: DaySchedule) { return d.day && d.slots.length > 0 })
       }
     }
     if (siteConfig.schedule_title) scheduleTitle = siteConfig.schedule_title
@@ -135,6 +158,67 @@ export default function SchedulePage() {
       <div className="min-h-screen flex items-center justify-center bg-background" dir={pageDir}>
         {/* (2026-و95) لودر رموز الرياضيات الموحد */}
         <PlatformLoader variant="inline" />
+      </div>
+    )
+  }
+
+  /* (ص7) رندر كروت الأيام — مشترك بين الحصص العادية وحصص البرايفت
+     (نفس الشكل بالظبط زي ما المستر طلب: زي الحصص العادية بس برايفت) */
+  function renderDayGrid(days: DaySchedule[]) {
+    return (
+      <div className="grid gap-5 md:grid-cols-2">
+        {days.map((daySchedule, dayIdx) => {
+          const count = daySchedule.slots.length
+          return (
+            <Card
+              key={dayIdx}
+              className="overflow-hidden rounded-xl border border-border bg-card py-0 gap-0 shadow-none hover:bg-muted/10 transition-colors"
+            >
+              {/* Day header — خفيف: خلفية هادية وحد سفلي رفيع (بدون جريدينت) */}
+              <div className="flex items-center justify-between gap-3 border-b border-border/60 bg-muted/30 px-4 py-3">
+                <h3 className="text-base font-bold text-foreground">
+                  {daySchedule.day}
+                </h3>
+                <span className="text-xs font-medium text-muted-foreground border border-border/50 bg-background px-2.5 py-0.5 rounded-full">
+                  {slotCountLabel(count, lang)}
+                </span>
+              </div>
+
+              {/* Slots */}
+              <CardContent className="p-0">
+                <div className="divide-y divide-border/40">
+                  {daySchedule.slots.map((slot, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-4 px-4 py-3 hover:bg-muted/30 transition-colors"
+                    >
+                      {/* Time */}
+                      <div className="flex items-center gap-2 shrink-0 min-w-[110px]">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+                          <Clock className="h-4 w-4 text-primary" />
+                        </div>
+                        <span className="text-sm font-bold text-foreground" dir="ltr">
+                          {slot.time}
+                        </span>
+                      </div>
+
+                      {/* Divider */}
+                      <div className="h-8 w-px bg-border/50" />
+
+                      {/* Grade */}
+                      <div className="flex items-center gap-2 flex-1">
+                        <GraduationCap className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <span className="text-sm font-medium text-foreground">
+                          {slot.grade}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )
+        })}
       </div>
     )
   }
@@ -186,59 +270,48 @@ export default function SchedulePage() {
         {/* Schedule Grid — (10-b) كروت خفيفة بحواف ناعمة بطلب صاحب المنصة:
             rounded-xl + حد رفيع border-border + خلفية هادية (bg-card + هيدر
             bg-muted/30) + padding مريح — من غير جريدينت ولا ظلال تقيلة */}
-        <div className="grid gap-5 md:grid-cols-2">
-          {schedule.map((daySchedule, dayIdx) => {
-            const count = daySchedule.slots.length
-            return (
-              <Card
-                key={dayIdx}
-                className="overflow-hidden rounded-xl border border-border bg-card py-0 gap-0 shadow-none hover:bg-muted/10 transition-colors"
-              >
-                {/* Day header — خفيف: خلفية هادية وحد سفلي رفيع (بدون جريدينت) */}
-                <div className="flex items-center justify-between gap-3 border-b border-border/60 bg-muted/30 px-4 py-3">
-                  <h3 className="text-base font-bold text-foreground">
-                    {daySchedule.day}
-                  </h3>
-                  <span className="text-xs font-medium text-muted-foreground border border-border/50 bg-background px-2.5 py-0.5 rounded-full">
-                    {slotCountLabel(count, lang)}
-                  </span>
+        {renderDayGrid(schedule)}
+
+        {/* ===== (ص7) حصص البرايفت — في الآخر زي ما المستر طلب حرفيًا:
+            «في الآخر كده حاجة اسمها حصص البرايفت اللي يدوس عليها تظهر
+            حصص البرايفت كلها، زي الحصص العادية بس تبقى حصص برايفت» ===== */}
+        <div className="mt-10">
+          {/* الزرار/الكلمة اللي بتفتح القسم */}
+          <button
+            type="button"
+            onClick={function () { setShowPrivate(!showPrivate) }}
+            aria-expanded={showPrivate}
+            className="w-full group rounded-xl border border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 transition-colors px-5 py-4 flex items-center justify-center gap-3 min-h-[56px]"
+          >
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 group-hover:bg-primary/25 transition-colors">
+              <Lock className="h-5 w-5 text-primary" />
+            </span>
+            <span className="text-base sm:text-lg font-bold text-foreground">
+              {T('حصص البرايفت', 'Private Classes')}
+            </span>
+            <ChevronDown
+              className={'h-5 w-5 text-primary transition-transform duration-300 ' + (showPrivate ? 'rotate-180' : '')}
+            />
+          </button>
+
+          {/* المحتوى — يظهر لما يدوس */}
+          {showPrivate && (
+            <div className="mt-5">
+              {privateSchedule.length > 0 ? (
+                renderDayGrid(privateSchedule)
+              ) : (
+                <div className="rounded-xl border border-border/60 bg-muted/30 px-5 py-8 text-center">
+                  <Lock className="h-6 w-6 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-sm font-medium text-foreground mb-1">
+                    {T('لسه مفيش حصص برايفت مضافة', 'No private classes added yet')}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {T('تابعنا — الحصص الخاصة هتظهر هنا أول ما تتحدد', 'Stay tuned — private sessions will appear here once scheduled')}
+                  </p>
                 </div>
-
-                {/* Slots */}
-                <CardContent className="p-0">
-                  <div className="divide-y divide-border/40">
-                    {daySchedule.slots.map((slot, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center gap-4 px-4 py-3 hover:bg-muted/30 transition-colors"
-                      >
-                        {/* Time */}
-                        <div className="flex items-center gap-2 shrink-0 min-w-[110px]">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-                            <Clock className="h-4 w-4 text-primary" />
-                          </div>
-                          <span className="text-sm font-bold text-foreground" dir="ltr">
-                            {slot.time}
-                          </span>
-                        </div>
-
-                        {/* Divider */}
-                        <div className="h-8 w-px bg-border/50" />
-
-                        {/* Grade */}
-                        <div className="flex items-center gap-2 flex-1">
-                          <GraduationCap className="h-4 w-4 text-muted-foreground shrink-0" />
-                          <span className="text-sm font-medium text-foreground">
-                            {slot.grade}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })}
+              )}
+            </div>
+          )}
         </div>
 
         {/* Footer note */}

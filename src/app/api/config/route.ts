@@ -69,6 +69,9 @@ var DEFAULTS = {
   schedule_footer_note: 'جميع المواعيد بتوقيت القاهرة. لو عندك أي استفسار عن موعد حصتك تواصل معنا عبر واتساب.',
   schedule_brand: 'Zicola In Math',
   schedule_data: '',
+  /* (ص7) حصص البرايفت — نفس شكل schedule_data بيبقى في قسم منفصل في آخر
+     صفحة مواعيد السنتر، بيتضاف من لوحة الأدمن (GradesSchedulePanel) */
+  private_schedule_data: '',
 
   // === Instructor ===
   instructor_name: 'مستر أحمد شعبان',

@@ -28,6 +28,9 @@ var TYPE_ICONS: Record<string, string> = {
   exam: '📝',
   homework: '📚',
   announcement: '📣',
+  /* (ص7) إشعارات النتايج — للطالب نفسه لما الدرجة تظهر */
+  exam_result: '🎯',
+  homework_result: '✅',
   general: '🔔',
 }
 

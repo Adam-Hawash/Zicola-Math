@@ -33,6 +33,16 @@ import { parseQuestions, resolveQuestionsForStudent } from '@/lib/exam-models'
 import { isWritingQuestion } from '@/lib/question-figures'
 /* (2026-و87) إشعار ولي الأمر بعد التسليم — القوالب من lib/parent-notify */
 import { notifyParentsOfResult, notifyParentsOfSubmission } from '@/lib/parent-notify'
+/* (ص7) إشعار الطالب نفسه بالنتيجة — طلب المستر: النتيجة توصل ولي الأمر والطالب */
+import { notifyStudent } from '@/lib/notify'
+
+/* (ص7) رسالة نتيجة الامتحان للطالب */
+function examStudentResultBody(title: string, score: number, maxScore: number): string {
+  var s = Number(score) || 0
+  var m = Number(maxScore) || 0
+  var pct = m > 0 ? Math.round((s / m) * 100) : 0
+  return 'امتحان «' + String(title || 'امتحان') + '» — درجتك: ' + s + ' من ' + m + ' (' + pct + '%) — افتح تاب الامتحانات وشوف تفاصيل إجاباتك'
+}
 
 export const runtime = 'nodejs'
 export const maxDuration = 300
@@ -365,6 +375,15 @@ export async function POST(request) {
             siteUrl: examOrigin96,
           })
         } catch (e96) { console.error('[exam-submit] instant parent score notify error (ignored):', e96) }
+        /* (ص7) وإشعار الطالب نفسه في جرس المنصة — نفس اللحظة */
+        try {
+          await notifyStudent(
+            studentId,
+            'exam_result',
+            '🎯 نتيجة امتحانك ظهرت',
+            examStudentResultBody(examTitle96, Number(score) || 0, Number(maxScore) || 0)
+          )
+        } catch (eS96) { console.error('[exam-submit] instant student notify error (ignored):', eS96) }
       })
     } else {
       after(async function () {
@@ -671,6 +690,15 @@ export async function POST(request) {
             maxScore: Number(exFin[0].maxScore) || 0,
             siteUrl: requestOrigin,
           })
+          /* (ص7) وإشعار الطالب نفسه بالدرجة النهائية بعد اكتمال تصحيح المقالي */
+          try {
+            await notifyStudent(
+              studentId,
+              'exam_result',
+              '🎯 نتيجة امتحانك ظهرت',
+              examStudentResultBody(String((exam as any).title || 'امتحان'), Number(exFin[0].score) || 0, Number(exFin[0].maxScore) || 0)
+            )
+          } catch (eSFin) { console.error('[exam-submit] student final notify error (ignored):', eSFin) }
         }
       } catch (pnErr) {
         console.error('[exam-submit] parent notify error (ignored):', pnErr)
