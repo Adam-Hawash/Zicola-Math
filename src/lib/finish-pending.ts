@@ -26,6 +26,55 @@ import {
   type QItem,
 } from '@/lib/regrade-core'
 import { resolveQuestionsForStudent } from '@/lib/exam-models'
+/* (ص7) لما مكمّل التصحيح يكمل نتيجة متعطلة — الإشعارات اللي فاتت تتبعت:
+   الطالب نفسه + ولي الأمر (نفس طلب المستر: النتيجة توصل الاتنين) */
+import { notifyStudent } from '@/lib/notify'
+import { notifyParentsOfResult } from '@/lib/parent-notify'
+
+/* (ص7) منع تكرار الإشعارات لنفس النتيجة في نفس الprocess */
+var _healNotified: Record<string, boolean> = {}
+
+/* (ص7) إشعارات نتيجة الواجب بعد الاستكمال — فحص إن كل الأحكام كملت */
+async function healNotifyHomework(res: any, hwTitle: string, finalScore: number, finalMax: number, mergedVerdicts: any[], allWriting: QItem[]): Promise<void> {
+  try {
+    var key = 'hw:' + String(res.id)
+    if (_healNotified[key]) return
+    var stillPending = allWriting.some(function (it) {
+      var v = mergedVerdicts.find(function (g) { return g && g.origIdx === it.origIdx })
+      return verdictNeedsWork(v)
+    })
+    if (stillPending) return /* لسه فيه ناقص — الإشعار هيبعت بعد ما يكمل كله */
+    _healNotified[key] = true
+    var sid = String(res.studentId || '')
+    var t = String(hwTitle || 'واجب')
+    var s = Number(finalScore) || 0
+    var m = Number(finalMax) || 0
+    var pct = m > 0 ? Math.round((s / m) * 100) : 0
+    await notifyStudent(sid, 'homework_result', '✅ نتيجة واجبك ظهرت', 'واجب «' + t + '» — درجتك: ' + s + ' من ' + m + ' (' + pct + '%) — افتح تاب الواجبات وشوف تفاصيل إجاباتك')
+    await notifyParentsOfResult({ studentId: sid, kind: 'homework', title: t, score: s, maxScore: m })
+  } catch (e) { console.error('[finish-pending] hw heal notify error (ignored):', e) }
+}
+
+/* (ص7) نفس الحاجة للامتحانات */
+async function healNotifyExam(res: any, exTitle: string, finalScore: number, finalMax: number, mergedVerdicts: any[], allWriting: QItem[]): Promise<void> {
+  try {
+    var key = 'ex:' + String(res.id)
+    if (_healNotified[key]) return
+    var stillPending = allWriting.some(function (it) {
+      var v = mergedVerdicts.find(function (g) { return g && g.origIdx === it.origIdx })
+      return verdictNeedsWork(v)
+    })
+    if (stillPending) return
+    _healNotified[key] = true
+    var sid = String(res.studentId || '')
+    var t = String(exTitle || 'امتحان')
+    var s = Number(finalScore) || 0
+    var m = Number(finalMax) || 0
+    var pct = m > 0 ? Math.round((s / m) * 100) : 0
+    await notifyStudent(sid, 'exam_result', '🎯 نتيجة امتحانك ظهرت', 'امتحان «' + t + '» — درجتك: ' + s + ' من ' + m + ' (' + pct + '%) — افتح تاب الامتحانات وشوف تفاصيل إجاباتك')
+    await notifyParentsOfResult({ studentId: sid, kind: 'exam', title: t, score: s, maxScore: m })
+  } catch (e) { console.error('[finish-pending] exam heal notify error (ignored):', e) }
+}
 
 // هل حكم السؤال ده ناقص تصحيح فعلاً؟ (أوسع من فحص pending العادي عشان
 // يشمل الحالات اللي فشل تصحيحها بصمت: graded من غير ملاحظة على صورة)
@@ -95,7 +144,7 @@ export async function finishPendingForHomeworkResult(
     if (!rows || rows.length === 0) return null
     var res = rows[0]
     var hwRows: any[] = await db.$queryRawUnsafe(
-      'SELECT id, questions FROM Homework WHERE id = ? LIMIT 1',
+      'SELECT id, title, questions FROM Homework WHERE id = ? LIMIT 1',
       res.homeworkId
     )
     if (!hwRows || hwRows.length === 0) return null
@@ -145,6 +194,14 @@ export async function finishPendingForHomeworkResult(
     var finalRows: any[] = await db.$queryRawUnsafe(
       'SELECT score FROM HomeworkResult WHERE id = ? LIMIT 1', resultId
     )
+    /* (ص7) لو استكملنا أسئلة ناقصة والكل خلص → الإشعارات اللي فاتت تتبعت */
+    if (gradedCount > 0) {
+      var mergedAll = parts.writing
+        .map(function (it) { return byIdx[String(it.origIdx)] })
+        .filter(Boolean)
+      var finalSc = finalRows && finalRows.length ? Number(finalRows[0].score) || 0 : 0
+      await healNotifyHomework(res, String(hwRows[0].title || ''), finalSc, Number(res.maxScore) || 0, mergedAll, parts.writing)
+    }
     return { graded: gradedCount, score: finalRows && finalRows.length ? Number(finalRows[0].score) || 0 : 0 }
   } catch (e) {
     console.error('[finish-pending] hw error:', e)
@@ -170,7 +227,7 @@ export async function finishPendingForExamResult(
     if (!rows || rows.length === 0) return null
     var res = rows[0]
     var examRows: any[] = await db.$queryRawUnsafe(
-      'SELECT id, questions, models, modelMode, fixedModel FROM Exam WHERE id = ? LIMIT 1',
+      'SELECT id, title, questions, models, modelMode, fixedModel FROM Exam WHERE id = ? LIMIT 1',
       res.examId
     )
     if (!examRows || examRows.length === 0) return null
@@ -216,6 +273,14 @@ export async function finishPendingForExamResult(
     var finalRows: any[] = await db.$queryRawUnsafe(
       'SELECT score FROM ExamResult WHERE id = ? LIMIT 1', resultId
     )
+    /* (ص7) لو استكملنا أسئلة ناقصة والكل خلص → الإشعارات اللي فاتت تتبعت */
+    if (gradedCount > 0) {
+      var mergedAllEx = parts.writing
+        .map(function (it) { return byIdx[String(it.origIdx)] })
+        .filter(Boolean)
+      var finalScEx = finalRows && finalRows.length ? Number(finalRows[0].score) || 0 : 0
+      await healNotifyExam(res, String(examRows[0].title || ''), finalScEx, Number(res.maxScore) || 0, mergedAllEx, parts.writing)
+    }
     return { graded: gradedCount, score: finalRows && finalRows.length ? Number(finalRows[0].score) || 0 : 0 }
   } catch (e) {
     console.error('[finish-pending] exam error:', e)
