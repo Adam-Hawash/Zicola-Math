@@ -113,8 +113,15 @@ export default async function RootLayout({
   var heroPhotoUrl = String(initialConfig.instructor_photo || "/images/the-scholar-full.png");
 
   return (
-    <html lang="en" dir="ltr" suppressHydrationWarning>
+    <html lang="en" dir="ltr" translate="no" suppressHydrationWarning>
       <head>
+        {/* (ص113) منع الترجمة الأوتوماتيكية نهائيًا — سبب حقيقي: الصفحة معلنة lang="en"
+            وخيارات الصفوف دايمًا عربي (g.ar) → كروم على موبايل الطالب بيترجم الصفحة
+            «إنجليزي → عربي» وبيعيد ترجمة العربي نفسه فبيطلع كلام مكسور
+            («مسؤول اريش G4»، «مكافة يابانية s1») — المنصة فيها نظام لغتين جاهز
+            فمفيش أي داعي لمترجم كروم أصلاً. translate=no + meta google
+            notranslate = حماية مزدوجة (الأولى ستاندرد والتانية خاصة بكروم) */}
+        <meta name="google" content="notranslate" />
         {/* (و64) سكريبت مبكر — الثيم (ليلي/نهاري) واللغة بيتريّكوا قبل أول رسم
             عشان مفيش وميض غلط: الثيم من مفتاح next-themes «theme» والافتراضي ليلي،
             (10-b) اللغة: الافتراضي إنجليزي LTR — بس لو mg_lang محفوظ «ar»
@@ -122,7 +129,7 @@ export default async function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "try{var t=localStorage.getItem('theme');var c=(t==='light'?'light':'dark');var el=document.documentElement;el.classList.remove('dark','light');el.classList.add(c);el.style.colorScheme=c;if(localStorage.getItem('mg_lang')==='ar'){el.lang='ar';el.dir='rtl'}else{el.lang='en';el.dir='ltr'}}catch(e){}",
+              "try{var t=localStorage.getItem('theme');var c=(t==='light'?'light':'dark');var el=document.documentElement;el.classList.remove('dark','light');el.classList.add(c);el.style.colorScheme=c;el.setAttribute('translate','no');if(localStorage.getItem('mg_lang')==='ar'){el.lang='ar';el.dir='rtl'}else{el.lang='en';el.dir='ltr'}}catch(e){}",
           }}
         />
         {/* Cairo via Google Fonts CDN (avoids Turbopack build error) */}
