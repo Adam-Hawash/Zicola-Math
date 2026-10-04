@@ -24,6 +24,8 @@ async function ensureExamFeatureColumns() {
   try { await db.$executeRawUnsafe("ALTER TABLE Exam ADD COLUMN targetStudentIds TEXT DEFAULT ''") } catch (e) {}
   /* (2026-و29) استهداف المجموعات — نفس النمط: JSON array بids المجموعات */
   try { await db.$executeRawUnsafe("ALTER TABLE Exam ADD COLUMN targetGroupIds TEXT DEFAULT ''") } catch (e) {}
+  /* (2026-و115) نهاية مدة الامتحان */
+  try { await db.$executeRawUnsafe('ALTER TABLE Exam ADD COLUMN endsAt DATETIME') } catch (e) {}
 })()
   }
   await _examColsReady
@@ -47,6 +49,11 @@ function normalizeTargetIds(v: unknown): string | undefined {
 function parseTargetIds(raw: unknown): string[] {
   try { var p = JSON.parse(String(raw || '[]')); return Array.isArray(p) ? p : [] } catch (e) { return [] }
 }
+
+/* (2026-و115) نهاية مدة الامتحان — طلب المستر: بعد نهاية المدة الطالب يشوف
+   رسالة «مدة الامتحان خلصت» لمدة يومين، وبعدهم الامتحان يختفي تلقائيًا من
+   قايمة الطلاب. البيانات تفضل في الداتابيز عشان النتايج القديمة متبوظش */
+var EXAM_END_GRACE_MS = 2 * 24 * 60 * 60 * 1000
 
 // ============================================================
 // توزيع النماذج العشوائي (طلب المستر): لما الامتحان يكون فيه نماذج كتير
@@ -128,7 +135,11 @@ export async function GET(request: NextRequest) {
        لأي طلب مش من أدمن (الطالب/الزائر) — هو بس اللي يشوفها (ببادج مجدول).
        الفلتر الافتراضي = أمان: لو مفيش إثبات أدمن الرد نضيف. */
     if (!admin) {
-      where.AND = [{ OR: [{ scheduledAt: null }, { scheduledAt: { lte: new Date() } }] }]
+      where.AND = [
+        { OR: [{ scheduledAt: null }, { scheduledAt: { lte: new Date() } }] },
+        /* (2026-و115) الامتحان اللي عدت مدته + مهلة اليومين → مش بينزل للطلاب خالص */
+        { OR: [{ endsAt: null }, { endsAt: { gt: new Date(Date.now() - EXAM_END_GRACE_MS) } }] },
+      ]
     }
 
     const [exams, total] = await Promise.all([
@@ -170,6 +181,27 @@ export async function GET(request: NextRequest) {
     // المستر) — وإلا الامتحان زي ما هو
     let outExams = studentId ? visibleExams.map(function (e: any) { return applyModelForStudent(e, studentId) }) : visibleExams
 
+    /* (2026-و115) المدة عدّت (لسه في مهلة اليومين) → flag ended + تفريغ أي
+       محتوى أسئلة/ملفات — الطالب يشوف رسالة «مدة الامتحان خلصت» بس ومفيش
+       أي تسريب لمحتوى الامتحان بعد قفله */
+    if (!admin) {
+      var nowEndMs = Date.now()
+      outExams = (outExams as any[]).map(function (e: any) {
+        if (!e || !e.endsAt) return e
+        var endMs = new Date(e.endsAt).getTime()
+        if (isNaN(endMs) || nowEndMs < endMs) return e
+        return Object.assign({}, e, {
+          ended: true,
+          questions: '',
+          models: '',
+          filePath: '',
+          fileType: '',
+          answerKeyPath: '',
+          answerKeyType: '',
+        })
+      })
+    }
+
     /* (2026-و55) للطالب (مش أدمن): الجداول اللي الـ AI مجاوبها كله بتتفضى —
        الطالب هو اللي يكتب فيها، والقيم الأصلية بتفضل في الداتابيز للإدمن */
     if (!admin) {
@@ -186,9 +218,13 @@ export async function GET(request: NextRequest) {
     /* (25-ب1) للأدمن بس: بادج «مجدول» — العناصر اللي موعدها في المستقبل
        بترجع مع flag scheduled: true عشان اللوحة تعرضها بوضوح */
     if (admin) {
+      var nowAdmMs = Date.now()
       outExams = (outExams as any[]).map(function (e: any) {
-        var isScheduled = e && e.scheduledAt ? new Date(e.scheduledAt).getTime() > Date.now() : false
-        return { ...e, scheduled: isScheduled }
+        var isScheduled = e && e.scheduledAt ? new Date(e.scheduledAt).getTime() > nowAdmMs : false
+        /* (2026-و115) بادجات المدة للأدمن: expired = المدة خلصت، ended = لسه في مهلة اليومين */
+        var endMsAdm = e && e.endsAt ? new Date(e.endsAt).getTime() : 0
+        var expiredAdm = !!endMsAdm && nowAdmMs >= endMsAdm
+        return { ...e, scheduled: isScheduled, expired: expiredAdm, ended: expiredAdm && nowAdmMs < endMsAdm + EXAM_END_GRACE_MS }
       })
     }
 
@@ -203,7 +239,7 @@ export async function POST(request: NextRequest) {
   try {
     await ensureExamFeatureColumns()
     const body = await request.json()
-    const { title, content, grade, filePath, fileType, questions, models, modelMode, fixedModel, passScore, answerKeyPath, answerKeyType, thumbnail, showResult, timeLimitMin, scheduledAt, targetStudentIds, targetGroupIds } = body
+    const { title, content, grade, filePath, fileType, questions, models, modelMode, fixedModel, passScore, answerKeyPath, answerKeyType, thumbnail, showResult, timeLimitMin, scheduledAt, endsAt, targetStudentIds, targetGroupIds } = body
 
     if (!title || !grade) {
       return NextResponse.json({ error: 'Title and grade are required' }, { status: 400 })
@@ -222,6 +258,15 @@ export async function POST(request: NextRequest) {
     }
     var timeLimit = parseInt(String(timeLimitMin === undefined || timeLimitMin === null || timeLimitMin === '' ? '0' : timeLimitMin), 10)
     if (isNaN(timeLimit) || timeLimit < 0) timeLimit = 0
+
+    /* (2026-و115) نهاية المدة (ISO string أو null = بدون نهاية) */
+    var endsDate: Date | null = null
+    if (endsAt) {
+      try {
+        var ed115 = new Date(String(endsAt))
+        if (!isNaN(ed115.getTime())) endsDate = ed115
+      } catch (e) {}
+    }
 
     /* (2026-و26) استهداف الطلاب: array ids → JSON string (فاضي = الكل) */
     var targetIds = normalizeTargetIds(targetStudentIds)
@@ -249,6 +294,7 @@ export async function POST(request: NextRequest) {
           showResult: showResult === true || showResult === 'true' || showResult === 1,
           timeLimitMin: timeLimit,
           scheduledAt: scheduledDate,
+          endsAt: endsDate,
           targetStudentIds: targetIds,
           targetGroupIds: targetGids,
         },
