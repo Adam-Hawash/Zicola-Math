@@ -274,10 +274,56 @@ export function CMSPanel() {
     setSaving(false)
   }
 
+  /* (2026-ص) ضغط الصور قبل الرفع — صور الموبايل الخام (3-8MB) كانت بتتخزن
+     زي ما هي فبتتأخر في التحميل في الهيرو والنافيبار («الصورة بتتاخر عقبال ما
+     تحمل»). بنصغّر لأقصى بعد 1400px وبنطلع JPEG بجودة 0.85 —
+     PNG/SVG/GIF الصغيرة (لوجوهات بشفافية) تعدي زي ما هي من غير لمس. */
+  var compressImageFile = function(file: File): Promise<File> {
+    return new Promise(function(resolve) {
+      try {
+        var type = String(file.type || '')
+        if (type.indexOf('image/') !== 0) return resolve(file)
+        if (/(png|svg|gif)/i.test(type) && file.size < 1500000) return resolve(file)
+        if (file.size < 400000) return resolve(file)
+        var url = URL.createObjectURL(file)
+        var img = new Image()
+        img.onload = function() {
+          try {
+            var MAX = 1400
+            var w = img.naturalWidth || (img as any).width || 0
+            var h = img.naturalHeight || (img as any).height || 0
+            if (!w || !h) { URL.revokeObjectURL(url); return resolve(file) }
+            var scale = Math.min(1, MAX / Math.max(w, h))
+            var c = document.createElement('canvas')
+            c.width = Math.max(1, Math.round(w * scale))
+            c.height = Math.max(1, Math.round(h * scale))
+            var cx = c.getContext('2d')
+            if (!cx) { URL.revokeObjectURL(url); return resolve(file) }
+            cx.fillStyle = '#ffffff'; cx.fillRect(0, 0, c.width, c.height)
+            cx.drawImage(img, 0, 0, c.width, c.height)
+            c.toBlob(function(blob) {
+              URL.revokeObjectURL(url)
+              try {
+                if (blob && blob.size > 0 && blob.size < file.size) {
+                  var outName = String(file.name || 'photo').replace(/\.[^.]+$/, '') + '.jpg'
+                  resolve(new File([blob], outName, { type: 'image/jpeg' }))
+                } else resolve(file)
+              } catch (e2) { resolve(file) }
+            }, 'image/jpeg', 0.85)
+          } catch (e) { URL.revokeObjectURL(url); resolve(file) }
+        }
+        img.onerror = function() { URL.revokeObjectURL(url); resolve(file) }
+        img.src = url
+      } catch (e) { resolve(file) }
+    })
+  }
+
   var handleUpload = async function(file: File, configKey: string) {
     setUploading(configKey)
     try {
-      var data = await chunkedUpload(file, 'photos')
+      /* (2026-ص) الضغط التلقائي قبل الرفع — بيمنع الصور الضخمة من إبطاء المنصة */
+      var upFile = await compressImageFile(file)
+      var data = await chunkedUpload(upFile, 'photos')
       var newConfig = Object.assign({}, config)
       newConfig[configKey] = data.filePath
       setConfig(newConfig)
