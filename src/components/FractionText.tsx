@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { repairCorruptMath } from '@/lib/math-text'
+import { repairCorruptMath, normalizeLooseRoots } from '@/lib/math-text'
 
 /*
  * FractionText — professional math renderer in the APP'S OWN FONT
@@ -613,10 +613,19 @@ function renderMathTokens(src: string, ctx: MathCtx): React.ReactNode[] {
         }
         var bodyRes = readGroupContent(src, i)
         i = bodyRes[1]
+        /* (2026-و111) جذر حقيقي متصل — طلب المستر: «الـ root بيتكتب غلط
+         * بعلامة جذر وشرطة منفصلين — عاوزه كلهم متوصلين ببعض، يبقى شكله حقيقي».
+         * الرمز بقى SVG بيتمدد مع ارتفاع المحتوى (كسور جوه الجذر بيكبر معاها)
+         * ورأسه بيلتحم بالظبط مع خط الـ radicand العلوي — والحرف التكعيبي
+         * بيقعد في وكر الرمز زي الكتب الحقيقية. */
         out.push(
           <span key={nextKey(ctx)} className="msqrt" dir="ltr">
-            {rootIdx ? <sup className="mrootidx">{renderMathTokens(rootIdx, ctx)}</sup> : null}
-            <span className="mrad">√</span>
+            <span className="mradical" aria-hidden="true">
+              <svg className="mradsvg" viewBox="0 0 12 100" preserveAspectRatio="none" focusable="false" aria-hidden="true">
+                <path d="M1 56 L3.4 87 L11.6 1.2" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+              </svg>
+            </span>
+            {rootIdx ? <span className="mrootidx">{renderMathTokens(rootIdx, ctx)}</span> : null}
             <span className="mradicand">{renderMathTokens(bodyRes[0], ctx)}</span>
           </span>
         )
@@ -704,6 +713,9 @@ export function FractionText({ text, className }: { text: string; className?: st
 
   /* repair JSON-corrupted math BEFORE anything else */
   raw = repairCorruptMath(raw)
+  /* (2026-و111) الجذور الخام sqrt(3)/√3/∛8 في الصفوف القديمة المحفوظة
+   * بتتحول لأوامر LaTeX قبل العرض — عشان تترسم جذر متصل حقيقي */
+  raw = normalizeLooseRoots(raw)
 
   /* split into text segments + real inline images */
   var segments = splitImageMarkers(raw)
