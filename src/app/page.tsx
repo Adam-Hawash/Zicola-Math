@@ -9,6 +9,7 @@ import { LoginView, RegisterView } from '@/components/landing/AuthPages'
 import dynamic from 'next/dynamic'
 import { useEffect, useState, useRef } from 'react'
 import { PlatformLoader } from '@/components/PlatformLoader'
+import { Reveal } from '@/components/landing/Reveal'
 /* (تسريع المنصة — و112) شاشة التحميل تحمّل بيانات الأقسام */
 import { prefetchLanding } from '@/lib/landing-prefetch'
 
@@ -232,18 +233,18 @@ export default function HomePage() {
       {currentView === 'landing' && (
         <main className="flex-1">
           <HeroSection />
-          {/* (و70) الفيديو التعريفي في الأعلى + قسم التحديات — طلب المستر */}
-          <IntroVideoSection />
-          <FeaturesGuideSection />
-          <FeaturesSection />
-          <GradesSection />
+          {/* (و111-b) تأثير «لما بنزل الحاجات بتتكون» — كل قسم بيظهر بتلاشي وصعود (نفس منصة صبري) — من غير الهيرو */}
+          <Reveal><IntroVideoSection /></Reveal>
+          <Reveal><FeaturesGuideSection /></Reveal>
+          <Reveal><FeaturesSection /></Reveal>
+          <Reveal><GradesSection /></Reveal>
           {/* (2026-و29) أفضل 3 طلاب بقوا في النافبار (زرار أوائل الطلبة) بدل الرئيسية
               (و70) زرار أوائل الطلبة اتشال من النافبار بطلب المستر (حاجات الطلاب) */}
-          <LessonsSection />
-          <ChallengesSection />
+          <Reveal><LessonsSection /></Reveal>
+          <Reveal><ChallengesSection /></Reveal>
           {/* (Z-5) فيديو تعريف المستر — فوق قسم المعرض بالظبط بطلب المستر */}
-          <TeacherVideoSection />
-          <GallerySection />
+          <Reveal><TeacherVideoSection /></Reveal>
+          <Reveal><GallerySection /></Reveal>
         </main>
       )}
 
