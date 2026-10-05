@@ -288,31 +288,11 @@ export function gradesFromConfig(siteConfig: SiteConfig | null | undefined): Gra
             cleaned.push(items[ci])
           }
           items = cleaned
-          /* (و71) دمج رابعة وخمسة ابتدائي: لو قاعدة البيانات (أو تخصيص أدمن قديم)
-             مفيهوش الصفين الجداد — بندخلهم قبل «السادس الابتدائي» (أول القايمة لو
-             مش موجودة) من غير ما نلمس باقي تخصيص الأدمن */
-          var hasG4 = false
-          var hasG5 = false
-          for (var m = 0; m < items.length; m++) {
-            var nm = items[m].ar || ''
-            if (nm === 'رابعة ابتدائي' || nm === 'الصف الرابع الابتدائي') hasG4 = true
-            if (nm === 'خمسة ابتدائي' || nm === 'الصف الخامس الابتدائي') hasG5 = true
-          }
-          if (!hasG4 || !hasG5) {
-            var g4: GradeItem = { ar: 'رابعة ابتدائي', en: 'Grade 4', emoji: '4️⃣', short: 'G4' }
-            var g5: GradeItem = { ar: 'خمسة ابتدائي', en: 'Grade 5', emoji: '5️⃣', short: 'G5' }
-            var insertAt = 0
-            for (var s = 0; s < items.length; s++) {
-              if ((items[s].ar || '').indexOf('السادس') !== -1) { insertAt = s; break }
-            }
-            if (insertAt === 0 && items.length > 0 && (items[0].ar || '').indexOf('السادس') === -1) {
-              /* مفيش سادس في القايمة — ندخلهم في الأول */
-              insertAt = 0
-            }
-            if (!hasG4 && !hasG5) items.splice(insertAt, 0, g4, g5)
-            else if (!hasG4) items.splice(insertAt, 0, g4)
-            else items.splice(insertAt, 0, g5)
-          }
+          /* (ص123) اتشال حقن «رابعة/خمسة ابتدائي» القديم (و71) — طلب المستر:
+             «اللي موجودة في صفحة الادمن هي اللي تبقى موجودة» — قايمة الصفوف
+             في كل المنصة = grades_data بتاعت الأدمن بالظبط من غير أي إضافة
+             تلقائية من الكود. الأدمن يضيف/يعدل الصفين دول من لوحة الصفوف
+             ولو عايزهم هيحفظهم هو. */
           return items
         }
       }
