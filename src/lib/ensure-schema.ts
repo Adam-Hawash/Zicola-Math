@@ -140,7 +140,7 @@ var SCHEMA_FIXES = [
   // Grade 5» — لو grades_data مش موجودة خالص بنكتب الافتراضي بسبعة صفوف،
   // ولو موجودة (حتى لو قديمة من غير رابعة/خامسة) الدمج بيحصل في الكود
   // gradesFromConfig — **ممنوع** نكتب فوق تخصيص الأدمن (idempotent).
-  "INSERT INTO SiteConfig (id, key, value, updatedAt) SELECT 'cfg_grades_w71', 'grades_data', '[{\"ar\":\"رابعة ابتدائي\",\"en\":\"Grade 4\",\"emoji\":\"4️⃣\",\"short\":\"G4\"},{\"ar\":\"خمسة ابتدائي\",\"en\":\"Grade 5\",\"emoji\":\"5️⃣\",\"short\":\"G5\"},{\"ar\":\"الصف السادس الابتدائي\",\"en\":\"Grade 6\",\"emoji\":\"6️⃣\",\"short\":\"G6\"},{\"ar\":\"أولى إعدادي\",\"en\":\"Prep 1\",\"emoji\":\"1️⃣\",\"short\":\"1\"},{\"ar\":\"تانية إعدادي\",\"en\":\"Prep 2\",\"emoji\":\"2️⃣\",\"short\":\"2\"},{\"ar\":\"تالتة إعدادي\",\"en\":\"Prep 3\",\"emoji\":\"3️⃣\",\"short\":\"3\"},{\"ar\":\"أولى ثانوي\",\"en\":\"1 Bac\",\"emoji\":\"🅱️\",\"short\":\"1B\"}]', CURRENT_TIMESTAMP WHERE NOT EXISTS (SELECT 1 FROM SiteConfig WHERE key = 'grades_data')",
+  "INSERT INTO SiteConfig (id, key, value, updatedAt) SELECT 'cfg_grades_w71', 'grades_data', '[{\"ar\":\"الرابعة الابتدائي\",\"en\":\"Grade 4\",\"emoji\":\"4️⃣\",\"short\":\"G4\"},{\"ar\":\"الخامسة الابتدائي\",\"en\":\"Grade 5\",\"emoji\":\"5️⃣\",\"short\":\"G5\"},{\"ar\":\"السادس الابتدائي\",\"en\":\"Grade 6\",\"emoji\":\"6️⃣\",\"short\":\"G6\"},{\"ar\":\"أولى إعدادي\",\"en\":\"Prep 1\",\"emoji\":\"1️⃣\",\"short\":\"1\"},{\"ar\":\"تانية إعدادي\",\"en\":\"Prep 2\",\"emoji\":\"2️⃣\",\"short\":\"2\"},{\"ar\":\"تالتة إعدادي\",\"en\":\"Prep 3\",\"emoji\":\"3️⃣\",\"short\":\"3\"},{\"ar\":\"أولى ثانوي\",\"en\":\"1 Bac\",\"emoji\":\"🅱️\",\"short\":\"1B\"}]', CURRENT_TIMESTAMP WHERE NOT EXISTS (SELECT 1 FROM SiteConfig WHERE key = 'grades_data')",
   // الصفوف الافتراضية في الكود اتحدثت برضه — للقواعد اللي grades_data فيها
   // صفوف مخصصة من الأدمن بنحافظ عليها زي ما هي (الدمج في gradesFromConfig)
   // ===== ترحيل لمرة واحدة (idempotent) =====
@@ -239,11 +239,65 @@ var GRADE_CONTENT_TABLES: Array<[string, string]> = [
   ['Payment', 'studentGrade'],
 ]
 
+/* ============================================================
+   (ص119) توحيد أسماء صفوف الابتدائي — طلب المستر حرفيًا:
+   «حتى الصف السادس الابتدائي كاتبه سادس ما تعدله» — الصف لازم
+   يتكتب بالاسم الكامل «السادس الابتدائي» مش الرقم لوحده.
+   العيلة دي بتشمّل أي صيغة: سادس / سادسة / السادس / سادس ابتدائي /
+   الصف السادس الابتدائي / grade 6 / g6 — وكلها بتترجع بالاسم المعتمد.
+   ============================================================ */
+var PRIMARY_GRADE_CANONICAL: Array<{ ar: string; en: string; emoji: string; short: string; keys: string[] }> = [
+  {
+    ar: 'الرابعة الابتدائي', en: 'Grade 4', emoji: '4️⃣', short: 'G4',
+    keys: ['رابعة', 'رابع', 'رابعة ابتدائي', 'رابع ابتدائي', 'grade 4', 'g4', '4', '٤'],
+  },
+  {
+    ar: 'الخامسة الابتدائي', en: 'Grade 5', emoji: '5️⃣', short: 'G5',
+    keys: ['خامسة', 'خامس', 'خامسة ابتدائي', 'خامس ابتدائي', 'grade 5', 'g5', '5', '٥'],
+  },
+  {
+    ar: 'السادس الابتدائي', en: 'Grade 6', emoji: '6️⃣', short: 'G6',
+    keys: ['سادس', 'سادسة', 'سادس ابتدائي', 'سادسة ابتدائي', 'grade 6', 'g6', '6', '٦'],
+  },
+]
+
+/* لو الاسم بيمثل صف ابتدائي من العائلات دي يرجع الصيغة المعتمدة بتاعته */
+function canonicalPrimaryGrade(name: any): { ar: string; en: string; emoji: string; short: string } | null {
+  var g = normalizeGradeKey(name)
+  if (!g) return null
+  /* شيل «الصف» أو «ال» البادئة + كلمة «الابتدائي/ابتدائي» الاختيارية عشان نخلي المطابقة بسيطة */
+  var bare = g.replace(/^(ال)?(صف\s+)?/, '').replace(/\s*(ابتدائي|الابتدائي)$/, '').trim()
+  for (var i = 0; i < PRIMARY_GRADE_CANONICAL.length; i++) {
+    var c = PRIMARY_GRADE_CANONICAL[i]
+    for (var k = 0; k < c.keys.length; k++) {
+      var kk = normalizeGradeKey(c.keys[k])
+      if (g === kk || bare === kk) return { ar: c.ar, en: c.en, emoji: c.emoji, short: c.short }
+    }
+  }
+  return null
+}
+
 var _gradesMigrationDone = false
+
+/* خريطة إعادة التسمية المتراكمة: (اسم قديم مخزّن) → (الاسم المعتمد الجديد).
+   (ص119) بقت تستخدم لكل العائلات (أولى ثانوي + صفوف الابتدائي) بدل ما
+   كل الأسماء الممسوحة كانت بتترجع لـ «أولى ثانوي» بس. */
+var gradeRenames: Array<{ from: string; to: string }> = []
+function pushGradeRename(from: string, to: string) {
+  var f = String(from || '').trim()
+  var t = String(to || '').trim()
+  if (!f || !t || f === t) return
+  for (var i = 0; i < gradeRenames.length; i++) {
+    if (gradeRenames[i].from === f) { gradeRenames[i].to = t; return }
+  }
+  gradeRenames.push({ from: f, to: t })
+}
 
 /* الترحيل الفعلي — بيرجع ملخص للتشخيص. آمن للاستدعاء المتكرر. */
 export async function migrateGradesData(client: any): Promise<{ changed: boolean; removedNames?: string[]; keptName?: string; scheduleFixed?: boolean }> {
   if (_gradesMigrationDone) return { changed: false }
+  /* (ص119) تفقية خريطة التسميات بين التشغيلات — متغيرة عند كل تحميل */
+  gradeRenames = []
   /* لو المفتاح مش موجود أصلًا (قاعدة جديدة) — الإدخال الافتراضي في
      SCHEMA_FIXES (cfg_grades_w71) هيتكتب بالقايمة الصح، ومفيش حاجة ننظفها */
   var rows: any
@@ -286,11 +340,13 @@ export async function migrateGradesData(client: any): Promise<{ changed: boolean
           short: typeof g.short === 'string' && g.short.trim() ? g.short : GRADE_S1_DEFAULTS.short,
         })
         if (ar.trim() && removedNames.indexOf(ar.trim()) === -1) removedNames.push(ar.trim())
+        pushGradeRename(ar, GRADE_S1_CANONICAL)
         changed = true
       } else {
         /* صف بكالوريا زيادة (فيه أولى ثانوي تاني في القايمة) → محذوف نهائيًا
            ومحتواه بيتنقل لـ أولى ثانوي */
         if (ar.trim() && ar.trim() !== GRADE_S1_CANONICAL && removedNames.indexOf(ar.trim()) === -1) removedNames.push(ar.trim())
+        pushGradeRename(ar, GRADE_S1_CANONICAL)
         changed = true
       }
       continue
@@ -308,6 +364,7 @@ export async function migrateGradesData(client: any): Promise<{ changed: boolean
         }
         if (ar !== GRADE_S1_CANONICAL) {
           if (ar.trim() && removedNames.indexOf(ar.trim()) === -1) removedNames.push(ar.trim())
+          pushGradeRename(ar, GRADE_S1_CANONICAL)
           changed = true
         }
         if (JSON.stringify(item) !== JSON.stringify({ ar: ar, en: g.en, emoji: g.emoji, short: g.short })) changed = true
@@ -315,6 +372,7 @@ export async function migrateGradesData(client: any): Promise<{ changed: boolean
       } else {
         /* تكرار إضافي — بيتشال ومحتواه (لو الاسم مختلف عن المعتمد) بيتنقل */
         if (ar.trim() && ar.trim() !== GRADE_S1_CANONICAL && removedNames.indexOf(ar.trim()) === -1) removedNames.push(ar.trim())
+        if (ar.trim() && ar.trim() !== GRADE_S1_CANONICAL) pushGradeRename(ar, GRADE_S1_CANONICAL)
         if (ar !== GRADE_S1_CANONICAL) changed = true
         changed = true
       }
@@ -323,17 +381,43 @@ export async function migrateGradesData(client: any): Promise<{ changed: boolean
     out.push(g)
   }
 
+  /* ============================================================
+     (ص119) توحيد صفوف الابتدائي: أي اسم من عيلة رابعة/خامسة/سادسة
+     ابتدائي بيتكتب بالصيغة المعتمدة (الرابعة/الخامسة/السادس الابتدائي)
+     — طلب المستر: «سادس» ممنوع تفضل لوحدها.
+     ============================================================ */
+  for (var gp = 0; gp < out.length; gp++) {
+    var gg: any = out[gp] || {}
+    var gAr = typeof gg.ar === 'string' ? gg.ar : ''
+    if (!gAr) continue
+    var canon = canonicalPrimaryGrade(gAr)
+    if (canon && gAr !== canon.ar) {
+      if (gAr.trim() && removedNames.indexOf(gAr.trim()) === -1) removedNames.push(gAr.trim())
+      pushGradeRename(gAr, canon.ar)
+      out[gp] = {
+        ar: canon.ar,
+        en: typeof gg.en === 'string' && gg.en.trim() ? gg.en : canon.en,
+        emoji: typeof gg.emoji === 'string' && gg.emoji.trim() ? gg.emoji : canon.emoji,
+        short: typeof gg.short === 'string' && gg.short.trim() ? gg.short : canon.short,
+      }
+      changed = true
+    }
+  }
+
   /* لو مفيش أي صف أولى ثانوي أصلًا مفيش حاجة نعملها للقايمة (الصف مش موجود) */
 
   if (changed) {
-    /* 1) نقل المحتوى المربوط بالأسماء المصلحية قبل حذفها — مفيش فيديو يتيم */
-    for (var r = 0; r < removedNames.length; r++) {
-      var oldName = removedNames[r]
+    /* 1) نقل المحتوى المربوط بالأسماء المصلحية قبل حذفها — مفيش فيديو يتيم.
+       (ص119) كل اسم بيترجع للصف المعتمد بتاعه هو (من خريطة gradeRenames)
+       — مش كل الأسماء لأولى ثانوي. */
+    for (var rn = 0; rn < gradeRenames.length; rn++) {
+      var oldName = gradeRenames[rn].from
+      var newName = gradeRenames[rn].to
       for (var t = 0; t < GRADE_CONTENT_TABLES.length; t++) {
         try {
           await client.execute({
             sql: 'UPDATE ' + GRADE_CONTENT_TABLES[t][0] + ' SET ' + GRADE_CONTENT_TABLES[t][1] + ' = ? WHERE ' + GRADE_CONTENT_TABLES[t][1] + ' = ?',
-            args: [GRADE_S1_CANONICAL, oldName],
+            args: [newName, oldName],
           })
         } catch (e) { /* جدول ناقص في قاعدة قديمة — الترحيل مكمل */ }
       }
@@ -350,12 +434,15 @@ export async function migrateGradesData(client: any): Promise<{ changed: boolean
             var val = String(dist.rows[d].g || '')
             var trimmed = val.trim()
             if (!trimmed || trimmed === GRADE_S1_CANONICAL) continue
-            var matchesFamily = isFirstSecondaryGradeName(trimmed) || isBaccalaureateGradeName(trimmed)
-            if (matchesFamily) {
+            /* (ص119) العائلات التلاتة: أولى ثانوي/بكالوريا + صفوف الابتدائي */
+            var s1Family = isFirstSecondaryGradeName(trimmed) || isBaccalaureateGradeName(trimmed)
+            var primaryCanon = canonicalPrimaryGrade(trimmed)
+            if (s1Family || (primaryCanon && primaryCanon.ar !== trimmed)) {
+              var target = s1Family ? GRADE_S1_CANONICAL : primaryCanon!.ar
               /* تحديث بالقيمة المخزنة زي ما هي (بالمسافات) — لو اتحدث قبل كده
                  الشرط بيرجع صفر صف = no-op آمن ومكرر التشغيل */
               try {
-                await client.execute({ sql: 'UPDATE ' + tbl + ' SET ' + col + ' = ? WHERE ' + col + ' = ?', args: [GRADE_S1_CANONICAL, val] })
+                await client.execute({ sql: 'UPDATE ' + tbl + ' SET ' + col + ' = ? WHERE ' + col + ' = ?', args: [target, val] })
               } catch (e2) {}
             }
           }
@@ -379,9 +466,18 @@ export async function migrateGradesData(client: any): Promise<{ changed: boolean
             if (!Array.isArray(day.slots)) continue
             for (var ss = 0; ss < day.slots.length; ss++) {
               var slotGrade = String((day.slots[ss] || {}).grade || '')
-              if (slotGrade && slotGrade.trim() !== GRADE_S1_CANONICAL && (isFirstSecondaryGradeName(slotGrade) || isBaccalaureateGradeName(slotGrade))) {
+              if (!slotGrade) continue
+              var slotTrim = slotGrade.trim()
+              if (slotTrim !== GRADE_S1_CANONICAL && (isFirstSecondaryGradeName(slotGrade) || isBaccalaureateGradeName(slotGrade))) {
                 day.slots[ss].grade = GRADE_S1_CANONICAL
                 schChanged = true
+              } else {
+                /* (ص119) صفوف الابتدائي في المواعيد كمان تتوحّد */
+                var slotCanon = canonicalPrimaryGrade(slotGrade)
+                if (slotCanon && slotTrim !== slotCanon.ar) {
+                  day.slots[ss].grade = slotCanon.ar
+                  schChanged = true
+                }
               }
             }
           }
@@ -446,7 +542,7 @@ export var CORE_TABLES = ['Admin', 'Student', 'StudentActivity', 'Video', 'Homew
  * إشعارات Web Push لولي الأمر) دخل SCHEMA_TABLES — نفس الدرس الموثق
  * و38/و40/و43/و44/و45: من غير تغيير المفتاح الجدول مش هيتعمل على
  * قواعد Turso الموجودة أول ريكوست بعد النشر. */
-var SCHEMA_HASH_KEY = 'schema_heal_hash_v2_w115_examends'
+var SCHEMA_HASH_KEY = 'schema_heal_hash_v2_w119_gradecanon'
 
 /* ============================================================
  * 2026-و23 — **إصلاح بطء المنصة** (طلب المستر: «المنصة بطيئة، تسجيل
