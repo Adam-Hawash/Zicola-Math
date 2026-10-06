@@ -1,4 +1,7 @@
 import { create } from 'zustand'
+/* (توحيد الصفوف) المرجع الموحد لأسماء الصفوف — وظيفة صرفة من غير
+   أي حاجة سيرفر — عشان القايمة المعروضة تتوحّد على الاسم المعتمد الكامل */
+import { normalizeGrade as canonicalGradeName } from '@/lib/grade-names'
 
 export type AppView =
   | 'landing'
@@ -293,7 +296,35 @@ export function gradesFromConfig(siteConfig: SiteConfig | null | undefined): Gra
              في كل المنصة = grades_data بتاعت الأدمن بالظبط من غير أي إضافة
              تلقائية من الكود. الأدمن يضيف/يعدل الصفين دول من لوحة الصفوف
              ولو عايزهم هيحفظهم هو. */
-          return items
+          /* ============================================================
+             (توحيد الصفوف — طلب المستر: «ما تخلي البيانات كلها زي بعض»)
+             كل صيغ صفوف الابتدائي بتترجع للاسم المعتمد الكامل + دمج المكرر —
+             «الخامس» و«خمسة ابتدائي» و«الخامسة الابتدائي» بيبقوا صف واحد
+             «الخامسة الابتدائي» — فالقوائم المنسدلة بقت أسماء كاملة موحدة
+             (مفيش «الخامس، السادس، الرابع» جنب الأسماء الكاملة) والامتحان
+             المضاف لصف بيتطابق مع طالب نفس الصف مهما كانت الصيغة القديمة.
+             ============================================================ */
+          var uniSeen: Record<string, boolean> = {}
+          var unified: GradeItem[] = []
+          for (var ui = 0; ui < items.length; ui++) {
+            var uAr = (items[ui].ar || '').trim()
+            if (!uAr) continue
+            var uCanon = canonicalGradeName(uAr) || uAr
+            if (uniSeen[uCanon]) {
+              for (var um = 0; um < unified.length; um++) {
+                if ((canonicalGradeName(unified[um].ar) || unified[um].ar) === uCanon) {
+                  if (!String(unified[um].en || '').trim() && String(items[ui].en || '').trim()) unified[um].en = items[ui].en
+                  if (!String(unified[um].emoji || '').trim() && String(items[ui].emoji || '').trim()) unified[um].emoji = items[ui].emoji
+                  if (!String(unified[um].short || '').trim() && String(items[ui].short || '').trim()) unified[um].short = items[ui].short
+                  break
+                }
+              }
+              continue
+            }
+            uniSeen[uCanon] = true
+            unified.push({ ar: uCanon, en: items[ui].en, emoji: items[ui].emoji, short: items[ui].short })
+          }
+          return unified
         }
       }
     }

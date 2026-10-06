@@ -4,6 +4,9 @@
 // missing) so a freshly-swapped database repairs itself instead of 500ing
 // every API (the "الفديو مش شغال" outage class).
 import { createClient } from '@libsql/client'
+/* (توحيد الصفوف) المرجع الموحد لأسماء الصفوف — نفس العائلات المستخدمة
+   في كل الـ APIs بدل نسخة محلية بتتفرق عن الأصل */
+import { primaryGradeCanonical } from './grade-names'
 
 export function makeLibsqlClient() {
   var dbUrl = process.env.TURSO_DATABASE_URL || process.env.DATABASE_URL || ''
@@ -240,42 +243,13 @@ var GRADE_CONTENT_TABLES: Array<[string, string]> = [
 ]
 
 /* ============================================================
-   (ص119) توحيد أسماء صفوف الابتدائي — طلب المستر حرفيًا:
-   «حتى الصف السادس الابتدائي كاتبه سادس ما تعدله» — الصف لازم
-   يتكتب بالاسم الكامل «السادس الابتدائي» مش الرقم لوحده.
-   العيلة دي بتشمّل أي صيغة: سادس / سادسة / السادس / سادس ابتدائي /
-   الصف السادس الابتدائي / grade 6 / g6 — وكلها بتترجع بالاسم المعتمد.
+   (ص119 + توحيد الصفوف) عائلات صفوف الابتدائي انتقلت للمرجع الموحد
+   src/lib/grade-names.ts (PRIMARY_GRADE_FAMILIES) — نفس الأسماء
+   المعتمدة في DEFAULT_GRADES، ومعاها الأول/الثاني/التالتة الابتدائي —
+   عشان كل مكان في المنصة ياخد نفس الاسم بالظبط (كتابة = قراءة = عرض).
    ============================================================ */
-var PRIMARY_GRADE_CANONICAL: Array<{ ar: string; en: string; emoji: string; short: string; keys: string[] }> = [
-  {
-    ar: 'الرابعة الابتدائي', en: 'Grade 4', emoji: '4️⃣', short: 'G4',
-    keys: ['رابعة', 'رابع', 'ربعة', 'ربع', 'رابعة ابتدائي', 'رابع ابتدائي', 'ربعة ابتدائي', 'grade 4', 'g4', '4', '٤'],
-  },
-  {
-    ar: 'الخامسة الابتدائي', en: 'Grade 5', emoji: '5️⃣', short: 'G5',
-    /* (ص119) «خمسة» و«خمس» بدون ألف كمان — صيغ مصرية شائعة */
-    keys: ['خامسة', 'خامس', 'خمسة', 'خمس', 'خامسة ابتدائي', 'خامس ابتدائي', 'خمسة ابتدائي', 'خمس ابتدائي', 'grade 5', 'g5', '5', '٥'],
-  },
-  {
-    ar: 'السادس الابتدائي', en: 'Grade 6', emoji: '6️⃣', short: 'G6',
-    keys: ['سادس', 'سادسة', 'سادس ابتدائي', 'سادسة ابتدائي', 'grade 6', 'g6', '6', '٦'],
-  },
-]
-
-/* لو الاسم بيمثل صف ابتدائي من العائلات دي يرجع الصيغة المعتمدة بتاعته */
 function canonicalPrimaryGrade(name: any): { ar: string; en: string; emoji: string; short: string } | null {
-  var g = normalizeGradeKey(name)
-  if (!g) return null
-  /* شيل «الصف» أو «ال» البادئة + كلمة «الابتدائي/ابتدائي» الاختيارية عشان نخلي المطابقة بسيطة */
-  var bare = g.replace(/^(ال)?(صف\s+)?/, '').replace(/\s*(ابتدائي|الابتدائي)$/, '').trim()
-  for (var i = 0; i < PRIMARY_GRADE_CANONICAL.length; i++) {
-    var c = PRIMARY_GRADE_CANONICAL[i]
-    for (var k = 0; k < c.keys.length; k++) {
-      var kk = normalizeGradeKey(c.keys[k])
-      if (g === kk || bare === kk) return { ar: c.ar, en: c.en, emoji: c.emoji, short: c.short }
-    }
-  }
-  return null
+  return primaryGradeCanonical(name)
 }
 
 var _gradesMigrationDone = false
@@ -404,6 +378,32 @@ export async function migrateGradesData(client: any): Promise<{ changed: boolean
       changed = true
     }
   }
+
+  /* ============================================================
+     (توحيد الصفوف) دمج أي صفين بقى لهم نفس الاسم المعتمد بعد التوحيد —
+     مثال: «الخامس» و«الخامسة الابتدائي» الاتنين بقوا «الخامسة الابتدائي»
+     → صف واحد بس في القايمة (مفيش تكرار في القوائم المنسدلة). الأول
+     بياخد بياناته والناقص فيه بيتكمل من المكرر.
+     ============================================================ */
+  var dedupSeen: Record<string, number> = {}
+  var deduped: any[] = []
+  for (var dd = 0; dd < out.length; dd++) {
+    var dAr = typeof (out[dd] || {}).ar === 'string' ? String(out[dd].ar).trim() : ''
+    if (!dAr) continue
+    var dKey = normalizeGradeKey(dAr)
+    if (dedupSeen[dKey] === undefined) {
+      dedupSeen[dKey] = deduped.length
+      deduped.push(out[dd])
+    } else {
+      var first: any = deduped[dedupSeen[dKey]] || {}
+      var dup: any = out[dd] || {}
+      if (!String(first.en || '').trim() && String(dup.en || '').trim()) first.en = dup.en
+      if (!String(first.emoji || '').trim() && String(dup.emoji || '').trim()) first.emoji = dup.emoji
+      if (!String(first.short || '').trim() && String(dup.short || '').trim()) first.short = dup.short
+      changed = true
+    }
+  }
+  out = deduped
 
   /* لو مفيش أي صف أولى ثانوي أصلًا مفيش حاجة نعملها للقايمة (الصف مش موجود) */
 
