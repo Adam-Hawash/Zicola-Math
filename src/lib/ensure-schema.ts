@@ -5,8 +5,9 @@
 // every API (the "الفديو مش شغال" outage class).
 import { createClient } from '@libsql/client'
 /* (توحيد الصفوف) المرجع الموحد لأسماء الصفوف — نفس العائلات المستخدمة
-   في كل الـ APIs بدل نسخة محلية بتتفرق عن الأصل */
-import { primaryGradeCanonical } from './grade-names'
+   في كل الـ APIs بدل نسخة محلية بتتفرق عن الأصل
+   (S-3) normalizeGrade اتضاف للترحيل الفعلي لصفوف الجداول */
+import { primaryGradeCanonical, normalizeGrade } from './grade-names'
 
 export function makeLibsqlClient() {
   var dbUrl = process.env.TURSO_DATABASE_URL || process.env.DATABASE_URL || ''
@@ -495,6 +496,64 @@ export async function migrateGradesData(client: any): Promise<{ changed: boolean
   return { changed: false }
 }
 
+/* ============================================================
+ * (S-3) الترحيل الفعلي لصفوف الجداول — المكمل الناقص لكوميت 825bdb9:
+ * توحيد الصفوف السابق وحّد الكتابة (storeGrade) والقراءة
+ * (gradeVariants/gradeWhere) بس **ما نفّذش أي UPDATE على الصفوف
+ * القديمة المخزنة في قاعدة البيانات نفسها** — مسح DISTINCT جوه
+ * migrateGradesData كان بيتنفذ فقط لو قايمة grades_data نفسها محتاجة
+ * تنظيف، ففضل فيديوهات/امتحانات/طلاب بصيغ قديمة («الخامس»، «سادسة»،
+ * «6»، «أولى بكالوريا»...). طلب المستر: «عاوز كله يبقى موحد — كل
+ * الصفوف — البيانات كلها زي بعض».
+ * ------------------------------------------------------------
+ * القواعد:
+ *  - لكل جدول فيه عمود صف (GRADE_CONTENT_TABLES):
+ *      SELECT DISTINCT <col> AS g FROM <Table>
+ *    ولكل قيمة: canonical = normalizeGrade(value) من المرجع الموحد
+ *    src/lib/grade-names.ts → لو مختلف: UPDATE ... SET col = canonical
+ *    WHERE col = value (بنفس نمط migrateGradesData بالظبط).
+ *  - idempotent 100%: الصفوف اللي بالاسم المعتمد بيفضلوا زي ما هم
+ *    (canonical === value → مفيش UPDATE) — التشغيل التاني بلاقي
+ *    مفيش أي قيمة قديمة فبيعدّي من غير أي كتابة.
+ *  - كل جدول في try/catch لوحده: جدول ناقص في قاعدة قديمة
+ *    (no such table) بيتتجاهل بصمت والباقي بيكمّل.
+ *  - راية _gradeRowsMigrationDone: مرة واحدة لكل عملية تشغيل سيرفر
+ *    (أول نداء لـ ensureSchema قبل المسار السريع للبصمة) — والترحيل
+ *    نفسه آمن يتكرر على أي حال (بيكتب فقط لو فيه تغيير فعلي).
+ *  - نفس libsql client بتاع migrateGradesData (ممنوع Prisma هنا).
+ * ============================================================ */
+var _gradeRowsMigrationDone = false
+
+export async function migrateGradeRows(client: any): Promise<{ changed: boolean; migrated: number; tables: number; renamed: Array<{ table: string; column: string; from: string; to: string }> }> {
+  if (_gradeRowsMigrationDone) return { changed: false, migrated: 0, tables: 0, renamed: [] }
+  var migrated = 0
+  var tablesScanned = 0
+  var renamed: Array<{ table: string; column: string; from: string; to: string }> = []
+  for (var t = 0; t < GRADE_CONTENT_TABLES.length; t++) {
+    var tbl = GRADE_CONTENT_TABLES[t][0]
+    var col = GRADE_CONTENT_TABLES[t][1]
+    /* كل جدول لوحده — جدول مش موجود (no such table) يتتجاهل بصمت */
+    try {
+      var dist = await client.execute('SELECT DISTINCT ' + col + ' AS g FROM ' + tbl)
+      if (!dist || !dist.rows) continue
+      tablesScanned++
+      for (var d = 0; d < dist.rows.length; d++) {
+        var val = String(dist.rows[d].g || '')
+        if (!val.trim()) continue /* فاضي/NULL — مفيش حاجة نتوحّده */
+        var canonical = normalizeGrade(val)
+        if (!canonical || canonical === val) continue /* بالاسم المعتمد أصلًا — idempotent */
+        try {
+          await client.execute({ sql: 'UPDATE ' + tbl + ' SET ' + col + ' = ? WHERE ' + col + ' = ?', args: [canonical, val] })
+          migrated++
+          renamed.push({ table: tbl, column: col, from: val, to: canonical })
+        } catch (eUp) { /* تحديث قيمة واحدة فشل — الباقي بيكمّل */ }
+      }
+    } catch (eTbl) { /* جدول ناقص في قاعدة قديمة — الترحيل مكمل */ }
+  }
+  _gradeRowsMigrationDone = true
+  return { changed: migrated > 0, migrated: migrated, tables: tablesScanned, renamed: renamed }
+}
+
 /* (2026-و23) الفهارس الناقصة (بيئة SQLite مش بتعمل فهارس تلقائية
  * للـ Foreign Keys) — لوحة «طلابي» كانت بتعمل count/groupBy على
  * StudentActivity و ExamResult بفل سكان على كل الصفوف. الفهارس دي
@@ -617,6 +676,19 @@ export async function ensureSchema(client: any, opts?: { force?: boolean }) {
       console.log('[ensure-schema] grades_data cleanup:', JSON.stringify(gm))
     }
   } catch (eGm) { /* الترحيل خدمة تنظيف — فشله ما يمنعش السكيما */ }
+
+  /* ============================================================
+   * (S-3) ترحيل الصفوف المخزنة فعليًا في جداول المحتوى — نفس مكان
+   * migrateGradesData (أول نداء في العملية قبل المسار السريع للبصمة،
+   * وبعد كده الـ memo بيرجع فورًا) وبنفس نمط العلم والتسجيل.
+   * ============================================================ */
+  try {
+    var gr = await migrateGradeRows(client)
+    if (gr && gr.changed) {
+      results.push({ gradeRowsMigration: gr })
+      console.log('[ensure-schema] grade rows migration:', JSON.stringify(gr))
+    }
+  } catch (eGr) { /* ترحيل صفوف — فشله ما يمنعش السكيما */ }
 
   /* المسار السريع: البصمة متخزنة ومطابقة → مفيش أي ترميم محتاج
      (استعلام واحد بدل ~70 — ده اللي هيخلي الدخول ولوحة الطلاب فورًا) */
