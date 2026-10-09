@@ -34,6 +34,7 @@ import { MathKeyboard } from '@/components/student/MathKeyboard'
 /* (2026-و97) رجوع لودر و95 في بوابة الطالب زي ما كان — بطلب المستر */
 import { PlatformLoader } from '@/components/PlatformLoader'
 import { SecurePlayerModal } from '@/components/student/SecurePlayerModal'
+import { ExamResultViewer } from '@/components/student/ExamResultViewer'
 import { StudentComplaints } from '@/components/student/StudentComplaints'
 import { BooksTab } from '@/components/student/BooksTab'
 /* (تسريع المنصة — و112) البيانات بتتجهز من لحظة نجاح الدخول */
@@ -3317,6 +3318,14 @@ function ExamsTab({ exams, results, completedExamIds, onExamSubmitted, studentId
         >
           العودة إلى قائمة الامتحانات
         </Button>
+        {/* (2026-ي2) لو المستر مفعّل «إظهار النتيجة» — الطالب يشوف درجته من شاشة البلوك نفسها */}
+        {(() => {
+          var bxE: any = exams.find(function(e) { return e.id === blockedExamId })
+          var bxR: any = bxE ? results.find(function(r) { return r.examId === bxE.id }) : null
+          return bxE && (bxE as any).showResult === true ? (
+            <ExamResultViewer studentId={studentId} examId={bxE.id} examTitle={bxE.title} result={bxR} />
+          ) : null
+        })()}
       </div>
     )
   }
@@ -3839,6 +3848,14 @@ function ExamsTab({ exams, results, completedExamIds, onExamSubmitted, studentId
                         <Badge className="text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
                           تم تسليم الامتحان
                         </Badge>
+                        {(exam as any).showResult === true && (
+                          <ExamResultViewer
+                            studentId={studentId}
+                            examId={exam.id}
+                            examTitle={exam.title}
+                            result={examResult}
+                          />
+                        )}
                       </div>
                     ) : isEnded115 ? (
                       <div className="flex items-center gap-2 flex-wrap">
