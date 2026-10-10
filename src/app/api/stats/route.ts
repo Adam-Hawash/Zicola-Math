@@ -53,7 +53,8 @@ export async function GET() {
 
     // Fallback — الطريقة القديمة (جداول ناقصة في قاعدة جديدة)
     var coreStats = await Promise.all([
-      db.student.count(),
+      /* (2026-ز12) المرفوض اتحذف من المنصة — مش بيعد في الإجمالي */
+      db.student.count({ where: { status: { notIn: ['rejected', 'refused'] } } }),
       db.student.count({ where: { status: 'pending' } }),
       db.student.count({ where: { status: 'approved' } }),
       db.video.count(),
