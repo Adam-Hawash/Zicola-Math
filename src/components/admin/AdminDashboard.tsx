@@ -26,7 +26,7 @@ import {
   Video as VideoIcon, LinkIcon, MonitorPlay, Send,
   MessageCircle, Copy,
   ChevronLeft, CheckCircle2, Smartphone, RotateCcw, ShieldCheck, Monitor, Tablet, Flag, GraduationCap, UsersRound, PieChart, BookOpen, ChevronDown, Wrench,
-  Layers, ChevronUp
+  Layers, ChevronUp, EyeOff, Swords
 } from 'lucide-react'
 import { AdminComplaints } from './AdminComplaints'
 import { CMSPanel } from './CMSPanel'
@@ -43,6 +43,8 @@ import { VideoGroupScheduleDialog } from './VideoGroupScheduleDialog'
 /* (و70) CommunityPanel اتشالت من التابات بطلب المستر — الملف موجود لو احتاجت ترجع */
 // import { CommunityPanel } from './CommunityPanel'
 import { ChallengesPanel } from './ChallengesPanel'
+/* (2026-ز13) تحدي المستر — بنك أسئلة + فلاش كاردز + التحدي الأسبوعي (منقول من ماث جينيوس) */
+import { TeacherChallengePanel } from './TeacherChallengePanel'
 import { ActivityPanel } from './ActivityPanel'
 import { PaymentsPanel } from '@/components/PaymentsPanel'
 import { StudentTargetPicker, parseTargetStudentIds } from '@/components/admin/StudentTargetPicker'
@@ -437,6 +439,8 @@ export function AdminDashboard() {
             <TabsTrigger value="grades-schedule" className="text-xs sm:text-sm gap-1 text-emerald-600 dark:text-emerald-400"><GraduationCap className="h-4 w-4" /><span className="hidden sm:inline">{T('الصفوف والمواعيد', 'Grades')}</span></TabsTrigger>
             {/* (2026-و40) الكتب والملازم — مكتبة PDF الطالب يفتحها/يحملها */}
             <TabsTrigger value="books" className="text-xs sm:text-sm gap-1 text-sky-600 dark:text-sky-400"><BookOpen className="h-4 w-4" /><span className="hidden sm:inline">{T('الكتب والملازم', 'Books')}</span></TabsTrigger>
+            {/* (2026-ز13) تحدي المستر — نزّل تحدي وادخل بنفسك */}
+            <TabsTrigger value="teacher-challenge" className="text-xs sm:text-sm gap-1 text-amber-600 dark:text-amber-400"><Swords className="h-4 w-4" /><span className="hidden sm:inline">{T('تحدي المستر', 'Teacher Challenge')}</span></TabsTrigger>
             <TabsTrigger value="player-settings" className="text-xs sm:text-sm gap-1 text-indigo-600 dark:text-indigo-400"><MonitorPlay className="h-4 w-4" /><span className="hidden sm:inline">{T('إعدادات الفيديو والووترمارك', 'Video & Watermark')}</span></TabsTrigger>
           </TabsList>
 
@@ -472,6 +476,8 @@ export function AdminDashboard() {
           <TabsContent value="grades-schedule"><GradesSchedulePanel /></TabsContent>
           {/* (2026-و40) الكتب والملازم */}
           <TabsContent value="books"><BooksManager /></TabsContent>
+          {/* (2026-ز13) تحدي المستر — سؤال صعب أسبوعي + لوحة ترتيب + دخول المستر بنفسه */}
+          <TabsContent value="teacher-challenge"><TeacherChallengePanel /></TabsContent>
           <TabsContent value="player-settings"><PlayerSettingsPanel /></TabsContent>
         </Tabs>
 
@@ -1533,6 +1539,45 @@ function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
     } catch { setAllStudents([]) }
   }
 
+  /* (2026-ز13) إخفاء درس كامل عن طلاب */
+  const [lessonHideOpen, setLessonHideOpen] = useState(false)
+  const [lessonHideGroup, setLessonHideGroup] = useState<{ key: string; title: string; grade: string; parts: number } | null>(null)
+  const [lessonHideStudents, setLessonHideStudents] = useState<any[]>([])
+  const [lessonHideSelected, setLessonHideSelected] = useState<string[]>([])
+  const [lessonHideSaving, setLessonHideSaving] = useState(false)
+
+  const openLessonHide = async function (gKey: string, grade: string, title: string, parts: number) {
+    setLessonHideGroup({ key: gKey, title: title, grade: grade, parts: parts })
+    setLessonHideOpen(true)
+    setLessonHideStudents([])
+    try {
+      var res = await fetch('/api/students?pageSize=200&grade=' + encodeURIComponent(grade))
+      var data = await res.json()
+      setLessonHideStudents((data.students || []).filter(function (s: any) { return s.status === 'approved' || s.status === 'paid' }))
+    } catch { setLessonHideStudents([]) }
+    try {
+      var r2 = await fetch('/api/lesson-hide?groupKey=' + encodeURIComponent(gKey))
+      var d2 = await r2.json()
+      setLessonHideSelected(d2.studentIds || [])
+    } catch { setLessonHideSelected([]) }
+  }
+  const handleLessonHideSave = async function () {
+    if (!lessonHideGroup) return
+    setLessonHideSaving(true)
+    try {
+      var res = await fetch('/api/lesson-hide', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ groupKey: lessonHideGroup.key, grade: lessonHideGroup.grade, studentIds: lessonHideSelected }),
+      })
+      if (res.ok) {
+        toast.success(lessonHideSelected.length > 0 ? 'تم إخفاء الدرس كامل عن الطلاب المحددين — مش هيشوفوه خالص' : 'تم فك إخفاء الدرس — بقى ظاهر للكل')
+        setLessonHideOpen(false)
+      } else { toast.error('فشل الحفظ') }
+    } catch { toast.error('خطأ في الاتصال') }
+    setLessonHideSaving(false)
+  }
+
   const loadExistingSchedule = async (videoId: string) => {
     try {
       var res = await fetch('/api/video-schedule?videoId=' + videoId)
@@ -2024,6 +2069,11 @@ function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
                       <Button size="sm" variant="ghost" className={`w-full ${isGrouped ? 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20' : 'text-muted-foreground'} text-xs h-7`} onClick={() => { if (gKey) openAddToLesson(gKey) }} title="ضيف فيديو تاني على نفس الدرس">
                         <Layers className="h-3.5 w-3.5 mr-1" />{isGrouped ? 'ضيف فيديو تاني للدرس ده' : 'درس بفيديوهات متعددة؟'}
                       </Button>
+                      {gKey ? (
+                        <Button size="sm" variant="ghost" className="w-full text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 text-xs h-7" onClick={() => openLessonHide(gKey, v.grade, v.title, gParts.length)} title="إخفاء الدرس كله (كل فيديوهاته) عن طلاب محددين">
+                          <EyeOff className="h-3.5 w-3.5 mr-1" />إخفاء الدرس كامل عن طلاب
+                        </Button>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -2130,6 +2180,50 @@ function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
                 {scheduleSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'حفظ الجدولة'}
               </Button>
               <Button variant="outline" onClick={() => setScheduleOpen(false)}>إلغاء</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* (2026-ز13) إخفاء درس كامل عن طلاب — كل فيديوهات الدرس بتختفي */}
+      {lessonHideOpen && lessonHideGroup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setLessonHideOpen(false)}>
+          <div className="bg-card border border-border rounded-xl p-5 shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto" onClick={function (e) { e.stopPropagation() }}>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="font-bold text-sm">إخفاء الدرس: {lessonHideGroup.title}</h3>
+                <p className="text-[10px] text-muted-foreground">الدرس كله ({lessonHideGroup.parts} فيديو) هيختفي من الطلاب المحددين — مش هيشوفوه خالص لحد ما تفك الإخفاء</p>
+              </div>
+              <button type="button" onClick={() => setLessonHideOpen(false)} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="mb-3">
+              <Label className="text-xs font-semibold text-red-600">طلاب صف {lessonHideGroup.grade} — المحددين مخفيين عنهم ({lessonHideSelected.length})</Label>
+              <div className="max-h-[220px] overflow-y-auto border rounded-md p-2 space-y-1 mt-2">
+                {lessonHideStudents.length === 0 ? (
+                  <p className="text-[10px] text-muted-foreground text-center py-4">مفيش طلاب في الصف ده</p>
+                ) : (
+                  lessonHideStudents.map(function (s) {
+                    var isSel = lessonHideSelected.includes(s.id)
+                    return (
+                      <button key={'lh-' + s.id} type="button"
+                        onClick={function () { if (isSel) { setLessonHideSelected(lessonHideSelected.filter(function (id) { return id !== s.id })) } else { setLessonHideSelected([...lessonHideSelected, s.id]) } }}
+                        className={"w-full flex items-center gap-2 p-2 rounded-md text-xs transition-colors " + (isSel ? 'bg-red-50 dark:bg-red-900/20 border border-red-500/30' : 'bg-muted/30 hover:bg-muted/50')}>
+                        <div className={"h-4 w-4 rounded border-2 flex items-center justify-center " + (isSel ? 'border-red-500 bg-red-500' : 'border-muted-foreground/30')}>
+                          {isSel && <Check className="h-3 w-3 text-white" />}
+                        </div>
+                        <span className="font-medium">{s.name}</span>
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1">اللي مختارينهم بيتخفي عنهم الدرس بأكله — سيبهم فاضيين ودوس حفظ لو عايز تفك الإخفاء</p>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handleLessonHideSave} disabled={lessonHideSaving} className="flex-1">
+                {lessonHideSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'حفظ'}
+              </Button>
+              <Button variant="outline" onClick={() => setLessonHideOpen(false)}>إلغاء</Button>
             </div>
           </div>
         </div>

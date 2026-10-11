@@ -48,6 +48,23 @@ export var SCHEMA_TABLES = [
   // (و70) قسم التحديات — فيديو المستر + حلول الطلاب بترتيب الزمن (طلب المستر حرفيًا)
   'CREATE TABLE IF NOT EXISTS Challenge (id TEXT PRIMARY KEY, title TEXT NOT NULL, description TEXT DEFAULT \'\', videoUrl TEXT DEFAULT \'\', videoType TEXT DEFAULT \'youtube\', active INTEGER NOT NULL DEFAULT 0, createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)',
   'CREATE TABLE IF NOT EXISTS ChallengeSolution (id TEXT PRIMARY KEY, challengeId TEXT NOT NULL, studentName TEXT NOT NULL, phone TEXT DEFAULT \'\', content TEXT NOT NULL, createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (challengeId) REFERENCES Challenge(id) ON DELETE CASCADE)',
+  /* (2026-ز13) ساحة التحدي — منقولة من Maths-Genius (ز13) — غرف الجروبات + اللاعبين + تحدي المستر + الفلاش كاردز
+     (2026-و88) timed (بوقت/من غير وقت) + qSeconds (ثواني السؤال الواحد للأسئلة العامة) */
+  'CREATE TABLE IF NOT EXISTS BattleRoom (id TEXT PRIMARY KEY, code TEXT NOT NULL UNIQUE, title TEXT DEFAULT \'\', hostPlayerId TEXT DEFAULT \'\', status TEXT NOT NULL DEFAULT \'lobby\', questions TEXT NOT NULL DEFAULT \'[]\', currentIndex INTEGER NOT NULL DEFAULT 0, questionStartAt TEXT NOT NULL DEFAULT \'0\', startedAt TEXT DEFAULT \'\', mode TEXT DEFAULT \'general\', difficulty TEXT DEFAULT \'mixed\', cardSeconds INTEGER DEFAULT 15, timed INTEGER DEFAULT 1, qSeconds INTEGER DEFAULT 25, createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)',
+  'CREATE TABLE IF NOT EXISTS BattlePlayer (id TEXT PRIMARY KEY, roomId TEXT NOT NULL, name TEXT NOT NULL, token TEXT DEFAULT \'\', isHost INTEGER NOT NULL DEFAULT 0, score INTEGER NOT NULL DEFAULT 0, streak INTEGER NOT NULL DEFAULT 0, answers TEXT NOT NULL DEFAULT \'{}\', lastSeen TEXT NOT NULL DEFAULT \'0\', studentId TEXT DEFAULT \'\', qIndex INTEGER DEFAULT 0, qStartAt TEXT DEFAULT \'\', finishedAt TEXT DEFAULT \'\', finished INTEGER DEFAULT 0, status TEXT DEFAULT \'active\', createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)',
+  'CREATE TABLE IF NOT EXISTS TeacherChallenge (id TEXT PRIMARY KEY, title TEXT NOT NULL, question TEXT NOT NULL, options TEXT NOT NULL DEFAULT \'[]\', correctIndex INTEGER NOT NULL DEFAULT 0, points INTEGER NOT NULL DEFAULT 30, durationMin INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1, closesAt DATETIME, createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)',
+  'CREATE TABLE IF NOT EXISTS ChallengeEntry (id TEXT PRIMARY KEY, challengeId TEXT NOT NULL, studentId TEXT DEFAULT \'\', name TEXT NOT NULL, isTeacher INTEGER NOT NULL DEFAULT 0, choice INTEGER NOT NULL DEFAULT -1, correct INTEGER NOT NULL DEFAULT 0, timeMs INTEGER NOT NULL DEFAULT 0, createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)',
+  'CREATE TABLE IF NOT EXISTS FlashcardScore (id TEXT PRIMARY KEY, studentId TEXT DEFAULT \'\', name TEXT NOT NULL, score INTEGER NOT NULL DEFAULT 0, correctCount INTEGER NOT NULL DEFAULT 0, totalCards INTEGER NOT NULL DEFAULT 10, createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)',
+  /* (2026-و66) الخرائط الذهنية التفاعلية */
+  'CREATE TABLE IF NOT EXISTS MindMap (id TEXT PRIMARY KEY, videoId TEXT DEFAULT \'\', title TEXT NOT NULL, sourceType TEXT DEFAULT \'youtube\', sourceUrl TEXT DEFAULT \'\', sourceName TEXT DEFAULT \'\', data TEXT NOT NULL DEFAULT \'{}\', createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)',
+  /* (2026-و68) بنك أسئلة التحدي — المستر يرفع ملفات → استخراج إنجليزي →
+     الطالب ياخد أسئلة عشوائية من كل الملفات + محاولات محفوظة بلوحة ترتيب */
+  'CREATE TABLE IF NOT EXISTS ChallengeBankQuestion (id TEXT PRIMARY KEY, fileName TEXT DEFAULT \'\', question TEXT NOT NULL, options TEXT NOT NULL DEFAULT \'[]\', correctIndex INTEGER NOT NULL DEFAULT 0, points INTEGER NOT NULL DEFAULT 10, active INTEGER NOT NULL DEFAULT 1, createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)',
+  'CREATE TABLE IF NOT EXISTS ChallengeAttempt (id TEXT PRIMARY KEY, studentId TEXT DEFAULT \'\', name TEXT NOT NULL, score INTEGER NOT NULL DEFAULT 0, correctCount INTEGER NOT NULL DEFAULT 0, totalQuestions INTEGER NOT NULL DEFAULT 10, timeMs INTEGER NOT NULL DEFAULT 0, createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)',
+  /* (و70-ج) كروت الفلاش بتاعة المستر — «تحدي على الـ flash cards والحاجات
+     اللي احنا بنحطها» — الأمام سؤال والظهر إجابة (بالإنجليزي) والطالب
+     بيتحدي عليها بنفس مؤقت الفلاش كاردز ولوحة الشرف */
+  'CREATE TABLE IF NOT EXISTS FlashcardCard (id TEXT PRIMARY KEY, fileName TEXT DEFAULT \'\', front TEXT NOT NULL, back TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)',
   /* (2026-و89) اشتراكات Web Push لولي الأمر — الإشعار الخارجي بقى إشعار براوزر حقيقي
      (مش واتساب — طلب المستر) — كل صف = جهاز مشترك لرقم ولي أمر مطبّع */
   'CREATE TABLE IF NOT EXISTS ParentPushSubscription (id TEXT PRIMARY KEY, parentId TEXT NOT NULL DEFAULT \'\', endpoint TEXT NOT NULL UNIQUE, p256dh TEXT NOT NULL DEFAULT \'\', auth TEXT NOT NULL DEFAULT \'\', userAgent TEXT NOT NULL DEFAULT \'\', createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)',
@@ -122,6 +139,32 @@ var SCHEMA_COLUMNS = [
   ['Homework', 'targetGroupIds', 'TEXT', "DEFAULT ''"],
   // (و43) الكتب بلينك خارجي — عمود sourceUrl لجدول Book (التخزين على الدرايف مش في القاعدة)
   ['Book', 'sourceUrl', 'TEXT', "NOT NULL DEFAULT ''"],
+  // (2026-ز13) ساحة التحدي — أعمدة إضافية منقولة من Maths-Genius (ز13)
+  // (2026-و68-إضافي) فيديو المستر في تحدي المستر — طلب المستر: «يصور فيديو ويعمله
+  // في التحديات» — videoUrl: لينك يوتيوب خام أو مسار /api/files/<id> لملف مرفوع،
+  // videoType: 'youtube' | 'file' | '' (فاضي = مفيش فيديو — الواجهة بتخفي البلوك)
+  ['TeacherChallenge', 'videoUrl', 'TEXT', "DEFAULT ''"],
+  ['TeacherChallenge', 'videoType', 'TEXT', "DEFAULT ''"],
+  /* (و72) السباق الفردي في تحدي الجروبات — كل لاعب ليه مؤقت وسؤال مستقل:
+     BattlePlayer.studentId (ربط الحساب + منع العودة بعد الخروج)
+     qIndex/qStartAt (سؤالي الحالي وبدايته — تقدم لكل لاعب لوحده)
+     finished/finishedAt (خلّص؟ وإمتى — لترتيب «مين خلّص الأول»)
+     status (active | left — الخروج من أي مرحلة)
+     BattleRoom.startedAt (بداية السباق — ساعة التوقيت) mode/difficulty/cardSeconds (خيارات الغرفة) */
+  ['BattlePlayer', 'studentId', 'TEXT', "DEFAULT ''"],
+  ['BattlePlayer', 'qIndex', 'INTEGER', 'DEFAULT 0'],
+  ['BattlePlayer', 'qStartAt', 'TEXT', "DEFAULT ''"],
+  ['BattlePlayer', 'finishedAt', 'TEXT', "DEFAULT ''"],
+  ['BattlePlayer', 'finished', 'INTEGER', 'DEFAULT 0'],
+  ['BattlePlayer', 'status', 'TEXT', "DEFAULT 'active'"],
+  ['BattleRoom', 'startedAt', 'TEXT', "DEFAULT ''"],
+  ['BattleRoom', 'mode', 'TEXT', "DEFAULT 'general'"],
+  ['BattleRoom', 'difficulty', 'TEXT', "DEFAULT 'mixed'"],
+  ['BattleRoom', 'cardSeconds', 'INTEGER', 'DEFAULT 15'],
+  // (2026-و88) وضع التوقيت في تحدي الجروبات — طلب المستر: في الأسئلة العامة
+  // «يقدر يحدد السؤال يبقى بوقت ولا من غير وقت ويختار الوقت بتاعه قد ايه»
+  ['BattleRoom', 'timed', 'INTEGER', 'DEFAULT 1'],
+  ['BattleRoom', 'qSeconds', 'INTEGER', 'DEFAULT 25'],
 ]
 
 var SCHEMA_FIXES = [

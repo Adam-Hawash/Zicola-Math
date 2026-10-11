@@ -54,6 +54,9 @@ export function BooksManager() {
   const [sourceUrl, setSourceUrl] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  /* (2026-ز13) معاينة + أسئلة الكتاب — منقول من و110 (طلب المستر: «أشوفه وأشوف الأسئلة اللي جواه») */
+  const [previewBook, setPreviewBook] = useState<any | null>(null)
+  const [bookQsBook, setBookQsBook] = useState<any | null>(null)
 
   var loadBooks = async function () {
     if (!adminId) return
@@ -337,6 +340,26 @@ export function BooksManager() {
                       {b.description && <span className="truncate max-w-[200px] hidden sm:inline">{b.description}</span>}
                     </div>
                   </div>
+                  {/* (2026-ز13) معاينة الكتاب + أسئلته — الكتاب بلينك خارجي بيتفتح عبر /api/books/proxy */}
+                  {(() => {
+                    var qCount = 0
+                    try { var pq = JSON.parse(b.questionsJson || '[]'); if (Array.isArray(pq)) qCount = pq.length } catch (eQm) {}
+                    var src2 = b.sourceUrl ? '/api/books/proxy?url=' + encodeURIComponent(b.sourceUrl) : (b.filePath || '')
+                    return (
+                      <>
+                        {qCount > 0 && (
+                          <Button variant="outline" size="sm" className="h-8 px-2 text-[10px] font-bold border-emerald-500/40 text-emerald-700 dark:text-emerald-400" onClick={function () { setBookQsBook(b) }}>
+                            الأسئلة ({qCount})
+                          </Button>
+                        )}
+                        {src2 && (
+                          <Button variant="outline" size="sm" className="h-8 gap-1" title="معاينة الكتاب" onClick={function () { setPreviewBook(b) }} aria-label="معاينة">
+                            👁 معاينة
+                          </Button>
+                        )}
+                      </>
+                    )
+                  })()}
                   <a
                     href={isLinkBook ? b.sourceUrl : (b.filePath + (b.filePath.indexOf('?') !== -1 ? '&' : '?') + 'dl=1')}
                     target="_blank"
@@ -345,14 +368,75 @@ export function BooksManager() {
                   >
                     <Button variant="outline" size="sm" className="h-8 gap-1"><FileDown className="h-3.5 w-3.5" />تحميل</Button>
                   </a>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive" onClick={function () { handleDelete(b) }} title="حذف">
-                    <Trash2 className="h-3.5 w-3.5" />
+                  {/* (2026-ز13) المسح بقى زرار مكتوب — أيقونة السلة لوحدها كانت مش باينة للمستر */}
+                  <Button variant="ghost" size="sm" className="h-8 gap-1 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={function () { handleDelete(b) }} title="مسح الكتاب">
+                    <Trash2 className="h-3.5 w-3.5" />مسح
                   </Button>
                 </div>
               )
             })}
           </div>
         )}
+
+        {/* (2026-ز13) معاينة الكتاب — iframe بـ filePath أو /api/books/proxy?url= للينك الخارجي */}
+        {previewBook && (function () {
+          var pSrc = previewBook.sourceUrl ? '/api/books/proxy?url=' + encodeURIComponent(previewBook.sourceUrl) : (previewBook.filePath || '')
+          return (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-2 sm:p-6" onMouseDown={function (e) { if (e.target === e.currentTarget) setPreviewBook(null) }}>
+              <div className="bg-background rounded-xl border shadow-2xl w-full max-w-4xl h-[92vh] flex flex-col">
+                <div className="flex items-center justify-between gap-2 p-3 border-b shrink-0">
+                  <p className="text-sm font-bold truncate">👁 معاينة: {previewBook.title}</p>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <a href={pSrc} target="_blank" rel="noreferrer" className="text-xs text-sky-600 dark:text-sky-400 hover:underline px-2">فتح في تاب جديد</a>
+                    <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={function () { setPreviewBook(null) }} aria-label="إغلاق">✕</Button>
+                  </div>
+                </div>
+                <div className="flex-1 min-h-0">
+                  <iframe src={pSrc} title={'معاينة ' + (previewBook.title || 'الكتاب')} className="w-full h-full rounded-b-xl bg-white" />
+                </div>
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* (2026-ز13) أسئلة الكتاب المستخرجة — بتظهر بس لما الكتاب نفسه فيه questionsJson */}
+        {bookQsBook && (function () {
+          var qsList: any[] = []
+          try { var pq2 = JSON.parse(bookQsBook.questionsJson || '[]'); if (Array.isArray(pq2)) qsList = pq2 } catch (eQ2) {}
+          return (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-2 sm:p-6" onMouseDown={function (e) { if (e.target === e.currentTarget) setBookQsBook(null) }}>
+              <div className="bg-background rounded-xl border shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col">
+                <div className="flex items-center justify-between gap-2 p-3 border-b shrink-0">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold truncate">📄 أسئلة «{bookQsBook.title}»</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">آخر أسئلة اتحكمت من الكتاب ده — {qsList.length} سؤال</p>
+                  </div>
+                  <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 shrink-0" onClick={function () { setBookQsBook(null) }} aria-label="إغلاق">✕</Button>
+                </div>
+                <div className="p-3 overflow-y-auto custom-scrollbar flex-1 space-y-2">
+                  {qsList.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-8">لسه مستخرجتش أسئلة من الكتاب ده — استخرج منه من شاشة استخراج الذكاء الاصطناعي والأسئلة هتتفصل هنا</p>
+                  ) : qsList.map(function (q: any, qi: number) {
+                    return (
+                      <div key={qi} className="p-2.5 rounded-lg border border-border bg-muted/30">
+                        <p className="text-xs font-semibold leading-relaxed">{(qi + 1) + '. ' + String(q.question || q.q || '')}</p>
+                        {Array.isArray(q.options) && q.options.length > 0 && (
+                          <div className="mt-1.5 space-y-0.5">
+                            {q.options.map(function (op: any, oi: number) {
+                              var isCorrect = (typeof q.correct === 'number' && q.correct === oi) || (Array.isArray(q.correct) && q.correct.indexOf(oi) !== -1)
+                              return <p key={oi} className={'text-[11px] ' + (isCorrect ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-muted-foreground')}>{String.fromCharCode(65 + oi) + '. ' + String(op || '')}{isCorrect ? ' ✓' : ''}</p>
+                            })}
+                          </div>
+                        )}
+                        {(!Array.isArray(q.options) || q.options.length === 0) && q.modelAnswer ? <p className="text-[11px] text-muted-foreground mt-1">النموذجي: {String(q.modelAnswer).substring(0, 200)}</p> : null}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          )
+        })()}
       </CardContent>
     </Card>
   )

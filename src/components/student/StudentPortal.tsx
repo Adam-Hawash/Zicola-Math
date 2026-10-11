@@ -12,9 +12,12 @@ import {
   LogOut, Loader2, FileDown, PlayCircle, CheckCircle2,
   BookOpen, Target, TrendingUp, GraduationCap, ChevronLeft, ExternalLink,
   User, Phone, Award, Lock, X, ListTodo, Search,
-  HelpCircle, ArrowLeft, Rocket, Flag, XCircle, Timer, Layers,
+  HelpCircle, ArrowLeft, Rocket, Flag, XCircle, Timer, Layers, Swords,
 } from 'lucide-react'
 import { useState, useEffect, useRef, useMemo } from 'react'
+/* (2026-ز13) ساحة التحدي + اتدرب أكتر — النسخة الإنجليزية الكانونية (طلب المستر) */
+import { BattleArena } from '@/components/student/BattleArena'
+import { PracticeGenerator } from '@/components/student/PracticeGenerator'
 import Image from 'next/image'
 import { toast } from 'sonner'
 import type { Video as VideoType, Homework, Exam, Announcement, Discussion, ExamResult } from '@/stores/app-store'
@@ -505,6 +508,9 @@ function StudentPortalInner() {
     { id: 'announcements', label: T('التنبيهات', 'Alerts'), icon: Megaphone },
     /* (و70) تاب المجتمع اتشال بطلب المستر (المجتمعات) */
     { id: 'complaints', label: T('الشكاوي', 'Complaints'), icon: Flag },
+    /* (2026-ز13) ساحة التحدي + اتدرب أكتر — تسميات إنجليزي بطلب المستر */
+    { id: 'arena', label: 'Arena', icon: Swords },
+    { id: 'practice', label: 'Practice', icon: Target },
   ]
 
   /* (2026-و59) أرقام الشارات الحمراء جنب التابات */
@@ -568,6 +574,9 @@ function StudentPortalInner() {
         {activeTab === 'announcements' && <AnnouncementsTab announcements={dashboardData.announcements} />}
         {/* (و70) تاب المجتمع اتشال بطلب المستر */}
         {activeTab === 'complaints' && <StudentComplaints studentId={studentId} studentName={currentStudent?.name || ''} studentPhone={currentStudent?.phone || ''} grade={grade} />}
+        {/* (2026-ز13) ساحة التحدي (جروبات + تحدي المستر + فلاش كاردز) + اتدرب أكتر */}
+        {activeTab === 'arena' && <BattleArena studentId={studentId} studentName={currentStudent?.name || ''} grade={grade} />}
+        {activeTab === 'practice' && <PracticeGenerator grade={grade} />}
       </div>
     </div>
   )
@@ -620,6 +629,8 @@ function VideosTab({ videos, watchedIds, approvedVideoIds, studentId, grade, vid
   // (2026-ف — رجعة نظام الجدولة القديم زي ما كان بالظبط)
   const [videoSchedules, setVideoSchedules] = useState<Record<string, any>>({})
   const [hiddenVideoIds, setHiddenVideoIds] = useState<Set<string>>(new Set())
+  // (2026-ز13) الدروس المخفية كاملة عن الطالب
+  const [hiddenGroupKeys, setHiddenGroupKeys] = useState<Set<string>>(new Set())
   const [activeLessonVideo, setActiveLessonVideo] = useState<VideoType | null>(null)
 
   // Load video schedules for this student
@@ -636,6 +647,15 @@ function VideosTab({ videos, watchedIds, approvedVideoIds, studentId, grade, vid
         setHiddenVideoIds(new Set(data.hiddenVideoIds || []))
       })
       .catch(function() {})
+  }, [studentId])
+
+  // (2026-ز13) الدروس المخفية كاملة عن الطالب ده
+  useEffect(() => {
+    if (!studentId) return
+    fetch('/api/lesson-hide?studentId=' + studentId)
+      .then(function (r) { return r.json() })
+      .then(function (data) { setHiddenGroupKeys(new Set(data.hiddenGroupKeys || [])) })
+      .catch(function () {})
   }, [studentId])
 
   // Check if video is locked for this student (scheduled but not yet unlocked)
@@ -742,7 +762,7 @@ function VideosTab({ videos, watchedIds, approvedVideoIds, studentId, grade, vid
     var map: Record<string, VideoType[]> = {}
     orderedVideos.forEach(function (v) {
       var k = groupKeyOf(v)
-      if (!k || hiddenVideoIds.has(v.id)) return
+      if (!k || hiddenVideoIds.has(v.id) || hiddenGroupKeys.has(k)) return
       if (!map[k]) map[k] = []
       map[k].push(v)
     })
@@ -754,7 +774,7 @@ function VideosTab({ videos, watchedIds, approvedVideoIds, studentId, grade, vid
       })
     })
     return map
-  }, [orderedVideos, hiddenVideoIds])
+  }, [orderedVideos, hiddenVideoIds, hiddenGroupKeys])
 
   // الدرس المفتوح حاليًا (صفحة الدرس — قائمة الفيديوهات بالترتيب)
   const [openLessonKey, setOpenLessonKey] = useState<string | null>(null)
