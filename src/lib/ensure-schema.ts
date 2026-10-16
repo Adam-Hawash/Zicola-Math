@@ -208,6 +208,10 @@ var SCHEMA_FIXES = [
   // القيم المخزنة اللي فيها Adham بتتصحح Adam. idempotent: القيم الصح
   // مفيهاش Adham فمش هتتلمس.
   "UPDATE SiteConfig SET value = REPLACE(value, 'Adham Hawash', 'Adam Hawash') WHERE (key LIKE '%made_by%' OR key LIKE '%developer_label%') AND value LIKE '%Adham Hawash%'",
+  // ===== (ز16) إزالة تكرار SiteConfig قبل إنشاء الفهرس الفريد — علة 500 في upsert على جداول قديمة
+  // بنحتفظ بأحدث صف لكل مفتاح (أكبر rowid) — لو مفيش تكرار الاستعلام مش بيمسح حاجة (idempotent)
+  'DELETE FROM SiteConfig WHERE rowid NOT IN (SELECT MAX(rowid) FROM SiteConfig GROUP BY key)',
+
 ]
 
 /* ============================================================
@@ -618,6 +622,9 @@ export var SCHEMA_INDEXES = [
   'CREATE INDEX IF NOT EXISTS idx_parent_student ON Parent(studentId)',
   'CREATE INDEX IF NOT EXISTS idx_notification_student ON Notification(studentId, read)',
   'CREATE INDEX IF NOT EXISTS idx_notification_created ON Notification(createdAt)',
+  // (ز16) فهرس فريد على مفتاح الكونفج — بدون ON CONFLICT فريد، upsert بيفشل 500 على الجداول القديمة
+  'CREATE UNIQUE INDEX IF NOT EXISTS idx_siteconfig_key_unique ON SiteConfig(key)',
+
 ]
 
 export var CORE_TABLES = ['Admin', 'Student', 'StudentActivity', 'Video', 'Homework', 'Exam', 'ExamResult', 'Announcement', 'Discussion', 'SiteConfig', 'Media', 'VideoProgress', 'GalleryImage', 'Payment', 'VideoAccess', 'Complaint', 'Parent', 'Book', 'Notification', 'Challenge', 'ChallengeSolution', 'BattleRoom', 'BattlePlayer', 'TeacherChallenge', 'ChallengeEntry', 'FlashcardScore', 'MindMap', 'ChallengeBankQuestion', 'ChallengeAttempt', 'FlashcardCard']

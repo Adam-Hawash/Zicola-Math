@@ -251,8 +251,11 @@ export async function PUT(request) {
       var batch = keys.slice(start, start + BATCH)
       await Promise.all(batch.map(function(key) {
         var value = body[key]
+          /* (ز16) grades_data وschedule_data حصراً لـ /api/site-config (لوحة الصفوف والمواعيد) —
+           * منع أي حفظ كونفج كامل من مسحهم بقيمة قديمة (علة «التعديلات بترجع»)،
+           * وfavicon_reset_v1 بصمة ترميم داخلية مش من الكونفج */
         // Skip non-config keys that might come from error responses
-        if (key === 'error' || key === 'defaults') return Promise.resolve()
+        if (key === 'error' || key === 'defaults' || key === 'grades_data' || key === 'schedule_data' || key === 'favicon_reset_v1') return Promise.resolve()
         return safeWrite(function(k, v) {
           return function() {
             return db.siteConfig.upsert({
