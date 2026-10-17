@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { AIAssistant } from "@/components/student/AIAssistant";
 import { FloatingInstallButton } from "@/components/InstallPwaButton";
 import { RecordingGuard } from "@/components/RecordingGuard";
+import { DevToolsGuard } from "@/components/DevToolsGuard";
 import { DeviceMessages } from "@/components/DeviceMessages";
 import { LangBoot } from "@/lib/i18n";
 
@@ -188,6 +189,8 @@ export default async function RootLayout({
         <FloatingInstallButton />
         {/* حماية عامة من التسجيل/التصوير + أدوات المطوّر في كل الصفحات */}
         <RecordingGuard />
+        {/* (ز19) حارس أدوات المطوّر — شاشة سودة + عداد 35 ثانية + مسح الحساب (طلب المستر) */}
+        <DevToolsGuard />
         {/* (2026-و111) رسايل حل الشكاوى للجهاز — أول ما الطالب يفتح المنصة
             من الجهاز اللي بعت منه الشكوى تظهرله رسالة الأدمن بالحل */}
         <DeviceMessages />
