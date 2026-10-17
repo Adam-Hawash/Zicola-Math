@@ -540,7 +540,7 @@ export const PLAYER_PAGE = `<!doctype html>
      مساحة كبيرة من الفيديو */
   /* 2026-و60-b — «الخط اللي فوق ده كبّره نص سم» — الشريط العلوي بقى أنصه
      (58–68px بدل 40–50px) وكلمة Zicola In Math أكبر شوية */
-  #topShield{position:absolute;top:0;left:0;right:0;z-index:22;pointer-events:auto;
+  #topShield{position:absolute;top:0;left:0;right:0;z-index:22;pointer-events:none;
     height:max(58px,min(10%,68px)); /* (MG-2) بيتطبق عليها ارتفاع محفوظ من الكونفج عبر JS */
     /* (MG-1) بدل الخلفية المعتمة — تدرج شفاف نازل من فوق (from-black/40
        to-transparent) + بلور خفيف: مفيش مربع أسود، والكلام الأبيض بظل واضح */
@@ -551,6 +551,13 @@ export const PLAYER_PAGE = `<!doctype html>
     border-bottom:1px solid rgba(255,255,255,.10)}
   #topShield::after{content:'';position:absolute;top:100%;left:0;right:0;height:12px;
     background:linear-gradient(to bottom,rgba(0,0,0,.45),rgba(0,0,0,0))}
+  /* (ز21) يوتيوب: الدرع بيتقص على منطقة العنوان/القناة بس (فوق من 33%
+     لليسار الفعلي — الشمال الأيسر سيبه مفتوح بصريًا عشان زرار ⚙ الجودة
+     الأصلي (اللي فوق الشمال في واجهة يوتيوب RTL) يبان للطالب ويقدر يدوس عليه
+     — البلوك الشفاف ytTitleBlock هو اللي بيقفل الدوس على العنوان/القناة)
+     + تلاشي ناعم لحافة الدرع الشمال (بدل القص الحاد) */
+  #topShield.ytmode{left:33%;
+    -webkit-mask-image:linear-gradient(to right,transparent 0,#000 46px);mask-image:linear-gradient(to right,transparent 0,#000 46px)}
   #topShield .brand{color:rgba(255,255,255,.95);font-weight:900;
     font-family:system-ui,-apple-system,'Segoe UI',sans-serif;
     font-size:clamp(15px,2.3vw,22px);letter-spacing:.5px;direction:ltr;white-space:nowrap;
@@ -581,9 +588,26 @@ export const PLAYER_PAGE = `<!doctype html>
     font-family:system-ui,-apple-system,'Segoe UI',sans-serif;
     font-size:clamp(12px,1.9vw,17px);letter-spacing:.5px;direction:ltr;white-space:nowrap;
     text-shadow:0 1px 3px rgba(0,0,0,.6);pointer-events:none}
-  #fsBtn{position:absolute;bottom:8px;left:8px;z-index:50;width:30px;height:30px;border-radius:8px;border:0;cursor:pointer;
-    background:rgba(0,0,0,.55);color:#fff;display:flex;align-items:center;justify-content:center;opacity:.75}
+  /* (ز21) زرار ملء الشاشة بتاعنا فوق الشريط الأصلي — ملء الشاشة الأصلي
+     مقفول (fs:0) عشان الووترمارك والدروع تفضل شغالة جوه ملء الشاشة */
+  #fsBtn{position:absolute;bottom:calc(var(--mgBarH) + 10px);left:10px;z-index:50;width:38px;height:38px;border-radius:10px;border:1px solid rgba(255,255,255,.18);cursor:pointer;
+    background:rgba(0,0,0,.55);color:#fff;display:flex;align-items:center;justify-content:center;opacity:.8;transition:opacity .3s ease}
   #fsBtn:hover{opacity:1;background:rgba(0,0,0,.75)}
+  #fsBtn.hide{opacity:0;pointer-events:none}
+  /* (ز21) بلوكات العلامات الميتة — شفافة تمامًا، شغلها الوحيد إن الدوس
+     ما توصلش ليوتيوب أبدًا (طلب المستر الحرفي: «علامة يوتيوب اللي بيدخل
+     للقناة وعلامة اسم القناة ما يكونوش شغالين»).
+     **مقاسات مقاسة فعليًا من واجهة يوتيوب RTL (hl=ar) على ديسكتوب وموبايل**:
+     واجهة يوتيوب بتنعكس مع العربي — فبتلاقي:
+     • ⚙ الإعدادات (قايمة الجودة) + الصوت + CC فوق الشمال (0–33%) → **لسة شغالة**
+     • العنوان + اسم القناة + الأفاتار فوق من 33% لليسار الكلي → ytTitleBlock (ميتة)
+     • لوجو «YouTube» + «المزيد من الفيديوهات» تحت الشمال (0–60%) → ytBrandBlock (ميتة)
+     • زرار الشير تحت اليمين (84–100%) → ytShareBlock (ميت)
+     والدرع العلوي المرئي بقال pointer-events:none — شكل بس من غير ما يمنع
+     دوسة الإعدادات ⚙ — والبلوكات الشفافة هي اللي بتقفل الدوس بالظبط */
+  #ytTitleBlock{position:absolute;z-index:21;top:0;left:33%;right:0;height:110px;pointer-events:auto;background:transparent}
+  #ytBrandBlock{position:absolute;z-index:46;bottom:0;left:0;width:60%;height:44px;pointer-events:auto;background:transparent}
+  #ytShareBlock{position:absolute;z-index:46;bottom:0;right:0;width:16%;height:44px;pointer-events:auto;background:transparent}
   /* ===== كنترولز بتاعتنا (بدون أي شكل يوتيوب) ===== */
   #tapLayer{position:absolute;inset:0;z-index:20;background:transparent}
   /* (الكنترولز بقيت بتاعة يوتيوب الأصلية — مفيش شريط تحكم من عندنا:
@@ -907,7 +931,7 @@ function ensureTopShield(){
   if(document.getElementById('topShield')) return;
   var ts = document.createElement('div'); ts.id='topShield';
   ts.innerHTML = '<span class="brand">Zicola In Math</span>';
-  try{ if(CFG.kind !== 'youtube') ts.classList.add('preplay'); }catch(e){}
+  try{ if(CFG.kind !== 'youtube') ts.classList.add('preplay'); else ts.classList.add('ytmode'); }catch(e){}
   wrap.appendChild(ts);
   applyPlayerChrome();
 }
@@ -915,6 +939,9 @@ function ensureTopShield(){
    بيغطي صف يوتيوب كله (اشتراك/لوجو/شير/كابشن) تغطية كاملة —
    وكروت QR فوقه ظاهرة، ومتلفسش أي حاجة برة مستطيل الفيديو */
 function ensureBotShield(){
+  /* (ز21) يوتيوب: مفيش درع سفلي خالص — الكنترولز الأصلية لازم تفضل حرة
+     (الدرع كان هيغطي زرار التشغيل و⚙ الجودة الأصلية ويمنع الدوس عليها) */
+  if(CFG.kind === 'youtube') return;
   if(document.getElementById('botShield')) return;
   var bs = document.createElement('div'); bs.id='botShield';
   bs.innerHTML = '<span class="brand">Zicola In Math</span>';
@@ -924,11 +951,16 @@ function ensureBotShield(){
    يوتيوب (فيه يوتيوب بس) — وبتمنع الدوس على اللي تحتها كمان */
 function ensureYtCovers(){
   if(CFG.kind !== 'youtube') return;
-  if(!document.getElementById('ytCoverR')){
-    var r = document.createElement('div'); r.id = 'ytCoverR'; wrap.appendChild(r);
+  /* (ز21) بلوكات العلامات الميتة بدل المستطيلات القديمة — القديمة كانت
+     هتغطي زرار ⚙ الأصلي نفسه. شفافة تمامًا + pointer-events:auto */
+  if(!document.getElementById('ytTitleBlock')){
+    var nt = document.createElement('div'); nt.id = 'ytTitleBlock'; wrap.appendChild(nt);
   }
-  if(!document.getElementById('ytCoverL')){
-    var l = document.createElement('div'); l.id = 'ytCoverL'; wrap.appendChild(l);
+  if(!document.getElementById('ytBrandBlock')){
+    var bb = document.createElement('div'); bb.id = 'ytBrandBlock'; wrap.appendChild(bb);
+  }
+  if(!document.getElementById('ytShareBlock')){
+    var sb = document.createElement('div'); sb.id = 'ytShareBlock'; wrap.appendChild(sb);
   }
 }
 /* self-heal: الووترمارك بيرجع يترسم لو حد شاله من الـ DOM */
@@ -1098,8 +1130,11 @@ document.addEventListener('keydown', function(e){
    فاضلة زي ما هي: منع اختصارات أدوات المطوّر + منع الكليك يمين + منع
    الحفظ + الووترمارك باسم الطالب ورقمه في كل إطار. */
 
-/* ===== مشغّل يوتيوب — بدون أي شكل يوتيوب: كنترولز خاصة بينا + شاشات تغطية
-   بتمنع ظهور العنوان/اللوجو نهائيًا. الـ ID بيتفك في الذاكرة بس زي ما هو ===== */
+/* ===== مشغّل يوتيوب (ز21 — «المشغل بتاع يوتيوب هو هو»): كنترولز يوتيوب
+   الأصلية controls=1 — قايمة الجودة ⚙ الحقيقية (360p→1080p) شغالة بجد،
+   وعلامة يوتيوب «Watch on YouTube» وعلامة اسم القناة/العنوان **ميتين**
+   (بلوكات شفافة فوقهم — مستحيل حد يدوس عليهم). ملء الشاشة زرارنا (fs:0)
+   عشان الووترمارك تفضل ظاهرة. الـ ID بيتفك في الذاكرة بس زي ما هو ===== */
 var playerApi = null;
 /* ===== رسائل الخطأ + إعادة بناء المشغل (2026-ح — علاج "المشغل بيتجهز ومش بيشتغل") =====
    يوتيوب ساعات بيرفض التشغيل خالص (خطأ auth/153 — حماية ضد البوتات على شبكات
@@ -1229,23 +1264,18 @@ function activateFallback(reason){
   if(pendingResume > 5) startS = Math.max(startS, Math.floor(pendingResume));
   var f = document.getElementById('ytPlain');
   if(!f){
-    /* (2026-د) نفس خدعة المشغل العملاق — الوضع البديل كمان بيرندر 1920×1080 */
-    var sc2 = document.createElement('div'); sc2.id = 'mgYtScaler';
+    /* (ز21) مقاس طبيعي 100% — الكنترولز الأصلية لازم تبان بمقاسها الحقيقي */
     f = document.createElement('iframe');
     f.id = 'ytPlain';
     f.setAttribute('allow','autoplay; fullscreen; encrypted-media; picture-in-picture');
     f.setAttribute('allowfullscreen','');
     f.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:0;background:#000';
-    sc2.appendChild(f);
-    wrap.appendChild(sc2);
+    wrap.appendChild(f);
   }
-  /* نفس مواصفات المشغل الأصلي بالظبط: **controls=0 — مفيش أي واجهة يوتيوب**
-     (لا لوجو ولا وقت ولا share ولا إعدادات — القرار 2026-ؤ) + كابشن مقفول
-     + ووترمارك ودروع وشريطنا فوقه — بيتشتغل لو الـ API نفسه ماقدرش يتحمل.
-     enablejsapi=1 → بنقدر نبعت أوامر إبادة الكابشن + تشغيل/إيقاف/كتم
-     لشريطنا جوه المشغل المباشر (postMessage كل 3 ثواني) — طلب المستر
-     الحرفي: «اعمل للكابشن بلوك» في أي مشغل */
-  f.src = 'https://www.youtube.com/embed/' + ytId + '?autoplay=1&controls=0&rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&cc_load_policy=0&cc_lang_pref=ar&hl=ar&disablekb=1&enablejsapi=1&vq=hd1080&origin=' + encodeURIComponent(location.origin || 'https://localhost') + '&start=' + startS;
+  /* (ز21) نفس مواصفات المشغل الأصلي: **controls=1 — كنترولز يوتيوب الأصلية**
+     (قايمة الجودة الحقيقية زي ما المستر طلب) + كابشن مقفول + الدروع والبلوكات
+     الشفافة فوقه. enablejsapi=1 → أوامر إبادة الكابشن عبر postMessage كل 3 ثواني */
+  f.src = 'https://www.youtube.com/embed/' + ytId + '?autoplay=1&controls=1&rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&cc_load_policy=0&cc_lang_pref=ar&hl=ar&enablejsapi=1&origin=' + encodeURIComponent(location.origin || 'https://localhost') + '&start=' + startS;
   layoutWrap();
   try{ if(plainCapTimer){ clearInterval(plainCapTimer); plainCapTimer = null; } }catch(e){}
   plainCapTimer = setInterval(killCaptionsPlain, 3000);
@@ -1348,7 +1378,7 @@ function startWithWatchdog(){
       /* الضربة القوية: loadVideoById بيحمّل التيار من الأول وبيشتغل فورًا —
          أقوى بكتير من playVideo في المتصفحات العنيدة */
       var cur = 0; try{ cur = playerApi.getCurrentTime() || 0; }catch(e){}
-      try{ playerApi.loadVideoById(ytIdCached, Math.max(0, Math.floor(cur)), 'large'); }catch(e){}
+      try{ playerApi.loadVideoById(ytIdCached, Math.max(0, Math.floor(cur))); }catch(e){}
     } else if(attempts === 5){
       try{ playerApi.mute(); muteFallback = true; showUnmuteBtn(); playerApi.playVideo(); }catch(e){}
     } else if(attempts >= 7){
@@ -1395,6 +1425,11 @@ function setBarHidden(h){
   var b = document.getElementById('mgBar');
   if(b){
     if(h){ b.classList.add('hide'); } else { b.classList.remove('hide'); }
+  }
+  /* (ز21) زرار ملء الشاشة بتاعنا بيتخفي/يظهر مع الكنترولز (يوتيوب الأصلي) */
+  var fb = document.getElementById('fsBtn');
+  if(fb){
+    if(h){ fb.classList.add('hide'); } else { fb.classList.remove('hide'); }
   }
   try{ document.body.style.cursor = h ? 'none' : ''; }catch(e){}
   if(h) closeQMenu();
@@ -1733,30 +1768,21 @@ function ytSetQuality(q){
 function mountYouTube(){
   var ytId = deobfuscate(CFG.blob, CFG.key);
   if(!ytId){ wrap.innerHTML = '<p style="color:#fca5a5;font-family:sans-serif;padding:24px;direction:rtl">حصل خطأ في تحميل الفيديو</p>'; return; }
-  /* **مفيش أي كنترولز يوتيوب خالص** (القرار النهائي 2026-ؤ — طلب المستر
-     الحرفي: «مش لاقي زرار الإعدادات.. خبي علامة اليوتيوب.. علامة الـ share
-     والـ time دي لغيها»): controls=0 → لوجو يوتيوب والوقت وshare والقايمة
-     كلهم **ماتشالوا من الأساس** (مش متغطيين — الغطاء كان بيفشل مع RTL).
-     مكانهم شريط تحكمنا (تشغيل/تقدم/ملء شاشة + الجودة) والفيديو
-     كامل 100% من غير أي قص.
-     (ملغاة 2026-و4: استثناء وضع كود HTML embed اتنست — المستر شال الميزة
-     نفسها لأنها كانت بتجيب واجهة يوتيوب) */
-  /* **خدعة الجودة الحاسمة (2026-د)**: يوتيوب بيحدد سقف التيار بمقاس المشغل —
-     مشغل 390px على الموبايل = سقف 480p حتى لو الفيديو 1080 (ده السبب الحقيقي
-     لـ "الجودة وحشة والفيديوهات ساعات 360 وساعات 720"). الحل: الـ iframe
-     بيرندر دايمًا **1920×1080** جوه حاوية بتتصغّر بالـ CSS (contain) —
-     يوتيوب يسمح بتيار 720p/1080p فعلًا + التصغير بيحافظ على الحدة 100%. */
-  var scaler = document.createElement('div');
-  scaler.id = 'mgYtScaler';
+  /* (ز21) المشغل الأصلي نفسه — طلب المستر الحرفي: «المشغل بتاع يوتيوب هو هو
+     عشان أقدر أتحكم في الجودات.. بس علامة يوتيوب اللي بيدخل للقناة وعلامة
+     اسم القناة ما يكونوش شغالين — شفتها في منصات كتير».
+     التنفيذ:
+     • controls=1 → كنترولز يوتيوب الأصلية جوه الـ iframe (قايمة ⚙ الحقيقية
+       بتغير الجودة بجد 360p→1080p + شريط السحب + السرعة) — **مفيش سكيلر
+       ومفيش شريط من عندنا** عشان الكنترولز تبان بمقاسها الطبيعي.
+     • العلامات الممنوعة **ميتة** مش متشالة: natTopBlock + ytLogoBlock
+       (شفافة pointer-events:auto) + الدرع العلوي المرئي.
+     • ملء الشاشة زرارنا (fs:0) عشان الووترمارك والدروع تفضل ظاهرة في الملء. */
   var host = document.createElement('div');
   host.id = 'ytHost';
   host.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;background:#000';
-  scaler.appendChild(host);
-  wrap.appendChild(scaler);
-  mgYtFit();
-  /* الكابشن: إبادة API + postMessage دورية — من غير أي تغطية مرئية زيادة
-     (غطاء capLid اتشال نهائيًا 2026-و2 بطلب المستر: «الفيديو من غير قص
-     تحت») — الشريط السفلي Opaque بتاعنا هو التغطية الوحيدة الباقية */
+  wrap.appendChild(host);
+  ensureYtCovers();
   // شاشة البداية — **صورة الفيديو الحقيقية من يوتيوب** (بتغطي أي عنوان/
   // برanding بتاع يوتيوب لحظة التحميل) + دوسة الطالب = إذن تشغيل بالصوت
   var startOv = document.createElement('div');
@@ -1771,15 +1797,15 @@ function mountYouTube(){
   startOv.addEventListener('click', function(){ if(!tapOk()) return; startWithWatchdog(); });
   startOv.addEventListener('touchend', function(e){ e.preventDefault(); if(!tapOk()) return; startWithWatchdog(); });
   wrap.appendChild(startOv);
-  // طبقة النقر — دوسة على الفيديو نفسه = تشغيل/إيقاف عن طريق الـ API
-  // (زي سلوك يوتيوب، بس بأمر من عندنا لأن كنترولزه مقفولة controls=0)
-  var tap = document.createElement('div');
-  tap.id = 'tapLayer';
-  tap.addEventListener('click', function(){ if(!tapOk()) return; ytTogglePlay(); });
-  wrap.appendChild(tap);
-  // شريط التحكم بتاعنا — ملء الشاشة الأصلي ليوتيوب مقفول (fs:0) وزراره
-  // في شريطنا عشان الووترمارك والدروع تفضل شغالة جوه ملء الشاشة
-  buildMgBar();
+  /* زرار ملء الشاشة بتاعنا — الملء الأصلي مقفول (fs:0) عشان الووترمارك
+     تفضل ظاهرة، وزرارنا بيكبّر الصفحة كلها (والأب هو اللي ينفذه جوه المنصة) */
+  var fsb = document.createElement('button');
+  fsb.id = 'fsBtn'; fsb.type = 'button';
+  fsb.setAttribute('aria-label','ملء الشاشة');
+  fsb.innerHTML = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>';
+  fsb.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); toggleFs(); });
+  fsb.addEventListener('touchend', function(e){ e.preventDefault(); e.stopPropagation(); toggleFs(); });
+  wrap.appendChild(fsb);
   // شاشة النهاية (بتغطي شاشة يوتيوب النهائية بالعنوان والاقتراحات)
   var endOv = document.createElement('div'); endOv.id='endOv';
   endOv.innerHTML = '<p>🎉 خلصت الفيديو — برافو عليك!</p><button type="button" id="replayBtn">شوفه تاني ↺</button>';
@@ -1815,10 +1841,12 @@ function buildPlayer(){
     videoId: ytId,
     width: '100%',
     height: '100%',
-    /* **controls:0 — مفيش أي واجهة يوتيوب خالص** (القرار النهائي 2026-ؤ):
-       مفيش لوجو/وقت/share/إعدادات — كله اتمسح من الأساس. كل التحكم بيبقت
-       عندنا (شريط mgBar + tapLayer عن طريق الـ JS API) */
-    playerVars: { autoplay:1, controls:0, rel:0, modestbranding:1, playsinline:1, iv_load_policy:3, cc_load_policy:0, cc_lang_pref:'ar', hl:'ar', fs:0, disablekb:1, enablejsapi:1, vq:'hd1080', origin: location.origin },
+    /* (ز21) **controls:1 — كنترولز يوتيوب الأصلية نفسها** (طلب المستر الحرفي:
+       «المشغل بتاع يوتيوب هو هو عشان أقدر أتحكم في الجودات») — قايمة ⚙
+       الأصلية بتغير الجودة بجد (360p→1080p) + شريط السحب + السرعة.
+       fs:0 → ملء الشاشة بزاريرنا عشان الووترمارك تفضل ظاهرة،
+       والعلامات الممنوعة (اللوجو/القناة) ميتة بالبلوكات الشفافة */
+    playerVars: { autoplay:1, controls:1, rel:0, modestbranding:1, playsinline:1, iv_load_policy:3, cc_load_policy:0, cc_lang_pref:'ar', hl:'ar', fs:0, enablejsapi:1, origin: location.origin },
     events: {
       onReady: function(ev){
         /* تكملة المشاهدة بنأجلها لأول لحظة تشغيل فعلية — أعلى أمان على الموبايل
@@ -1831,33 +1859,11 @@ function buildPlayer(){
         try{
           [400, 1200, 2500, 4000, 6000, 8000].forEach(function(ms){ setTimeout(killCaptions, ms); });
         }catch(e){}
-        /* (2026-و8) تلميح 480p من أول لحظة: لو التيار المقرر دلوقتي تحت 480
-           والفيديو لسه مش شغال → إعادة ترتيب بـ large قبل أي تشغيل —
-           ده كان سبب إن أول تشغيل بيبدأ 360p (التلميح كان في مسار إعادة
-           المحاولة بس) */
-        try{
-          setTimeout(function(){
-            try{
-              if(fallbackActive || ytQWanted || !playerApi || !ytIdCached) return;
-              var st0 = 0; try{ st0 = playerApi.getPlayerState ? playerApi.getPlayerState() : -1; }catch(e){}
-              if(st0 === 1 || st0 === 3) return;
-              var q0 = ''; try{ q0 = String(playerApi.getPlaybackQuality() || ''); }catch(e){}
-              if(q0 === 'tiny' || q0 === 'small' || q0 === 'medium' || q0 === 'large'){
-                playerApi.cueVideoById(ytIdCached, 0, 'hd720');
-                try{ if(playerApi.setPlaybackQualityRange) playerApi.setPlaybackQualityRange('hd720','highres'); }catch(e){}
-              }
-            }catch(e){}
-          }, 1200);
-        }catch(e){}
+        /* (ز21) الجودة كلها ليوتيوب الأصلي — مفيش تلميح ولا أرضية ولا قفل:
+           طلب المستر الحرفي «المشغل بتاع يوتيوب هو هو» */
         try{ setMuteIcon(!!(playerApi.isMuted && playerApi.isMuted())); }catch(e){}
         if(pendingStart){ pendingStart = false; startWithWatchdog(); }
         layoutWrap();
-      },
-      onPlaybackQualityChange: function(){
-        /* أرضية 480p: أي تغير جودة من يوتيوب → بنعيد طلب الأرضية فورًا
-           (لو الطالب مش مختار مستوى صريح) */
-        ytApplyFloor();
-        ytUpdateQLabel();
       },
       onStateChange: function(ev){
         try{
@@ -1874,10 +1880,7 @@ function buildPlayer(){
             }
             /* الكابشن ممنوع خالص — إبادة فورية مع كل تشغيل (قرار 2026-ن) */
             killCaptions();
-            /* قايمة الجودة: نجمع المستويات المتاحة من يوتيوب ونحدّث الزرار */
-            ytCollectLevels();
-            /* أرضية 480p مع كل تشغيل — طلب المستر 2026-و5: «مقبولة لـ 480» */
-            ytApplyFloor();
+            /* (ز21) الجودة كلها ليوتيوب الأصلي — مفيش أرضية ولا قفل */
             /* دورة الووترمارك الكبيرة بتشتغل مع التشغيل */
             wmRun(true); wmOn();
             setPlayIcon(true);
@@ -1936,7 +1939,6 @@ function buildPlayer(){
         var cur = playerApi.getCurrentTime() || 0, dur = playerApi.getDuration() || 0;
         reportProgress(cur, dur);
         mgUpdateProgress();
-        ytUpdateQLabel();
         /* (2026-د) مدة الفيديو: بتظهر على شاشة البداية + تتبعت للسيرفر مرة
            واحدة عشان بادج ⏱ يظهر على كروت الفيديوهات في المنصة */
         if(dur > 0){
@@ -1947,12 +1949,7 @@ function buildPlayer(){
             try{ fetch('/api/video-duration', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ videoId: CFG.videoId, durationSec: Math.round(dur) }) }).catch(function(){}); }catch(e){}
           }
         }
-        /* أرضية 480p دورية: طلب الأرضية كل 5 ثواني + حارس محدود (محاولتين
-           في أول 90 ثانية بس — من غير قطيعة) + متحقق اختيار الطالب */
-        var floorNow = Math.floor(Date.now() / 5000);
-        if(floorNow !== lastFloorCheck){ lastFloorCheck = floorNow; ytApplyFloor(); }
-        ytFloorGuard();
-        ytVerifyQuality();
+        /* (ز21) الجودة كلها ليوتيوب الأصلي — مفيش أرضية ولا حارس ولا متحقق */
         /* حارس النهاية: لو شاشة الاقتراحات هتظهر (ENDED ماتفوتش) → غطّي فورًا */
         if(ytState()===0){
           var eo3=document.getElementById('endOv');
