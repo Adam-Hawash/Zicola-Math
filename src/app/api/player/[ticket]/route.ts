@@ -105,13 +105,23 @@ export function isCloudinaryVideoUrl(u: string): boolean {
 }
 
 /* ============================================================
-   (2026-ص3) جودات archive.org الحقيقية — طلب المستر:
+   (2026-ص3 + ز19) جودات archive.org الحقيقية — طلب المستر:
    «أنا رفعت لينك من archive.org فالمفروض يظهر بجودته الطبيعية
    وأقدر أتحكم في الجودة براحتي»
    archive.org بيحفظ لنفس الفيديو كذا نسخة: الأصلي HD + مشتقات مضغوطة
    (512kb.mp4 اللي غالبًا المستر بياخد لينكها من صفحة العنصر = 360p).
    بنقرأ metadata العنصر منهم بنبني قايمة جودات حقيقية، والافتراضي =
    **أعلى جودة متاحة** (الجودة الطبيعية للفيديو) + المستر يبدّل براحته.
+   (ز19) الإصلاح الجذري لـ «المشغل متعدلش — لسه 360p»:
+   1) استدعاء السيرفر كان بيفشل على Vercel (تايم آوت 3.5 ثانية/حجب شبكة)
+      وساعتها مكانش فيه أي بديل → الفيديو بيفتح 360p من غير قايمة.
+      دلوقتي: تايم آوت أطمن + **المتصفح نفسه بيجيب الميتاداتا كبديل**
+      (archClientFallback جوه الصفحة — جهاز الطالب مش محجوب منه archive.org).
+   2) ترتيب النسخ كان بالارتفاع المكتوب بس — الأصل اللي ارتفاعه مش مكتوب
+      في الميتاداتا كان بيترتب تحت نسخة 360p! الأصل ( playable في المتصفحات)
+      بيتصدر دايمًا لأن archive.org ما بيصغّرش أبدًا.
+   3) العناصر اللي فيها أكتر من فيديو: الافتراضي بقى أعلى نسخة من
+      **نفس الدرس** (نفس الاسم الأساسي) مش أي فيديو في العنصر.
    أي فشل (مفيش نت / لينك مش archive / عنصر من غير نسخ) = السلوك القديم
    بالظبط — بيتشغل باللينك اللي اتقاله. */
 export function archiveOrgItemId(u: string): string {
@@ -122,43 +132,88 @@ export function archiveOrgItemId(u: string): string {
     || s.match(/archive\.org\/(?:\d+\/)?items\/([^\/\?#]+)/i)
   return m ? decodeURIComponent(m[1]) : ''
 }
-async function archiveOrgLevels(url: string): Promise<{ h: number; url: string }[] | null> {
+
+/* (ز19) الاسم الأساسي لملف archive.org — بنشيل الامتداد ولاحقات المشتقات
+   (_512kb/_h.264 إلخ) عشان نعرف النسخ اللي كلها بتاعة نفس الدرس */
+export function archiveOrgFileBase(nameOrUrl: string): string {
+  let s = String(nameOrUrl || '').split('?')[0].split('#')[0]
+  const parts = s.split('/')
+  s = parts[parts.length - 1] || ''
+  s = s.replace(/\.(mp4|m4v|mkv|webm|mov|ogv)$/i, '')
+  return s.replace(/_(512kb|h\.264|hd|hq|ia|mp4|smart|thumb)$/i, '').toLowerCase()
+}
+
+/* (ز19) بناء القايمة من metadata العنصر — فنكشن نقية عشان تتاختبر حقيقي */
+export function archiveOrgBuild(id: string, j: any, curUrl: string): { levels: { h: number; url: string }[]; defaultUrl: string } | null {
   try {
-    const id = archiveOrgItemId(url)
-    if (!id) return null
-    const r = await fetch('https://archive.org/metadata/' + encodeURIComponent(id), {
-      signal: AbortSignal.timeout(3500),
-      cache: 'no-store',
-    })
-    if (!r.ok) return null
-    const j: any = await r.json().catch(() => null)
     const files: any[] = (j && j.files) || []
-    const vids: { h: number; name: string; size: number }[] = []
+    const vids: { h: number; name: string; size: number; src: string }[] = []
     for (let i = 0; i < files.length; i++) {
       const f = files[i] || {}
       const nm = String(f.name || '')
-      if (!/\.(mp4|m4v|mkv|webm|mov|mpg|mpeg|avi)$/i.test(nm)) continue
+      if (!/\.(mp4|m4v|mkv|webm|mov|ogv)$/i.test(nm)) continue
       // ملفات معاينات/تشيكسوم — مش تشغيل
       if (/(_thumbs|\.ia\.|_source\.)/i.test(nm)) continue
+      // (ز19) الأصل اللي المتصفحات مش بتشغله (avi/mpg/mpeg) ما نفيدش كخيار
+      if (f.source === 'original' && /\.(avi|mpg|mpeg)$/i.test(nm)) continue
       vids.push({
         h: parseInt(String(f.height || ''), 10) || 0,
         name: nm,
         size: parseInt(String(f.size || ''), 10) || 0,
+        src: String(f.source || ''),
       })
     }
     if (!vids.length) return null
-    // الأعلى ارتفاعًا أولًا — وفي نفس الارتفاع الأكبر حجمًا (النسخة الأصلية)
-    vids.sort((a, b) => (b.h - a.h) || (b.size - a.size))
+    // (ز19) الأصل أولًا — archive.org ما بيصغّرش: الأصل (اللي المتصفح يشغله)
+    // دايمًا ≥ أي مشتق، حتى لو ارتفاعه مش مكتوب في الميتاداتا
+    const origTop = (v: { h: number; name: string; src: string }) =>
+      v.src === 'original' && /\.(mp4|m4v|mkv|webm|mov|ogv)$/i.test(v.name) ? 1 : 0
+    vids.sort((a, b) => {
+      const ao = origTop(a), bo = origTop(b)
+      if (ao !== bo) return bo - ao
+      if (a.h !== b.h) return b.h - a.h
+      return b.size - a.size
+    })
     const out: { h: number; url: string }[] = []
     const seen: Record<string, boolean> = {}
     for (let i = 0; i < vids.length; i++) {
-      const key = String(vids[i].h) // نفس الارتفاع = نفس الجودة — ناخد أكبر ملف
+      // نفس الارتفاع = نفس الجودة — ناخد أكبر ملف؛ الأصول بتتحفظ كلها بالاسم
+      const key = vids[i].src === 'original' ? 'orig:' + vids[i].name : String(vids[i].h)
       if (seen[key]) continue
       seen[key] = true
       const filePart = vids[i].name.split('/').map(encodeURIComponent).join('/')
       out.push({ h: vids[i].h, url: 'https://archive.org/download/' + encodeURIComponent(id) + '/' + filePart })
     }
-    return out.length > 1 ? out : null // نسخة واحدة = مفيش قايمة، السلوك القديم
+    if (out.length < 2) return null // نسخة واحدة = مفيش قايمة، السلوك القديم
+    // (ز19) الافتراضي = أعلى نسخة من **نفس الدرس** — العناصر اللي فيها أكتر
+    // من فيديو ما يفتحش المستر فيديو تاني بالغلط
+    const curBase = archiveOrgFileBase(curUrl)
+    let def = out[0]
+    if (curBase) {
+      for (let i = 0; i < out.length; i++) {
+        if (archiveOrgFileBase(out[i].url) === curBase) { def = out[i]; break } // out مترتبة
+      }
+    }
+    return { levels: out, defaultUrl: def.url }
+  } catch (e) {
+    return null
+  }
+}
+
+async function archiveOrgLevels(url: string): Promise<{ levels: { h: number; url: string }[]; defaultUrl: string } | null> {
+  try {
+    const id = archiveOrgItemId(url)
+    if (!id) return null
+    let j: any = null
+    try {
+      const r = await fetch('https://archive.org/metadata/' + encodeURIComponent(id), {
+        signal: AbortSignal.timeout(5000),
+        cache: 'no-store',
+      })
+      if (r.ok) j = await r.json().catch(() => null)
+    } catch (e) { j = null }
+    if (!j) return null
+    return archiveOrgBuild(id, j, url)
   } catch (e) {
     return null
   }
@@ -350,14 +405,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       cfg.fileUrl = directUrl
       // (و35) لينكات Cloudinary بياخدوا قايمة جودات حقيقية (1080/720/480/360)
       if (isCloudinaryVideoUrl(directUrl)) cfg.cloudinary = true
-      // (2026-ص3) لينكات archive.org بياخدوا كل نسخ الجودة الموجودة في
-      // العنصر + الافتراضي أعلى جودة (الجودة الطبيعية) — طلب المستر
+      // (2026-ص3 + ز19) لينكات archive.org بياخدوا كل نسخ الجودة الموجودة في
+      // العنصر + الافتراضي أعلى جودة من نفس الدرس — طلب المستر
       if (!/\.m3u8(\?|$)/i.test(String(cfg.fileUrl))) {
         const archLv = await archiveOrgLevels(String(cfg.fileUrl))
-        if (archLv && archLv.length > 1) {
-          cfg.archive = archLv
-          cfg.fileUrl = archLv[0].url // الافتراضي = أعلى جودة متاحة في العنصر
+        if (archLv && archLv.levels.length > 1) {
+          cfg.archive = archLv.levels
+          cfg.fileUrl = archLv.defaultUrl // الافتراضي = أعلى نسخة من نفس الدرس
         }
+        // لو فشل السيرفر هنا — archClientFallback جوه صفحة المشغل بيجيب
+        // الميتاداتا من جهاز الطالب مباشرة ويبني القايمة (ز19)
       }
     }
     const cfgJson = JSON.stringify(cfg).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026')
@@ -381,8 +438,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 /* ============================================================
    صفحة المشغل — قالب واحد فيه كل الحماية والوترمارك
+   (exported عشان اختبار كود المشغل المتشحن نفسه — ز19)
    ============================================================ */
-const PLAYER_PAGE = `<!doctype html>
+export const PLAYER_PAGE = `<!doctype html>
 <html dir="rtl" lang="ar">
 <head>
 <meta charset="utf-8">
@@ -2011,6 +2069,98 @@ function switchArchiveQuality(i){
     updateQLabel(); renderQMenu();
   }catch(e){}
 }
+/*Z19F-START*/
+/* ===== (ز19) شبكة أمان archive.org من جهاز الطالب نفسه =====
+   لو السيرفر ما قدرش يجيب ميتاداتا العنصر (شبكة/تايم آوت)، المتصفح بيجيبها
+   بنفسه من archive.org (مش محجوبة من الأجهزة) ويبني قايمة الجودات —
+   ولو لسه في أول الدرس بيبدّل فورًا لأعلى جودة من نفس الدرس بنفس الثانية.
+   الفنكشنز دي نقية (من غير DOM) عشان تتاختبر من الكود المتشحن نفسه */
+function archIdOf(u){
+  var s = String(u || '');
+  var m = s.match(/archive\\.org\\/(?:download|details|embed|metadata)\\/([^\\/\\?#]+)/i) || s.match(/archive\\.org\\/(?:\\d+\\/)?items\\/([^\\/\\?#]+)/i);
+  return m ? decodeURIComponent(m[1]) : '';
+}
+function archFileName(u){
+  try{ var s = String(u || '').split('?')[0].split('#')[0]; var p = s.split('/'); return decodeURIComponent(p[p.length - 1] || ''); }catch(e){ return ''; }
+}
+function archBaseName(u){
+  try{ var s = archFileName(u).replace(/\\.(mp4|m4v|mkv|webm|mov|ogv)$/i, ''); return s.replace(/_(512kb|h\\.264|hd|hq|ia|mp4|smart|thumb)$/i, '').toLowerCase(); }catch(e){ return ''; }
+}
+function archBuildLevels(id, j){
+  try{
+    var files = (j && j.files) || [], vids = [];
+    for(var i = 0; i < files.length; i++){
+      var f = files[i] || {}, nm = String(f.name || '');
+      if(!/\\.(mp4|m4v|mkv|webm|mov|ogv)$/i.test(nm)) continue;
+      if(/(_thumbs|\\.ia\\.|_source\\.)/i.test(nm)) continue;
+      if(f.source === 'original' && /\\.(avi|mpg|mpeg)$/i.test(nm)) continue;
+      vids.push({ h: parseInt(String(f.height || ''), 10) || 0, name: nm, size: parseInt(String(f.size || ''), 10) || 0, src: String(f.source || '') });
+    }
+    if(!vids.length) return null;
+    function origTop(v){ return (v.src === 'original' && /\\.(mp4|m4v|mkv|webm|mov|ogv)$/i.test(v.name)) ? 1 : 0; }
+    vids.sort(function(a, b){
+      var ao = origTop(a), bo = origTop(b);
+      if(ao !== bo) return bo - ao;
+      if(a.h !== b.h) return b.h - a.h;
+      return b.size - a.size;
+    });
+    var out = [], seen = {};
+    for(var i2 = 0; i2 < vids.length; i2++){
+      var key = vids[i2].src === 'original' ? ('orig:' + vids[i2].name) : String(vids[i2].h);
+      if(seen[key]) continue;
+      seen[key] = true;
+      var fp = vids[i2].name.split('/').map(encodeURIComponent).join('/');
+      out.push({ h: vids[i2].h, url: 'https://archive.org/download/' + encodeURIComponent(id) + '/' + fp });
+    }
+    if(out.length < 2) return null;
+    return out;
+  }catch(e){ return null; }
+}
+var archTried = false;
+function archClientFallback(){
+  try{
+    if(archTried || archLevels.length || CFG.kind !== 'file') return;
+    var id = archIdOf(String(CFG.fileUrl || ''));
+    if(!id) return;
+    archTried = true;
+    fetch('https://archive.org/metadata/' + encodeURIComponent(id), { cache: 'no-store' })
+      .then(function(r){ return r.ok ? r.json() : null })
+      .then(function(j){
+        try{
+          var lv = archBuildLevels(id, j);
+          if(!lv || !lv.length) return;
+          archLevels = lv;
+          var curName = archFileName(String(CFG.fileUrl || ''));
+          var matched = -1;
+          for(var z = 0; z < lv.length; z++){ if(archFileName(lv[z].url) === curName){ matched = z; break; } }
+          if(matched < 0){
+            var cb = archBaseName(String(CFG.fileUrl || ''));
+            if(cb){ for(var z2 = 0; z2 < lv.length; z2++){ if(archBaseName(lv[z2].url) === cb){ matched = z2; break; } } }
+          }
+          archCur = matched >= 0 ? matched : 0;
+          var v = fileApi;
+          /* لسه في أول الدرس (أو الملف الحالي بايظ) والنسخة الحالية مش أعلى
+             جودة من نفس الدرس → نبدّل فورًا بنفس الثانية (الإنقاذ في أي وقت
+             لو الملف باظ — والترقية السلسة في أول الدرس من غير قطيعة) */
+          if(v && (v.currentTime < 5 || v.error) && archCur !== 0 && archBaseName(lv[0].url) === archBaseName(lv[archCur].url)){
+            var cur = v.currentTime, wasPlaying = !v.paused;
+            archCur = 0;
+            v.src = lv[0].url; v.load();
+            var once = function(){
+              try{ v.removeEventListener('loadedmetadata', once); }catch(e2){}
+              try{ if(cur > 0 && v.duration && cur < v.duration - 1) v.currentTime = cur; }catch(e2){}
+              if(wasPlaying){ try{ var pp = v.play(); if(pp && pp.catch) pp.catch(function(){}); }catch(e2){} }
+            };
+            v.addEventListener('loadedmetadata', once);
+          }
+          fileQualityLabel = '';
+          renderQMenu(); updateQLabel();
+        }catch(e){}
+      })
+      .catch(function(){});
+  }catch(e){}
+}
+/*Z19F-END*/
 /* رسايل أخطاء المشغل العادي — شاشة واضحة + زرار إعادة */
 function fileError(msg){
   var ov = document.getElementById('fileErrOv');
@@ -2312,8 +2462,14 @@ function mountFile(){
   buildFileBar();
   /* المصدر: بث HLS له قايمة جودات حقيقية — Cloudinary ليه جودات حقيقية من الرابط — الملف المباشر بجودته الأصلية */
   var src = String(CFG.fileUrl || '');
-  /* (2026-ص3) archive.org: الافتراضي أعلى جودة متاحة (احتياط لو السيرفر ما بدّلش) */
-  if(archLevels.length && archLevels[0] && archLevels[0].url) src = archLevels[0].url;
+  /* (2026-ص3 + ز19) archive.org: السيرفر اختار أعلى نسخة من نفس الدرس —
+     ومحدد مكان النسخة الحالية في القايمة عشان علامة ✓ والليبل يبقوا صحيحين */
+  if(archLevels.length && archLevels[0] && archLevels[0].url){
+    var curNmA = archFileName(src), matchedA = -1;
+    for(var ziA = 0; ziA < archLevels.length; ziA++){ if(archFileName(archLevels[ziA].url) === curNmA){ matchedA = ziA; break; } }
+    if(matchedA >= 0){ archCur = matchedA; }
+    else { archCur = 0; src = archLevels[0].url; }
+  }
   if(CFG.cloudinary) cloudVariants(src);
   if(/\\.m3u8(\\?|$)/i.test(src)) setupHls(src);
   else v.src = src;
@@ -2326,6 +2482,8 @@ ensureYtCovers();
 ensureBotShield();
 layoutWrap();
 if(CFG.kind === 'youtube') mountYouTube(); else if(CFG.kind === 'file') mountFile();
+/* (ز19) شبكة أمان archive.org: لو السيرفر ما جابش القايمة، المتصفح بيجيبها من جهاز الطالب */
+if(CFG.kind === 'file') archClientFallback();
 
 /* زرار ملء الشاشة للملفات (ليوتيوب الزرار جوه الكنترولز بتاعته) */
 if(CFG.kind === 'file'){
