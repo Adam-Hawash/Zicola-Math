@@ -832,7 +832,8 @@ function VideosTab({ videos, watchedIds, approvedVideoIds, studentId, grade, vid
             const gProgress = Math.round(gParts.reduce(function (s: number, p) { return s + (mergedProgress[p.id] || 0) }, 0) / gParts.length)
             const allWatched = gParts.every(function (p) { return localWatched.has(p.id) })
             const gHasPrice = (first.price || 0) > 0
-            const gNeedsPay = gHasPrice && !approvedVideoIds.has(first.id)
+            /* (ز18) أي جزء متسدد = الدرس كله متسدد */
+            const gNeedsPay = gHasPrice && !gParts.some(function (pp) { return approvedVideoIds.has(pp.id) })
 
             if (schedG.locked && schedG.unlockAt) {
               return (
@@ -1144,7 +1145,8 @@ function VideosTab({ videos, watchedIds, approvedVideoIds, studentId, grade, vid
           onClose={function () { setOpenLessonKey(null) }}
           onPlayPart={function (p) { openPlayModal(p) }}
           onPayPart={function (p) {
-            setPendingPaymentVideo({ id: p.id, title: p.title, price: p.price || 0, grade: grade })
+            /* (ز18) الدفع بيفتح الدرس كله */
+            setPendingPaymentVideo({ id: p.id, title: 'الدرس كامل: ' + p.title, price: p.price || 0, grade: grade })
             setView('student-payment')
           }}
         />
@@ -1223,7 +1225,9 @@ function LessonPartsModal({ title, parts, mergedProgress, lockedMap, approvedVid
           {parts.map(function (p, i) {
             const pct = mergedProgress[p.id] || 0
             const locked = lockedMap[p.id] === true
-            const needsPay = (p.price || 0) > 0 && !approvedVideoIds.has(p.id)
+            /* (ز18) أول تسديد بيفتح الدرس كله — أي جزء متسدد يفتح الباقي */
+            const groupAnyPaidZ18 = parts.some(function (pp) { return approvedVideoIds.has(pp.id) })
+            const needsPay = !groupAnyPaidZ18 && (p.price || 0) > 0 && !approvedVideoIds.has(p.id)
             const watched = localWatched.has(p.id)
             const thumb = p.thumbnail || (p as any).thumb || null
             const label = 'الفيديو ' + (AR_NUM[i] || String(i + 1))
