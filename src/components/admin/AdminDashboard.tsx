@@ -1547,12 +1547,12 @@ function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
   const [lessonHideSaving, setLessonHideSaving] = useState(false)
   /* (ز18) Lesson price — set one price for the whole lesson (all its parts) */
   const [lessonPriceOpen, setLessonPriceOpen] = useState(false)
-  const [lessonPriceGroup, setLessonPriceGroup] = useState<{ key: string; title: string; grade: string; price: number } | null>(null)
+  const [lessonPriceGroup, setLessonPriceGroup] = useState<{ key: string; title: string; grade: string; price: number; videoId?: string } | null>(null)
   const [lessonPriceValue, setLessonPriceValue] = useState('')
   const [lessonPriceSaving, setLessonPriceSaving] = useState(false)
 
-  const openLessonPrice = function (key: string, grade: string, title: string, price: number) {
-    setLessonPriceGroup({ key: key, grade: grade, title: title, price: price })
+  const openLessonPrice = function (key: string, grade: string, title: string, price: number, videoId?: string) {
+    setLessonPriceGroup({ key: key, grade: grade, title: title, price: price, videoId: videoId || '' })
     setLessonPriceValue(price > 0 ? String(price) : '')
     setLessonPriceOpen(true)
   }
@@ -1564,11 +1564,11 @@ function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
       var res = await fetch('/api/videos/lesson-price', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ groupKey: lessonPriceGroup.key, grade: lessonPriceGroup.grade, price: Number(lessonPriceValue) || 0 }),
+        body: JSON.stringify({ groupKey: lessonPriceGroup.key, videoId: lessonPriceGroup.videoId || '', price: Number(lessonPriceValue) || 0 }),
       })
       var data = await res.json()
       if (!res.ok || !data.ok) throw new Error(data.error || 'failed')
-      toast.success('✓ Lesson price saved: ' + (Number(lessonPriceValue) || 0) + ' EGP — applied to all parts of the lesson')
+      toast.success('✓ Price saved: ' + (Number(lessonPriceValue) || 0) + ' EGP' + (lessonPriceGroup.key ? ' — applied to all parts of the lesson' : ' — this video is now paid for free-tier students'))
       setLessonPriceOpen(false)
       loadVideos(false)
     } catch (e) {
@@ -2102,7 +2102,7 @@ function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
                         <Layers className="h-3.5 w-3.5 mr-1" />{isGrouped ? 'ضيف فيديو تاني للدرس ده' : 'درس بفيديوهات متعددة؟'}
                       </Button>
                       {/* (ز18) سعر الدرس كله — مرة واحدة على كل الأجزاء */}
-                      <Button size="sm" variant="ghost" className="w-full text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20 text-xs h-7" onClick={function () { openLessonPrice(gKey, v.grade, v.title, gParts[0] ? Number(gParts[0].price || 0) : 0) }} title="Set one price for the whole lesson — paying once unlocks ALL its parts">
+                      <Button size="sm" variant="ghost" className="w-full text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20 text-xs h-7" onClick={function () { openLessonPrice(gKey, v.grade, v.title, gParts[0] ? Number(gParts[0].price || 0) : 0, v.id) }} title="Set one price for the whole lesson — paying once unlocks ALL its parts">
                         💰 سعر الدرس كله
                       </Button>
                       {gKey ? (
@@ -2272,7 +2272,7 @@ function VideoManager({ onStatsRefresh }: { onStatsRefresh: () => void }) {
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h3 className="font-bold text-sm">💰 Lesson price: {lessonPriceGroup.title}</h3>
-                <p className="text-[10px] text-muted-foreground">The price applies to the whole lesson ({lessonPriceGroup.grade}) — paying once unlocks ALL its parts. 0 = free.</p>
+                <p className="text-[10px] text-muted-foreground">{lessonPriceGroup.key ? 'The price applies to the whole lesson (' + lessonPriceGroup.grade + ') — paying once unlocks ALL its parts.' : 'This video is priced on its own — free students see it as paid content.'} 0 = free.</p>
               </div>
               <button type="button" onClick={function () { setLessonPriceOpen(false) }} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
             </div>
