@@ -608,6 +608,21 @@ export const PLAYER_PAGE = `<!doctype html>
   #ytTitleBlock{position:absolute;z-index:21;top:0;left:33%;right:0;height:110px;pointer-events:auto;background:transparent}
   #ytBrandBlock{position:absolute;z-index:46;bottom:0;left:0;width:60%;height:44px;pointer-events:auto;background:transparent}
   #ytShareBlock{position:absolute;z-index:46;bottom:0;right:0;width:16%;height:44px;pointer-events:auto;background:transparent}
+  /* (ز22) حالات الوقف (pause): يوتيوب بيطلع **فوق خط الشريط** زرار شير دائري
+     عايم تحت اليمين (بيفتح لوحة «نسخ الرابط» — شكوى المستر الحرفية:
+     «الزرار اللي على اليمين ده بينسخ رابط الفيديو — لا مش عاوزه ينسخ رابط،
+     عاوزه تموتهولي») + كارت «المزيد من الفيديوهات» (بيفتح القناة) تحت الشمال
+     — الاتنين أعلى من الـ44px بتاعة ز21 فكان جزءهم الفوقاني مكشوف والدوس عليه
+     كان شغال. بلوكات علوية شفافة من فوق الشريط لفوق تقفلهم تمامًا:
+     • ytShareHi: يمين 20% × 90px فوق الشريط → الزرار الدائري كله ميت
+     • ytBrandHi: شمال من 54px (عشان زرار ملء الشاشة بتاعنا fsBtn اللي على
+       الشمال ما يتغطيش) × عرض 58% × 116px → كارت «المزيد» كله ميت
+     والاتنين فوق خط الشريط أصلاً فما بيمسوش الشريط ولا السحب ولا ⚙
+     (ز22-ب) الارتفاعات بـclamp نسبية — على موبايل الصندوق بيبقى قصير
+     (390×219) فالارتفاع الثابت كان هيغطي وسط الفيديو — دلوقتي بيتقاس
+     مع الصندوق: أقل حاجة مضمونة للزرار/الكارت وأقصى حاجة ما تلمسش الوسط */
+  #ytShareHi{position:absolute;z-index:46;bottom:44px;right:0;width:20%;height:clamp(64px,16%,90px);pointer-events:auto;background:transparent}
+  #ytBrandHi{position:absolute;z-index:46;bottom:44px;left:54px;width:58%;height:clamp(96px,22%,130px);pointer-events:auto;background:transparent}
   /* ===== كنترولز بتاعتنا (بدون أي شكل يوتيوب) ===== */
   #tapLayer{position:absolute;inset:0;z-index:20;background:transparent}
   /* (الكنترولز بقيت بتاعة يوتيوب الأصلية — مفيش شريط تحكم من عندنا:
@@ -961,6 +976,15 @@ function ensureYtCovers(){
   }
   if(!document.getElementById('ytShareBlock')){
     var sb = document.createElement('div'); sb.id = 'ytShareBlock'; wrap.appendChild(sb);
+  }
+  /* (ز22) بلوكات الوقف العلوية — زرار الشير الدائري العايم + كارت «المزيد
+     من الفيديوهات» بيطلعوا فوق خط الشريط وقت الوقف، والبلوكات السفلية
+     (44px) ما كانتش بتوصلهم — دلوقتي ميتين من كل الاتجاهات */
+  if(!document.getElementById('ytShareHi')){
+    var sh = document.createElement('div'); sh.id = 'ytShareHi'; wrap.appendChild(sh);
+  }
+  if(!document.getElementById('ytBrandHi')){
+    var bh = document.createElement('div'); bh.id = 'ytBrandHi'; wrap.appendChild(bh);
   }
 }
 /* self-heal: الووترمارك بيرجع يترسم لو حد شاله من الـ DOM */

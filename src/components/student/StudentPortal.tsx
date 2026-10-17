@@ -729,6 +729,10 @@ function VideosTab({ videos, watchedIds, approvedVideoIds, studentId, grade, vid
 
   // قفل التسلسل (طلب المستر): الفيديو ميفتحش غير لما اللي قبله يتشاف كامل 100%
   // (و104) الترتيب التسلسلي دلوقتي واعي بالدروس متعددة الفيديوهات (seqOrdered)
+  // (ز22) الفيديو اللي بفلوس اللي الطالب مالوش وصول له = اختياري صامت —
+  // مش بيحجب اللي بعده (طلب المستر: «الفيديو اللي بفلوس يكون اختياري
+  // بس متكتبش ان هو اختياري — لو الطالب مشافش الفيديو اللي بعده يتفتح»)
+  // — لو معاه وصول (دفعة معتمدة/مُنِحت) بيفحص زي أي فيديو عادي
   const lockedMap = useMemo(function () {
     var map: Record<string, boolean> = {}
     var prevTrackable: string | null = null
@@ -741,12 +745,15 @@ function VideosTab({ videos, watchedIds, approvedVideoIds, studentId, grade, vid
       } else {
         map[v.id] = false
       }
-      if (trackable) prevTrackable = v.id
+      var paidNoAccess = (Number(v.price) || 0) > 0 && !approvedVideoIds.has(v.id)
+      if (trackable && !paidNoAccess) prevTrackable = v.id
     })
     return map
-  }, [seqOrdered, mergedProgress])
+  }, [seqOrdered, mergedProgress, approvedVideoIds])
 
   // الفيديو اللي قبل كل فيديو (عشان نعرض نسبته على كارت المقفول) — (و104) بترتيب المجموعات
+  // (ز22) نفس قاعدة الاختياري الصامت: الفيديو اللي بفلوس من غير وصول ما بيعدّش
+  // «اللي قبله» للفيديوهات اللي بعده — عشان النسبة المعروضة تكون لفيديو بيحسب فعلاً
   const prevVideoMap = useMemo(function () {
     var map: Record<string, string> = {}
     var prevTrackable: string | null = null
@@ -754,10 +761,11 @@ function VideosTab({ videos, watchedIds, approvedVideoIds, studentId, grade, vid
       var k = videoKindOf(v)
       var trackable = k === 'youtube' || k === 'file'
       if (trackable && prevTrackable) map[v.id] = prevTrackable
-      if (trackable) prevTrackable = v.id
+      var paidNoAccess = (Number(v.price) || 0) > 0 && !approvedVideoIds.has(v.id)
+      if (trackable && !paidNoAccess) prevTrackable = v.id
     })
     return map
-  }, [seqOrdered])
+  }, [seqOrdered, approvedVideoIds])
 
   // أجزاء كل درس متعدد — مرتبين (orderIndex) ومفلترين من المخفيين بالجدولة
   const groupPartsMap = useMemo(function () {

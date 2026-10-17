@@ -210,7 +210,7 @@ export async function checkSequentialUnlock(
     const gradeVideosAll = await db.video.findMany({
       where: { grade: video.grade },
       orderBy: { createdAt: 'asc' },
-      select: { id: true, title: true, url: true, filePath: true, fileType: true, groupKey: true, orderIndex: true, createdAt: true },
+      select: { id: true, title: true, url: true, filePath: true, fileType: true, groupKey: true, orderIndex: true, createdAt: true, price: true },
     })
     /* (2026-ص5) سلسلة مستقلة لكل نوع: الفيديو المطلوب برايفت → السلسلة برايفت بس،
        عادي → السلسلة العادية بس — تاب «برايفت» ما بيبوّظش قفل الدروس العادية */
@@ -246,6 +246,24 @@ export async function checkSequentialUnlock(
       const isYT = Boolean(getYouTubeId(v.url || ''))
       const isFile = Boolean(v.filePath || v.fileType)
       if (!isYT && !isFile) continue // لينك خارجي — مش قابل للتتبع، نتخطاه
+      /* (ز22) الفيديو اللي بفلوس والطالب مالوش وصول له — اختياري صامت
+         (طلب المستر الحرفي: «الفيديو اللي بفلوس ده يكون اختياري عادي بس
+         متكتبش ان هو اختياري — لو الطالب مشافش الفيديو الفيديو اللي بعده
+         يتفتح»): الطالب مش قادر يشوفه أصلًا (مفيش VideoAccess ولا دفعة
+         معتمدة) فمش منطقي يقف بياه الترتيب — نتخطاه ونكمل لورا لحد
+         أول فيديو الطالب يقدر فعلاً يشوفه. لو معاه وصول → بيحسب
+         زي أي فيديو عادي (لازم يشوفه عشان اللي بعده يفتح) */
+      if (v.price && Number(v.price) > 0) {
+        const acc = await db.videoAccess.findUnique({
+          where: { videoId_studentId: { videoId: v.id, studentId: String(studentId) } },
+        }).catch(() => null)
+        if (!acc) {
+          const pay = await db.payment.findFirst({
+            where: { studentId: String(studentId), videoId: v.id, status: 'approved' },
+          }).catch(() => null)
+          if (!pay) continue // مش وصول له أصلاً — مش بيحجب اللي بعده
+        }
+      }
       const prog = await db.videoProgress.findUnique({
         where: { studentId_videoId: { studentId, videoId: v.id } },
       }).catch(() => null)
