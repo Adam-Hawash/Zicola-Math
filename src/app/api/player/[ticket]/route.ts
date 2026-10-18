@@ -1245,13 +1245,22 @@ function rebuildThenPlay(kind){
   try{ if(playerApi && playerApi.destroy) playerApi.destroy(); }catch(e){}
   playerApi = null;
   if(wdTimer){ clearInterval(wdTimer); wdTimer = null; }
+  /* (ز20) إعادة البناء بنفس غلاف سكالر الجودة — غير كده الريتراي بيرجع
+     بالمشغل الطبيعي الصغير وقايمة ⚙ بتقفل على 360 تاني */
+  var oldQ = document.getElementById('ytQWrap');
+  if(oldQ && oldQ.parentNode) oldQ.parentNode.removeChild(oldQ);
   var old = document.getElementById('ytHost');
   if(old && old.parentNode) old.parentNode.removeChild(old);
   var crop = document.getElementById('ytCrop');
+  var rq = document.createElement('div');
+  rq.id = 'ytQWrap';
+  rq.style.cssText = 'position:absolute;top:50%;left:50%;background:#000;transform:translate(-50%,-50%) scale(var(--mgYtS,1));transform-origin:center center';
   var host = document.createElement('div');
   host.id = 'ytHost';
   host.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;background:#000';
-  if(crop) crop.appendChild(host); else wrap.appendChild(host);
+  rq.appendChild(host);
+  if(crop) crop.appendChild(rq); else wrap.appendChild(rq);
+  layoutWrap();
   pendingStart = true;
   try{ buildPlayer(); }catch(e){ showPlayError(msgForYtError(lastErrCode || 'auth')); }
 }
