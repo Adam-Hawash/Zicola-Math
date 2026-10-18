@@ -10,6 +10,7 @@ import { RecordingGuard } from "@/components/RecordingGuard";
 import { DevToolsGuard } from "@/components/DevToolsGuard";
 import { DeviceMessages } from "@/components/DeviceMessages";
 import { LangBoot } from "@/lib/i18n";
+import { RadixDirection } from "@/components/RadixDirection";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -180,7 +181,7 @@ export default async function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
         style={{ fontFamily: "Cairo, sans-serif" }}
       >
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider><RadixDirection>{children}</RadixDirection></ThemeProvider>
         {/* (و64) قراءة اللغة المحفوظة وتطبيقها على <html> */}
         <LangBoot />
         {/* (و47) المساعد الذكي رجع زي ما كان — المستر طلب رجوعه بنفس المميزات (شيرين بس هي اللي اتشالت) */}
