@@ -189,12 +189,42 @@ export async function POST(request: NextRequest) {
     // نفسه — الكود كان بيجيب واجهة يوتيوب ومفيش تحكم فعلي في الجودة.
     const finalUrl = String(url || '').trim()
 
-    /* (2026-ز14 — طلب المستر): رجّعنا الترتيب الزمني زي ما كان —
-       «أنا نزلت الدرس الأول وبعده الدرس الثاني، فالدرس الثاني يجي بعد الأول».
-       الفيديو/الدرس الجديد بيتمسك في الآخر (maxSort+1) لو الصف مرتب يدويًا،
-       ولو الصف مالوش ترتيب يدوي بيفضل 0 والترتيب بيبقى زمني (الأقدم أولًا).
+    if (!finalUrl && !filePath) {
+      return errOut('لازم لينك فيديو (يوتيوب أو أي موقع) أو ملف فيديو مرفوع — دوس واحدة منهم الأول', 400)
+    }
+
+    /* (و104) درس بفيديوهات متعددة:
+       - isMulti = المستر معلّم إن الدرس فيه أكتر من فيديو → أول إضافة بنولّد
+         groupKey جديد ونجيبه في الرد عشان باقي الإضافات تكمل على نفس الدرس
+       - groupKey موجود مسبقًا = «ضيف فيديو للدرس الفلاني» → بنستخدمه زي ما هو
+       - orderIndex = ترتيب الفيديو جوه الدرس (١، ٢، ٣…) */
+    let finalGroupKey = String(body.groupKey || '').trim().slice(0, 80)
+    let isMulti = false
+    if (!finalGroupKey && body.isMulti) {
+      finalGroupKey = 'les_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
+      isMulti = true
+    }
+    /* (و106) الترقيم من السيرفر مش من العميل — القيمة اللي جاية من الفورم
+       كانت length+1 ولو الفورم فاتح من جلسة قديمة أو متزامنتش مع الداتابيز
+       بتدي رقم مكرر (حصل فعلًا: فيديوهين رقمهم 4 في نفس الدرس → السهم
+       بيبقى بلا تأثير). max(orderIndex) + 1 مضمونة ضد التكرار دايمًا */
+    let finalOrder = 0
+    if (finalGroupKey) {
+      const aggOrder = await db.video.aggregate({ _max: { orderIndex: true }, where: { groupKey: finalGroupKey } })
+      const maxOrder = Number((aggOrder._max && (aggOrder._max as { orderIndex: number | null }).orderIndex) || 0)
+      finalOrder = maxOrder + 1
+    }
+
+    /* (2026-ز19 — طلب المستر الحرفي): «اعكسها خليها بالعكس» — رجّعنا
+       «اللي ينزل الجديد يبقى في الأول واللي في الآخر يكون الأقدم» زي ز11
+       بالظبط. الفيديو/الدرس الجديد بياخد أصغر رقم ترتيب (minSort-1) فبيطلع
+       أول القايمة حتى لو الصف مرتب يدويًا (▲▼).
        أما جزء جديد بيتركب على درس موجود (groupKey) فبياخد ترتيب درسه
-       عشان الدرس مايتنقلش من مكانه والأجزاء تفضل متسلسلة جواه. */
+       عشان الدرس مايتنقلش من مكانه والأجزاء تفضل متسلسلة جواه.
+       (ز19 إصلاح جذري: الكتلة دي كانت بتتنفذ قبل تعريف finalGroupKey/isMulti
+       من أيام ز11 — فكانت بترمي ReferenceError وبتتلقط في catch وnewSortIndex
+       بيفضل 0 دايمًا — فالفيديو الجديد كان بيروح تحت قايمة ▲▼ اليدوية.
+       نقلنا الكتلة بعد التعريفات فبقت شغالة فعلًا لأول مرة.) */
     let newSortIndex = 0
     try {
       let inherited = false
@@ -210,35 +240,11 @@ export async function POST(request: NextRequest) {
         }
       }
       if (!inherited) {
-        const agg = await db.video.aggregate({ _max: { sortIndex: true }, where: { grade: String(grade) } })
-        const maxSort = Number((agg._max && (agg._max as { sortIndex: number | null }).sortIndex) || 0)
-        if (maxSort > 0) newSortIndex = maxSort + 1
+        const agg = await db.video.aggregate({ _min: { sortIndex: true }, where: { grade: String(grade) } })
+        const minSort = Number((agg._min && (agg._min as { sortIndex: number | null }).sortIndex) || 0)
+        newSortIndex = minSort - 1
       }
     } catch {}
-
-    if (!finalUrl && !filePath) {
-      return errOut('لازم لينك فيديو (يوتيوب أو أي موقع) أو ملف فيديو مرفوع — دوس واحدة منهم الأول', 400)
-    }
-
-    /* (و104) درس بفيديوهات متعددة:
-       - isMulti = المستر معلّم إن الدرس فيه أكتر من فيديو → أول إضافة بنولّد
-         groupKey جديد ونجيبه في الرد عشان باقي الإضافات تكمل على نفس الدرس
-       - groupKey موجود مسبقًا = «ضيف فيديو للدرس الفلاني» → بنستخدمه زي ما هو
-       - orderIndex = ترتيب الفيديو جوه الدرس (١، ٢، ٣…) */
-    let finalGroupKey = String(body.groupKey || '').trim().slice(0, 80)
-    if (!finalGroupKey && body.isMulti) {
-      finalGroupKey = 'les_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
-    }
-    /* (و106) الترقيم من السيرفر مش من العميل — القيمة اللي جاية من الفورم
-       كانت length+1 ولو الفورم فاتح من جلسة قديمة أو متزامنتش مع الداتابيز
-       بتدي رقم مكرر (حصل فعلًا: فيديوهين رقمهم 4 في نفس الدرس → السهم
-       بيبقى بلا تأثير). max(orderIndex) + 1 مضمونة ضد التكرار دايمًا */
-    let finalOrder = 0
-    if (finalGroupKey) {
-      const aggOrder = await db.video.aggregate({ _max: { orderIndex: true }, where: { groupKey: finalGroupKey } })
-      const maxOrder = Number((aggOrder._max && (aggOrder._max as { orderIndex: number | null }).orderIndex) || 0)
-      finalOrder = maxOrder + 1
-    }
 
     /* (و45) الصورة المصغرة الأوتوماتيكية — لو الأدمن ماحطش صورة وفيه لينك
        يوتيوب: بنخزّن صورة الفيديو من i.ytimg.com على السيرفر كمان
