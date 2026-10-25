@@ -198,6 +198,15 @@ export default async function RootLayout({
         <Toaster />
         {/* Toaster بتاع sonner — كل رسائل التنبيه في المنصة بتستخدمه (toast من sonner) */}
         <SonnerToaster position="top-center" richColors closeButton expand={false} />
+        {/* (2026-Z32) تسجيل Service Worker من أول تحميل — من غيره كروم مش بيعتبر
+            المنصة قابلة للتثبيت (زرار «التطبيق» بيطلع تعليمات يدوية بدل نافذة
+            التثبيت الرسمية) وكمان تفعيل إشعارات ولي الأمر كان بيفشل أول زيارة */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){})})}}catch(e){}",
+          }}
+        />
       </body>
     </html>
   );
