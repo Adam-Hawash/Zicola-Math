@@ -124,8 +124,6 @@ export default function PushPermissionBanner({ parentId }: { parentId: string })
       setEnabled(true)
       setOpen(false)
       toast.success('تمام كده! 🎉 الإشعارات مفعّلة على الجهاز ده — أول ما ابنك يسلّم امتحان أو واجب هتوصلك درجته هنا أول بأول', { duration: 6000 })
-<<<<<<< Updated upstream
-=======
     } else if (r.reason === 'inapp') {
       /* (Z-30) متصفح داخلي — رسالة صريحة بدل «مقفلتش نافذة الإذن» المضللة */
       setOpen(false)
@@ -134,7 +132,6 @@ export default function PushPermissionBanner({ parentId }: { parentId: string })
       /* (Z-30) آيفون من غير تطبيق مثبت — إشعارات iOS بتشتغل من التطبيق المثبت بس */
       setOpen(false)
       toast.error('على الآيفون: الإشعارات بتشتغل بعد تثبيت المنصة كتطبيق — افتح المنصة في سفاري واضغط زرار «تثبيت التطبيق» (أو زرار المشاركة ← Add to Home Screen) وافتحها من الأيقونة وفعّل الإشعارات من هناك', { duration: 14000 })
->>>>>>> Stashed changes
     } else if (r.reason === 'denied') {
       setPerm('denied')
       setOpen(false)
@@ -178,18 +175,6 @@ export default function PushPermissionBanner({ parentId }: { parentId: string })
        على الجهاز ده — غالبًا اشتراك الجهاز ضاع من قاعدة البيانات (نشر/بارد)
        فنعيد حفظه تلقائيًا من غير أي برومبت ونجرب تاني — ولي الأمر ماحسش بحاجة */
     setTestBusy(false)
-<<<<<<< Updated upstream
-    /* (2026-ز32) التفريق بين «الإشعار اتقدم فعلاً» و«مفيش أجهزة متسجلة» —
-       لو مفيش أجهزة يبقى التفعيل من الجهاز ده مكتملش، والتوجيه الصح: إعادة تفعيل من هنا */
-    if (r.ok && typeof r.sent === 'number' && r.sent > 0) {
-      toast.success(r.message || 'اتبعت الإشعار — بص على شاشة موبايلك 📱', { duration: 6000 })
-    } else if (r.ok) {
-      toast.warning('مفيش جهاز متسجل على الحساب ده لسه — الإشعارات بتيجي على الجهاز اللي اتفعّل منها بس. اضغط «إيقاف» ثم «سماح بالتنبيهات» من الجهاز ده ووافق على إذن المتصفح، وبعدها جرب الإشعار التجريبي هيوصلك فورًا', { duration: 12000 })
-    } else {
-      toast.error('مفيش إشعار وصل — اتأكد إن التفعيل مكتوب «مفعّلة» وجرب تاني')
-    }
-  }, [parentId, testBusy])
-=======
     setHealing(true)
     var h = await healParentPushIfNeeded(parentId)
     setHealing(false)
@@ -203,7 +188,6 @@ export default function PushPermissionBanner({ parentId }: { parentId: string })
       toast.error('مفيش إشعار وصل — اتأكد إن التفعيل مكتوب «مفعّلة» وجرب تاني')
     }
   }, [parentId, testBusy, healing])
->>>>>>> Stashed changes
 
   var dismiss = useCallback(function () {
     try { sessionStorage.setItem('parent_push_dismissed', '1') } catch (e) {}

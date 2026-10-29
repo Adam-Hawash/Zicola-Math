@@ -157,15 +157,10 @@ async function ensureSWReady(): Promise<ServiceWorkerRegistration> {
  */
 export async function enableParentPush(parentId: string): Promise<{ ok: boolean; reason?: string }> {
   var result = await enableParentPushOnce(parentId)
-<<<<<<< Updated upstream
-  /* (و90) إعادة محاولة كاملة تلقائية مرة واحدة — شكاوى «التالتة اللي ظبطت» */
-  if (!result.ok && result.reason !== 'denied' && result.reason !== 'dismissed' && result.reason !== 'unsupported') {
-=======
   /* (و90) إعادة محاولة كاملة تلقائية مرة واحدة — شكاوى «التالتة اللي ظبطت»
      (Z-30) السبب الجديدة (inapp/ios-browser) مبتعادش تُعاد محاوتها تلقائيًا —
      إعادة المحاولة من غير إيماءة مستخدم مبتنفعش وممكن تضيع محاولات */
   if (!result.ok && ['denied', 'dismissed', 'unsupported', 'inapp', 'ios-browser'].indexOf(result.reason || '') === -1) {
->>>>>>> Stashed changes
     await wait(900)
     result = await enableParentPushOnce(parentId)
   }
@@ -294,8 +289,6 @@ export async function sendTestParentPush(parentId: string): Promise<{ ok: boolea
     return { ok: !!(json && json.ok), sent: sentN, message: String((json && json.message) || '') }
   } catch (e) {
     return { ok: false, sent: -1, message: '' }
-<<<<<<< Updated upstream
-=======
   }
 }
 
@@ -323,6 +316,5 @@ export async function healParentPushIfNeeded(parentId: string): Promise<{ healed
     return { healed: true, sent: t.sent, message: t.message }
   } catch (e) {
     return { healed: false, sent: 0 }
->>>>>>> Stashed changes
   }
 }

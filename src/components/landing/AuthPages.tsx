@@ -371,25 +371,6 @@ export function RegisterView() {
       var res = await fetch('/api/students', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: fullName, phone: phone.trim(), grade: grade, parentName: fullParentName, parentPhone: parentPhone.trim(), password: password.trim(), deviceId: getDeviceId(), deviceIds: getDeviceCandidates(), deviceTraits: JSON.stringify(getDeviceTraits()), deviceType: getDeviceType() }) })
       var data = await res.json()
       if (res.ok) {
-<<<<<<< Updated upstream
-        /* (ز29) القبول التلقائي: لو الحساب اتقبل على طول الرسالة بتفرّق — لو لسه في المراجعة بنفس الرسالة القديمة */
-        var regStatus = String((data.student || {}).status || '')
-        if (regStatus === 'pending') { setCurrentStudent(data.student); setView('student-pending'); toast.success('تم تسجيل طلبك بنجاح! خش اعمل تسجيل دخول وشوف اتقبلت ولا لسه') }
-        else {
-          /* (ز30 — طلب المستر) التسجيل = دخول فوري: «عمل الحساب وتقبل تلقائي
-             خلاص يدخل على حسابه من غير ما يعمل تسجيل دخول» — وأول ما يقفل
-             المنصة ويفتحها تاني يعمل تسجيل دخول عادي زي أي حساب */
-          try { startPortalBundle((data.student || {}).grade, (data.student || {}).id) } catch (eWarm2) {}
-          setCurrentStudent(data.student); setView('student-portal')
-          var firstName = String(fullName || '').trim().split(/\s+/)[0] || 'يا صديقي'
-          toast.success('أهلاً بيك يا ' + firstName + ' 🎉 — ده حسابك، وانت داخل عليه خلاص!')
-          fetch('/api/students/track-login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ studentId: (data.student || {}).id })
-          }).catch(function () {})
-        }
-=======
         /* (Z-30) القبول التلقائي: لو الطالب اتقبل فورًا (approved) يدخل
            المنصة على طول بنفس بيانات التسجيل — من غير شاشة «قيد المراجعة».
            النزول لشاشة الانتظار بيحصل بس لو الأدمن مقفّل القبول التلقائي */
@@ -409,6 +390,7 @@ export function RegisterView() {
             }
             if (autoStudent && (autoStudent.status === 'approved' || autoStudent.status === 'paid')) {
               setCurrentStudent(autoStudent); setView('student-portal')
+              try { startPortalBundle(autoStudent.grade, autoStudent.id) } catch (eWarm2) {}
               toast.success('أهلاً بيك في المنصة يا ' + autoStudent.name + ' — حسابك اتفعّل فورًا وابدأ تعلّم على طول! 🎉', { duration: 6000 })
               fetch('/api/students/track-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ studentId: autoStudent.id }) }).catch(function () {})
               setLoading(false)
@@ -417,7 +399,6 @@ export function RegisterView() {
           } catch (autoErr) { /* أي فشل في الدخول التلقائي → نكمل كأنه pending عادي */ }
         }
         setCurrentStudent(data.student); setView('student-pending'); toast.success('تم تسجيل طلبك بنجاح! خش اعمل تسجيل دخول وشوف اتقبلت ولا لسه')
->>>>>>> Stashed changes
       }
       else { toast.error(data.error || 'حدث خطأ في التسجيل') }
     } catch (e) { toast.error('حدث خطأ في الاتصال') }
