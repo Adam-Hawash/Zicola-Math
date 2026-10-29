@@ -463,6 +463,7 @@ export async function POST(request: NextRequest) {
     var name = body.name || ''
     var phone = body.phone || ''
     var grade = body.grade || ''
+<<<<<<< Updated upstream
     /* (ز29 — طلب المستر) القبول التلقائي للتسجيلات من صفحة الأدمن:
        المفتاح auto_approve_students في إعدادات المنصة — «1» (مفعّل دلوقتي) أي طالب
        يعمل حساب بيتقبل على طول من غير مراجعة، «0» يرجّع الوضع القديم
@@ -477,6 +478,26 @@ export async function POST(request: NextRequest) {
        عشان الطالب يبان «مقبول» في لوحة الأدمن من أول لحظة، ويعدّ في
        «الطلاب المفعّلين»، وتوصله الإشعارات الجماعية، ويدخل عادي من تسجيل الدخول */
     var status = body.status || (autoApprove ? 'approved' : 'pending')
+=======
+    /* (Z-30) القبول التلقائي للطلاب — طلب المستر (كل المنصات):
+       لو مفيش status صريح في الطلب → نقرأ إعداد student_auto_approve من
+       إعدادات المنصة (افتراضي مفعّل '1'):
+         - مفعّل → الطالب يتسجل 'approved' على طول ويدخل المنصة فورًا
+         - مقفول → الوضع القديم 'pending' ويستنى موافقة الأدمن
+       الأدمن يتحكم فيه من الإعدادات (شاشة إعدادات الحساب) */
+    var status = body.status || ''
+    var autoApproved = false
+    if (!status) {
+      try {
+        var autoRows: any = await db.$queryRawUnsafe("SELECT value FROM SiteConfig WHERE key = 'student_auto_approve' LIMIT 1")
+        var autoOn = !(autoRows && autoRows.length && String(autoRows[0] && autoRows[0].value) === '0')
+        status = autoOn ? 'approved' : 'pending'
+      } catch (eCfg) {
+        status = 'approved' /* لو قراءة الإعداد فشلت — القبول التلقائي هو الافتراضي */
+      }
+    }
+    autoApproved = status === 'approved'
+>>>>>>> Stashed changes
     var parentName = body.parentName || body.fatherName || ''
     var parentPhone = body.parentPhone || body.motherPhone || ''
     var password = body.password || ''
@@ -562,7 +583,7 @@ export async function POST(request: NextRequest) {
 
     try {
       await db.studentActivity.create({
-        data: { studentId: student.id, action: 'registered', details: 'Registered as ' + grade },
+        data: { studentId: student.id, action: 'registered', details: 'Registered as ' + grade + (autoApproved ? ' — قبول تلقائي فوري' : ' — في انتظار المراجعة') },
       })
     } catch (_) {}
 

@@ -206,6 +206,11 @@ var DEFAULTS = {
   payment_vodafone_cash: '',
   payment_instapay: '',
   payment_fawry: '',
+
+  // === (Z-30) القبول التلقائي للطلاب الجدد — طلب المستر: مفعّل افتراضيًا في كل المنصات ===
+  // '1' = الطالب الجديد بيتقبل تلقائيًا ويدخل المنصة فورًا بعد التسجيل
+  // '0' = الوضع القديم: الطالب بيتسجل pending وبيستنى موافقة الأدمن
+  student_auto_approve: '1',
 }
 
 export async function GET(request) {
