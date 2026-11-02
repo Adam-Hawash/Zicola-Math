@@ -5424,10 +5424,14 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
               pagesF.push({ n: pf, image: imgF })
             }
             var chunkDataF: any = null
-            for (var attemptF = 0; attemptF < 2 && !chunkDataF; attemptF++) {
+            /* (Z-40) مهلات متدرجة 45/90/180 + 3 محاولات + تجاوز القطعة العالقة بدل رمي الاستخراج كله:
+               Gemini بيعلّق بشكل متقطع (اتأكدت لايف — 504 بعد 180 ثانية)
+               وقطعة عالقة واحدة كانت بتقتل ملف كله بـ«انتهت مهلة الاستخراج» */
+            var tmsF = [45000, 90000, 180000]
+            for (var attemptF = 0; attemptF < 3 && !chunkDataF; attemptF++) {
               try {
                 var ctrlF = new AbortController()
-                var tmrF = setTimeout(function() { ctrlF.abort() }, 180000)
+                var tmrF = setTimeout(function() { ctrlF.abort() }, tmsF[attemptF] || 180000)
                 var resF = await fetch('/api/ai-extract-pages', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
@@ -5438,9 +5442,9 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
                 var dataF = await resF.json()
                 if (resF.ok && dataF.extracted) chunkDataF = dataF.extracted
               } catch (eF: any) {
-                if (eF && eF.name === 'AbortError') throw eF
+                /* (Z-40) القطعة العالقة بنتجاوز — مفيش رمي للاستخراج كله */
               }
-              if (!chunkDataF && attemptF === 0) await new Promise(function (r) { setTimeout(r, 1200) })
+              if (!chunkDataF && attemptF < 2) await new Promise(function (r) { setTimeout(r, 1200) })
             }
             if (!chunkDataF) continue
             var qsF = chunkDataF.questions || []
@@ -5868,10 +5872,12 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
           pages.push({ n: pn, image: img })
         }
         var extractedChunk: any = null
-        for (var attempt = 0; attempt < 2 && !extractedChunk; attempt++) {
+        /* (Z-40) نفس المعالجة: مهلات متدرجة + 3 محاولات — القطعة العالقة بنتجاوز بالفعل هنا */
+        var tmsB = [45000, 90000, 180000]
+        for (var attempt = 0; attempt < 3 && !extractedChunk; attempt++) {
           try {
             var ctrlB = new AbortController()
-            var tmrB = setTimeout(function() { ctrlB.abort() }, 180000)
+            var tmrB = setTimeout(function() { ctrlB.abort() }, tmsB[attempt] || 180000)
             var resB = await fetch('/api/ai-extract-pages', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -5882,9 +5888,9 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
             var dataB = await resB.json()
             if (resB.ok && dataB.extracted) extractedChunk = dataB.extracted
           } catch (eB: any) {
-            if (eB && eB.name === 'AbortError') throw eB
+            /* (Z-40) القطعة العالقة بنتجاوز — مفيش رمي للاستخراج كله */
           }
-          if (!extractedChunk && attempt === 0) await new Promise(function (r) { setTimeout(r, 1200) })
+          if (!extractedChunk && attempt < 2) await new Promise(function (r) { setTimeout(r, 1200) })
         }
         if (!extractedChunk) { skippedChunks++; continue }
         var qs = extractedChunk.questions || []
