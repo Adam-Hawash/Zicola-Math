@@ -271,7 +271,13 @@ export default function FigureCropEditor({ target, source, sourceMediaId, onSave
             </div>
           )}
           {!loading && loadErr && (
-            <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-xs font-semibold">{loadErr}</div>
+            <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-xs font-semibold">
+              {loadErr}
+              {/* (Z-40d) لو ظهر خطأ، أول حاجة: حدّث الصفحة — أغلب الحالات دي بتتبدى بتحديث المتصفح */}
+              <p className="mt-2 text-[11px] font-bold text-foreground/80 bg-muted/60 border border-border rounded-md px-2 py-1.5">
+                ⚡ أول حاجة اعملها: حدّث الصفحة كاملة (Ctrl+Shift+R) وافتح «عدّل القص» تاني — لو الرسالة رجعت بعد التحديث ابعت لي سكرين شوت
+              </p>
+            </div>
           )}
           {!loading && !loadErr && pageUrl && (
             <div
@@ -304,6 +310,8 @@ export default function FigureCropEditor({ target, source, sourceMediaId, onSave
         </div>
         <div className="flex items-center gap-2 p-3 border-t shrink-0">
           <p className="text-[10px] text-muted-foreground flex-1">القص بيتحفظ بجودة عالية (JPEG 92%) وبيوصل للطالب بالشكل ده بالظبط.</p>
+          {/* (Z-40d) علامة الإصدار — لو مش شايفها في النافذة يبقى المتصفح شغّل نسخة قديمة محمّلة قبل النشر */}
+          <span className="shrink-0 text-[10px] font-bold text-violet-500 bg-violet-500/10 border border-violet-500/30 rounded px-1.5 py-0.5">✓ v40d</span>
           <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={saving}>إلغاء</Button>
           <Button type="button" size="sm" onClick={save} disabled={saving || loading || !!loadErr || !pageUrl}>
             {saving ? <Loader2 className="h-4 w-4 ml-1 animate-spin" /> : <span>💾</span>}
