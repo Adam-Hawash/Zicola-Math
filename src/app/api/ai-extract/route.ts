@@ -44,7 +44,7 @@ async function callGemini(apiKey: string, parts: any[]): Promise<any> {
     parts: parts,
     generationConfig: { temperature: 0.1, maxOutputTokens: 16384, response_mime_type: 'application/json' },
     timeoutMs: 90000,
-    thinking: 'low',
+    /* (Z-40) thinking:'low' اتشال — مطابقة إعدادات /api/ai-extract-pages المجرّبة شغالة (504 اتأكد لايف) */
   })
   /* (و51) لو الموديل رفض الـ mime نفسه (400 نادر) → محاولة أخيرة من غيره */
   if (!result.ok) {
@@ -53,7 +53,6 @@ async function callGemini(apiKey: string, parts: any[]): Promise<any> {
       parts: parts,
       generationConfig: { temperature: 0.1, maxOutputTokens: 16384 },
       timeoutMs: 90000,
-      thinking: 'low',
     })
   }
   if (result.ok) {
