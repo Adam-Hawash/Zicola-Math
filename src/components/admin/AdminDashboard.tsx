@@ -5412,47 +5412,65 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
           var collectedF: any[] = []
           var seenKeysF: any = {}
           var chunksF = Math.ceil(totalPagesF / 5)
-          for (var cf = 0; cf < chunksF; cf++) {
-            var cFromF = 1 + cf * 5
-            var cToF = Math.min(totalPagesF, cFromF + 4)
-            setStatusMsg('بيقرأ صفحات الملف ' + cFromF + '–' + cToF + '… (' + (cf + 1) + '/' + chunksF + ')')
-            var pagesF: any[] = []
-            for (var pf = cFromF; pf <= cToF; pf++) {
-              /* (و52) 1700/0.85 بدل 1400/0.72 — دي نفس الصور اللي السيرفر بيقص منها الرسمات،
-                 الجودة الواطية كانت سبب «الرسومات جودتها وحشة» في الملفات الكبيرة */
-              var imgF = await renderPageToJpeg(docF, pf, 1700, 0.85)
-              pagesF.push({ n: pf, image: imgF })
-            }
-            var chunkDataF: any = null
-            /* (Z-40) مهلات متدرجة 45/90/180 + 3 محاولات + تجاوز القطعة العالقة بدل رمي الاستخراج كله:
-               Gemini بيعلّق بشكل متقطع (اتأكدت لايف — 504 بعد 180 ثانية)
-               وقطعة عالقة واحدة كانت بتقتل ملف كله بـ«انتهت مهلة الاستخراج» */
-            var tmsF = [45000, 90000, 180000]
-            for (var attemptF = 0; attemptF < 3 && !chunkDataF; attemptF++) {
-              try {
-                var ctrlF = new AbortController()
-                var tmrF = setTimeout(function() { ctrlF.abort() }, tmsF[attemptF] || 180000)
-                var resF = await fetch('/api/ai-extract-pages', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ pages: pagesF, mode: 'all', bookTitle: title }),
-                  signal: ctrlF.signal,
-                })
-                clearTimeout(tmrF)
-                var dataF = await resF.json()
-                if (resF.ok && dataF.extracted) chunkDataF = dataF.extracted
-              } catch (eF: any) {
-                /* (Z-40) القطعة العالقة بنتجاوز — مفيش رمي للاستخراج كله */
+          /* (Z-40b) التشغيلات بقت متوازية (3 في نفس الوقت بدل واحد ورا التاني) —
+             نفس منطق الصمود بتاع Z-40 جوّه كل تشغيلة (3 محاولات 45/90/180 + تجاوز العالقة)،
+             والنتايج بتتجمع بترتيب الصفحات زي ما هي فأسئلة الكتاب مبتتخربش */
+          var resultsF: any[] = new Array(chunksF).fill(null)
+          var chunkIdxF = 0
+          var doneChunksF = 0
+          var runChunkF = async function (): Promise<void> {
+            while (chunkIdxF < chunksF) {
+              var myF = chunkIdxF++
+              var cFromF = 1 + myF * 5
+              var cToF = Math.min(totalPagesF, cFromF + 4)
+              setStatusMsg('بيقرأ صفحات الملف ' + cFromF + '–' + cToF + '… (' + (doneChunksF + 1) + '/' + chunksF + ')')
+              var pagesF: any[] = []
+              for (var pf = cFromF; pf <= cToF; pf++) {
+                /* (و52) 1700/0.85 بدل 1400/0.72 — دي نفس الصور اللي السيرفر بيقص منها الرسمات،
+                   الجودة الواطية كانت سبب «الرسومات جودتها وحشة» في الملفات الكبيرة */
+                var imgF = await renderPageToJpeg(docF, pf, 1700, 0.85)
+                pagesF.push({ n: pf, image: imgF })
               }
-              if (!chunkDataF && attemptF < 2) await new Promise(function (r) { setTimeout(r, 1200) })
+              var chunkDataF: any = null
+              /* (Z-40) مهلات متدرجة 45/90/180 + 3 محاولات + تجاوز القطعة العالقة بدل رمي الاستخراج كله:
+                 Gemini بيعلّق بشكل متقطع (اتأكدت لايف — 504 بعد 180 ثانية)
+                 وقطعة عالقة واحدة كانت بتقتل ملف كله بـ«انتهت مهلة الاستخراج» */
+              var tmsF = [45000, 90000, 180000]
+              for (var attemptF = 0; attemptF < 3 && !chunkDataF; attemptF++) {
+                try {
+                  var ctrlF = new AbortController()
+                  var tmrF = setTimeout(function() { ctrlF.abort() }, tmsF[attemptF] || 180000)
+                  var resF = await fetch('/api/ai-extract-pages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pages: pagesF, mode: 'all', bookTitle: title }),
+                    signal: ctrlF.signal,
+                  })
+                  clearTimeout(tmrF)
+                  var dataF = await resF.json()
+                  if (resF.ok && dataF.extracted) chunkDataF = dataF.extracted
+                } catch (eF: any) {
+                  /* (Z-40) القطعة العالقة بنتجاوز — مفيش رمي للاستخراج كله */
+                }
+                if (!chunkDataF && attemptF < 2) await new Promise(function (r) { setTimeout(r, 1200) })
+              }
+              resultsF[myF] = chunkDataF
+              doneChunksF++
+              if (doneChunksF < chunksF) setStatusMsg('خلصت ' + doneChunksF + ' من ' + chunksF + ' تشغيلات…')
             }
-            if (!chunkDataF) continue
-            var qsF = chunkDataF.questions || []
-            for (var qfi = 0; qfi < qsF.length; qfi++) {
-              var keyF = bookQuestionKey(qsF[qfi])
+          }
+          var workersF: Promise<void>[] = []
+          var concF = Math.min(3, chunksF)
+          for (var wf = 0; wf < concF; wf++) workersF.push(runChunkF())
+          await Promise.all(workersF)
+          for (var cf2 = 0; cf2 < chunksF; cf2++) {
+            if (!resultsF[cf2]) continue
+            var qsF = resultsF[cf2].questions || []
+            for (var qfi2 = 0; qfi2 < qsF.length; qfi2++) {
+              var keyF = bookQuestionKey(qsF[qfi2])
               if (keyF && seenKeysF[keyF]) continue
               if (keyF) seenKeysF[keyF] = true
-              collectedF.push(qsF[qfi])
+              collectedF.push(qsF[qfi2])
             }
           }
           if (collectedF.length === 0) {
@@ -5468,6 +5486,10 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
           await finishExtraction(collectedF, { doc: docF, file: file })
           var okMsgF = (appendingFile ? 'تمت إضافة ' : 'تم استخراج ') + collectedF.length + (appendingFile ? ' سؤال من الملف الجديد!' : ' سؤال من الملف!')
           toast.success(okMsgF)
+          /* (Z-40b) تصفير المستند من مصدر القص قبل destroy — دي كانت رسالة
+             «عدّل القص» الحمراء: المحرر كان بيجد مستند مقفول ويفشل من غير
+             ما يجرب الملف الأصلي. دلوقتي المصدر بيرجع للملف نفسه */
+          try { if (lastCropSourceRef.current && lastCropSourceRef.current.doc === docF) lastCropSourceRef.current.doc = null } catch (eClrF) {}
           try { docF.destroy() } catch (eDxF2) {}
           setExtracting(false)
           return

@@ -42,7 +42,9 @@ async function callGemini(apiKey: string, parts: any[]): Promise<any> {
   console.log('[AI Extract] Calling Gemini (3.6 first, JSON mode, keys rotate on 429)')
   var result = await callGeminiCentral({
     parts: parts,
-    generationConfig: { temperature: 0.1, maxOutputTokens: 16384, response_mime_type: 'application/json' },
+    /* (Z-40b) 65536 بدل 16384 — الاستجابة الطويلة كانت بتفصل الـ JSON فيفشل
+       التحليل ويتعاد النداء كله = ضعف الوقت. thinking متلمسش (شالها Z-40 بعد تأكيد لايف إنها بتعليق 504) */
+    generationConfig: { temperature: 0.1, maxOutputTokens: 65536, response_mime_type: 'application/json' },
     timeoutMs: 90000,
     /* (Z-40) thinking:'low' اتشال — مطابقة إعدادات /api/ai-extract-pages المجرّبة شغالة (504 اتأكد لايف) */
   })
@@ -51,7 +53,8 @@ async function callGemini(apiKey: string, parts: any[]): Promise<any> {
     console.warn('[AI Extract] JSON-mode failed, retrying without response_mime_type:', result.error)
     result = await callGeminiCentral({
       parts: parts,
-      generationConfig: { temperature: 0.1, maxOutputTokens: 16384 },
+      /* (Z-40b) 65536 — نفس السبب */
+      generationConfig: { temperature: 0.1, maxOutputTokens: 65536 },
       timeoutMs: 90000,
     })
   }

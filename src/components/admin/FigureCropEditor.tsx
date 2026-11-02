@@ -70,8 +70,18 @@ export default function FigureCropEditor({ target, source, sourceMediaId, onSave
   /* تجهيز صورة الصفحة بالجودة العالية + canvas كامل الدقة للقص النهائي */
   useEffect(function () {
     var cancelled = false
+    /* (ز40) التعرف على PDF من المحتوى نفسه (أول 5 بايت %PDF-) — بعض الأجهزة
+       بترسل الملف من غير امتداد/type فيبقى متنكّر كصورة ويعجز FileReader */
+    var looksLikePdf = async function (f: File): Promise<boolean> {
+      try {
+        if (/\.pdf$/i.test(String(f.name || '')) || f.type === 'application/pdf') return true
+        var head = await f.slice(0, 5).text()
+        if (String(head).indexOf('%PDF-') === 0) return true
+      } catch (e) {}
+      return false
+    }
     var renderFromFile = async function (f: File, page: number): Promise<string> {
-      var isPdf = /\.pdf$/i.test(String(f.name || '')) || f.type === 'application/pdf'
+      var isPdf = await looksLikePdf(f)
       if (isPdf) {
         var opened = await openPdf(f)
         var n = Math.max(1, Math.min(page, opened.numPages || page))
@@ -89,20 +99,43 @@ export default function FigureCropEditor({ target, source, sourceMediaId, onSave
       try {
         var dataUrl = ''
         var src = source || {}
+        /* (ز40) سلسلة مصادر مقاومة للفشل — أي مصدر يفشل يجرب اللي بعده:
+           المستند المفتوح → الملف الأصلي → الملف المخزن على السيرفر.
+           ده كان سبب «الرسالة الحمراء» في عدّل القص: الملف الكبير بيتقفل
+           من الذاكرة بعد الاستخراج (destroy) والمحرر كان بيحاول يرندر منه
+           ويفشل من غير ما يجرب الملف — دلوقتي بيجرب كل المصادر بالترتيب */
+        var errs: string[] = []
         if (src.doc) {
-          var nDoc = Math.max(1, Math.min(target.page, Number(src.doc.numPages) || target.page))
-          dataUrl = await renderPageToJpeg(src.doc, nDoc, 1800, 0.9)
-        } else if (src.file) {
-          dataUrl = await renderFromFile(src.file, target.page)
-        } else if (sourceMediaId) {
-          var res = await fetch('/api/files/' + sourceMediaId, { cache: 'no-store' })
-          if (!res.ok) throw new Error('مقدرتش أجيب الملف الأصلي من السيرفر')
-          var blob = await res.blob()
-          var isPdfB = String(blob.type || '').indexOf('pdf') !== -1
-          var f2 = new File([blob], 'source' + (isPdfB ? '.pdf' : '.jpg'), { type: blob.type || (isPdfB ? 'application/pdf' : 'image/jpeg') })
-          dataUrl = await renderFromFile(f2, target.page)
-        } else {
-          throw new Error('مفيش مصدر متاح للصفحة — جرب من غير ما تقفل صفحة الاستخراج')
+          try {
+            var nDoc = Math.max(1, Math.min(target.page, Number(src.doc.numPages) || target.page))
+            dataUrl = await renderPageToJpeg(src.doc, nDoc, 1800, 0.9)
+          } catch (eDoc: any) {
+            errs.push('المستند المفتوح: ' + String((eDoc && eDoc.message) || eDoc))
+          }
+        }
+        if (!dataUrl && src.file) {
+          try {
+            dataUrl = await renderFromFile(src.file, target.page)
+          } catch (eFile: any) {
+            errs.push('الملف المرفوع: ' + String((eFile && eFile.message) || eFile))
+          }
+        }
+        if (!dataUrl && sourceMediaId) {
+          try {
+            var res = await fetch('/api/files/' + sourceMediaId, { cache: 'no-store' })
+            if (!res.ok) throw new Error('السيرفر رجع ' + res.status)
+            var blob = await res.blob()
+            var isPdfB = String(blob.type || '').indexOf('pdf') !== -1
+            var f2 = new File([blob], 'source' + (isPdfB ? '.pdf' : '.jpg'), { type: blob.type || (isPdfB ? 'application/pdf' : 'image/jpeg') })
+            dataUrl = await renderFromFile(f2, target.page)
+          } catch (eMed: any) {
+            errs.push('السيرفر: ' + String((eMed && eMed.message) || eMed))
+          }
+        }
+        if (!dataUrl) {
+          throw new Error(errs.length > 0
+            ? 'مقدرتش أجهز صفحة المصدر — ' + errs.join(' | ')
+            : 'مفيش مصدر متاح للصفحة — استخدم زرار 📷 لرفع الرسمة يدوي')
         }
         if (cancelled || !dataUrl) return
         var img = new Image()

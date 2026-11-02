@@ -119,7 +119,9 @@ async function callGeminiParts(parts: any[]): Promise<{ ok: boolean; text?: stri
   var result = await callGeminiCentral({
     parts: parts,
     /* (و51) JSON mode — منع أي JSON مكسور من المصدر */
-    generationConfig: { temperature: 0.1, maxOutputTokens: 16384, response_mime_type: 'application/json' },
+    /* (Z-40b) 65536 بدل 16384 — التشغيلات الغنية بالأسئلة كانت بتفصل الـ JSON
+       فيفشل التحليل ويتعاد النداء كله = ضعف الوقت. thinking متلمسش زي ما Z-40 ثبّتها */
+    generationConfig: { temperature: 0.1, maxOutputTokens: 65536, response_mime_type: 'application/json' },
     timeoutMs: 90000,
   })
   if (result.ok) return { ok: true, text: result.text }

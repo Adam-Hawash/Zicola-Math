@@ -185,7 +185,15 @@ export async function ensureFigureUrls(
       if (source.file) fallbackFile = source.file
     } else if (source.file) {
       var f = source.file
+      /* (ز40) التعرف على PDF من المحتوى (أول 5 بايت %PDF-) — بعض الأجهزة
+         بترسل الملف من غير امتداد/type فيتتعامل معاه كصورة بالغلط */
       var isPdf = /\.(pdf)$/i.test(f.name || '') || f.type === 'application/pdf'
+      if (!isPdf) {
+        try {
+          var head5 = await f.slice(0, 5).text()
+          if (String(head5).indexOf('%PDF-') === 0) isPdf = true
+        } catch (eH) {}
+      }
       if (isPdf) {
         var opened = await openPdf(f)
         pdfDoc = opened.doc
@@ -205,50 +213,60 @@ export async function ensureFigureUrls(
 
   /* كاش صفحات مرسومة (الصفحة الواحدة ممكن يطلع منها أكتر من رسمة) */
   var pageCanvasCache: Record<number, HTMLCanvasElement> = {}
+  /* (ز40) رندرات جارية — عشان الــ3 عمال المتوازيين ميرندروش نفس الصفحة مرتين */
+  var pageInflight: Record<number, Promise<HTMLCanvasElement | null> | undefined> = {}
 
-  var getPageCanvas = async function (page: number): Promise<HTMLCanvasElement | null> {
-    if (pageCanvasCache[page]) return pageCanvasCache[page]
-    var canvas: HTMLCanvasElement | null = null
-    /* 1) المحاولة من المستند المفتوح */
-    if (pdfDoc) {
-      try {
-        var numPages = Number(pdfDoc.numPages) || 0
-        if (page >= 1 && (numPages <= 0 || page <= numPages)) {
-          /* (و52) رندر أعلى 2000/0.9 — ده المصدر اللي القص بيتقص منه */
-          var dataUrl = await renderPageToJpeg(pdfDoc, page, 2000, 0.9)
-          canvas = await sourceToCanvas({ kind: 'dataurl', dataUrl: dataUrl })
-        }
-      } catch (e) { canvas = null }
-      /* 2) (و48) المستند فشل (متدمر/مقفول) → إعادة فتح الملف الأصلي */
-      if (!canvas && fallbackFile && !fallbackDoc) {
-        try { fallbackDoc = (await openPdf(fallbackFile)).doc } catch (eFb) { fallbackDoc = null }
-      }
-      if (!canvas && fallbackDoc) {
+  var getPageCanvas = function (page: number): Promise<HTMLCanvasElement | null> {
+    if (pageCanvasCache[page]) return Promise.resolve(pageCanvasCache[page])
+    if (pageInflight[page]) return pageInflight[page]
+    var p = (async function (): Promise<HTMLCanvasElement | null> {
+      var canvas: HTMLCanvasElement | null = null
+      /* 1) المحاولة من المستند المفتوح */
+      if (pdfDoc) {
         try {
-          var dataUrl2 = await renderPageToJpeg(fallbackDoc, page, 2000, 0.9)
-          canvas = await sourceToCanvas({ kind: 'dataurl', dataUrl: dataUrl2 })
-        } catch (eFb2) { canvas = null }
+          var numPages = Number(pdfDoc.numPages) || 0
+          if (page >= 1 && (numPages <= 0 || page <= numPages)) {
+            /* (و52) رندر أعلى 2000/0.9 — ده المصدر اللي القص بيتقص منه */
+            var dataUrl = await renderPageToJpeg(pdfDoc, page, 2000, 0.9)
+            canvas = await sourceToCanvas({ kind: 'dataurl', dataUrl: dataUrl })
+          }
+        } catch (e) { canvas = null }
+        /* 2) (و48) المستند فشل (متدمر/مقفول) → إعادة فتح الملف الأصلي */
+        if (!canvas && fallbackFile && !fallbackDoc) {
+          try { fallbackDoc = (await openPdf(fallbackFile)).doc } catch (eFb) { fallbackDoc = null }
+        }
+        if (!canvas && fallbackDoc) {
+          try {
+            var dataUrl2 = await renderPageToJpeg(fallbackDoc, page, 2000, 0.9)
+            canvas = await sourceToCanvas({ kind: 'dataurl', dataUrl: dataUrl2 })
+          } catch (eFb2) { canvas = null }
+        }
       }
-    }
-    /* 3) صورة مفردة (صفحة 1) */
-    if (!canvas && imgBitmap && page === 1) {
-      try { canvas = await sourceToCanvas({ kind: 'bitmap', bitmap: imgBitmap }) } catch (eB) { canvas = null }
-    }
-    if (canvas) pageCanvasCache[page] = canvas
-    return canvas
+      /* 3) صورة مفردة (صفحة 1) */
+      if (!canvas && imgBitmap && page === 1) {
+        try { canvas = await sourceToCanvas({ kind: 'bitmap', bitmap: imgBitmap }) } catch (eB) { canvas = null }
+      }
+      if (canvas) pageCanvasCache[page] = canvas
+      return canvas
+    })()
+    pageInflight[page] = p
+    return p
   }
 
   var done = 0
-  for (var i = 0; i < targets.length; i++) {
+  /* (ز40) القص والرفع بقوا متوازيين — 3 رسمات في نفس الوقت بدل واحد ورا
+     التاني: رفع كل رسمة بياخد ثواني على النت، والتتابع كان بيخلي مرحلة
+     «جهز الرسومات X من Y» تأخد ضعف الوقت في الملفات الغنية بالرسومات */
+  var processTarget = async function (i: number): Promise<void> {
     var tgt = targets[i]
     var q = tgt.q
     try {
       var fig = tgt.kind === 'q' ? q.figure : (q.optionFigures[tgt.oi || 0] || null)
       var bbox = sanitizeBbox(fig && fig.bbox)
-      if (!bbox) { done++; if (onProgress) onProgress(done, total); continue }
+      if (!bbox) { return }
       var page = parseInt(String((fig && fig.page) || q.sourcePage || 1), 10) || 1
       var pageCanvas = await getPageCanvas(page)
-      if (!pageCanvas) { done++; if (onProgress) onProgress(done, total); continue }
+      if (!pageCanvas) { return }
 
       /* (و52) padding حوالين bbox — رسمة السؤال هامش أكبر، رسومات الاختيارات أقل
          (عشان ماحضنش رسمة الاختيار اللي جنبه في الشبكة) */
@@ -258,7 +276,7 @@ export async function ensureFigureUrls(
       var ex0 = Math.min(pageCanvas.width, Math.ceil((bbox.x + bbox.w + padFrac) * pageCanvas.width))
       var ey0 = Math.min(pageCanvas.height, Math.ceil((bbox.y + bbox.h + padFrac) * pageCanvas.height))
       var sw0 = ex0 - sx0, sh0 = ey0 - sy0
-      if (sw0 < 8 || sh0 < 8) { done++; if (onProgress) onProgress(done, total); continue }
+      if (sw0 < 8 || sh0 < 8) { return }
       /* (و52) رصّ القص على المحتوى الفعلي — تقليم البيض جوه المنطقة الموسعة */
       var reg = refineByContentDom(pageCanvas, sx0, sy0, sw0, sh0)
       /* (و53) فك الالتحام — لو المنطقة التهمت رسمة مجاورة (رسمتين جنب بعض
@@ -273,7 +291,7 @@ export async function ensureFigureUrls(
         } catch (eG) { return null }
       }, reg, { x0: bbox.x * pc53.width, y0: bbox.y * pc53.height, x1: (bbox.x + bbox.w) * pc53.width, y1: (bbox.y + bbox.h) * pc53.height })
       var sw = regD.w, sh = regD.h, sx = regD.x, sy = regD.y
-      if (sw < 8 || sh < 8) { done++; if (onProgress) onProgress(done, total); continue }
+      if (sw < 8 || sh < 8) { return }
 
       /* تصغير لأقصى ضلع 1600 — الحفاظ على النسبة */
       var scale = Math.min(1, 1600 / Math.max(sw, sh))
@@ -282,7 +300,7 @@ export async function ensureFigureUrls(
       var out = document.createElement('canvas')
       out.width = outW; out.height = outH
       var octx = out.getContext('2d')
-      if (!octx) { done++; if (onProgress) onProgress(done, total); continue }
+      if (!octx) { return }
       octx.fillStyle = '#ffffff'
       octx.fillRect(0, 0, outW, outH)
       octx.imageSmoothingEnabled = true
@@ -292,7 +310,7 @@ export async function ensureFigureUrls(
       var blob = await new Promise<Blob | null>(function (resolve) {
         out.toBlob(function (b: Blob | null) { resolve(b) }, 'image/jpeg', 0.92)
       })
-      if (!blob) { done++; if (onProgress) onProgress(done, total); continue }
+      if (!blob) { return }
 
       var asFile = new File([blob], 'figure_q' + (i + 1) + '.jpg', { type: 'image/jpeg' })
       var up = await chunkedUpload(asFile, 'exam-figures')
@@ -309,7 +327,18 @@ export async function ensureFigureUrls(
     } catch (eFig) {
       /* فشل سؤال واحد مش بيوقف الباقي — bbox بيفضل موجود */
     }
-    done++
-    if (onProgress) onProgress(done, total)
   }
+  var tgtIdx = 0
+  var cropWorker = async function (): Promise<void> {
+    while (tgtIdx < targets.length) {
+      var my = tgtIdx++
+      await processTarget(my)
+      done++
+      if (onProgress) onProgress(done, total)
+    }
+  }
+  var workers: Promise<void>[] = []
+  var conc = Math.min(3, targets.length)
+  for (var w = 0; w < conc; w++) workers.push(cropWorker())
+  await Promise.all(workers)
 }
