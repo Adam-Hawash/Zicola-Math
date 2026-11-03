@@ -58,6 +58,14 @@ export async function GET(request: NextRequest) {
     if (!(globalThis as any).DOMMatrix) (globalThis as any).DOMMatrix = DOMMatrix
     if (!(globalThis as any).Path2D) (globalThis as any).Path2D = Path2D
     if (!(globalThis as any).ImageData) (globalThis as any).ImageData = ImageData
+    /* (Z-40e) تسجيل worker الـ pdf.js صراحة — على فيرسل الـ import الداخلي
+       بتاع pdf.worker.mjs مش بيتتبع فالملف بيتبعد عن النشر ويقع «fake worker».
+       الاستيراد الصريح بيخلي الباندلر يشمله + بنسجله في globalThis زي ما
+       pdf.js بيفحصه الأول في setupFakeWorkerGlobal */
+    try {
+      var wmod: any = await import('pdfjs-dist/legacy/build/pdf.worker.mjs')
+      if (wmod && !(globalThis as any).pdfjsWorker) (globalThis as any).pdfjsWorker = wmod
+    } catch (eW) {}
     var pdfjs: any = await import('pdfjs-dist/legacy/build/pdf.mjs')
 
     var pathMod = await import('path')
