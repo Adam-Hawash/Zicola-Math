@@ -6577,6 +6577,7 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
             target={cropEdit}
             source={{ file: (lastCropSourceRef.current && lastCropSourceRef.current.file) || null, doc: (lastCropSourceRef.current && lastCropSourceRef.current.doc) || null }}
             sourceMediaId={sourceMediaRef.current || ''}
+            adminId={adminId || ''}
             onSaved={function (url, bbox, page) { applyFigureCrop(cropEdit, url, bbox, page) }}
             onClose={function () { setCropEdit(null) }}
           />

@@ -29,6 +29,7 @@ interface Props {
   target: FigureCropTarget
   source: { file?: File | null; doc?: any | null }
   sourceMediaId?: string
+  adminId?: string
   onSaved: (url: string, bbox: { x: number; y: number; w: number; h: number }, page: number) => void
   onClose: () => void
 }
@@ -48,7 +49,7 @@ function safeBox(b: any): Box | null {
   }
 }
 
-export default function FigureCropEditor({ target, source, sourceMediaId, onSaved, onClose }: Props) {
+export default function FigureCropEditor({ target, source, sourceMediaId, adminId, onSaved, onClose }: Props) {
   var [pageUrl, setPageUrl] = useState<string>('')
   var [loading, setLoading] = useState<boolean>(true)
   var [loadErr, setLoadErr] = useState<string>('')
@@ -130,6 +131,31 @@ export default function FigureCropEditor({ target, source, sourceMediaId, onSave
             dataUrl = await renderFromFile(f2, target.page)
           } catch (eMed: any) {
             errs.push('السيرفر: ' + String((eMed && eMed.message) || eMed))
+          }
+        }
+        /* (Z-40e) المصدر الرابع — النووي: السيرفر نفسه بيرندر صفحة الأصل من الملف
+           المتخزن ويرجّعها JPEG جاهزة — من غير أي pdf.js على جهاز المستر.
+           ده اللي يخلي «عدّل القص» مستحيل يفشل طالما الملف الأصلي متخزن */
+        if (!dataUrl && sourceMediaId) {
+          try {
+            var rSrv = await fetch('/api/page-image?mediaId=' + encodeURIComponent(sourceMediaId)
+              + '&page=' + encodeURIComponent(String(target.page))
+              + (adminId ? '&adminId=' + encodeURIComponent(adminId) : ''), { cache: 'no-store' })
+            if (!rSrv.ok) {
+              var jSrv: any = null
+              try { jSrv = await rSrv.json() } catch (eJ) {}
+              throw new Error(String((jSrv && jSrv.error) || ('HTTP ' + rSrv.status)))
+            }
+            var bSrv = await rSrv.blob()
+            if (!bSrv || bSrv.size < 512) throw new Error('السيرفر رجّع صورة فاضية')
+            dataUrl = await new Promise<string>(function (resolve, reject) {
+              var r2 = new FileReader()
+              r2.onload = function () { resolve(String(r2.result || '')) }
+              r2.onerror = function () { reject(new Error('فشل قراءة صورة السيرفر')) }
+              r2.readAsDataURL(bSrv)
+            })
+          } catch (eSrv: any) {
+            errs.push('رندر السيرفر: ' + String((eSrv && eSrv.message) || eSrv))
           }
         }
         if (!dataUrl) {
@@ -311,7 +337,7 @@ export default function FigureCropEditor({ target, source, sourceMediaId, onSave
         <div className="flex items-center gap-2 p-3 border-t shrink-0">
           <p className="text-[10px] text-muted-foreground flex-1">القص بيتحفظ بجودة عالية (JPEG 92%) وبيوصل للطالب بالشكل ده بالظبط.</p>
           {/* (Z-40d) علامة الإصدار — لو مش شايفها في النافذة يبقى المتصفح شغّل نسخة قديمة محمّلة قبل النشر */}
-          <span className="shrink-0 text-[10px] font-bold text-violet-500 bg-violet-500/10 border border-violet-500/30 rounded px-1.5 py-0.5">✓ v40d</span>
+          <span className="shrink-0 text-[10px] font-bold text-violet-500 bg-violet-500/10 border border-violet-500/30 rounded px-1.5 py-0.5">✓ v40e</span>
           <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={saving}>إلغاء</Button>
           <Button type="button" size="sm" onClick={save} disabled={saving || loading || !!loadErr || !pageUrl}>
             {saving ? <Loader2 className="h-4 w-4 ml-1 animate-spin" /> : <span>💾</span>}

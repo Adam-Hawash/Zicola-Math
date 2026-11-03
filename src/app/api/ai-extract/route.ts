@@ -17,6 +17,7 @@ import { isWritingQuestion } from '@/lib/question-figures'
 /* (و53) القص السيرفري اتشال من وقت الاستخراج (قص المتصفح الأول بجودة أعلى
    والسيرفر بقى إنقاذ بس عبر /api/crop-figures) */
 import { db } from '@/lib/db'
+import { directDownloadCandidates, isHtmlContentType } from '@/lib/drive-url'
 
 export const runtime = 'nodejs'
 export const maxDuration = 180
@@ -127,16 +128,27 @@ export async function POST(request) {
       cropSrc = { base64: qBase64, name: String((questionFile as any).name || 'source'), mime: getMimeType(questionFile) }
     } else if (fileUrl.trim()) {
       try {
-        var fetchRes = await fetch(fileUrl.trim())
-        if (!fetchRes.ok) throw new Error('Download failed: ' + fetchRes.status)
-        var arrayBuf = await fetchRes.arrayBuffer()
+        /* (Z-40e) لينكات جوجل درايف بقت بتتحول لتحميل مباشر — الراو القديم كان
+           بيحمّل صفحة العارض HTML ويبعتها للـ AI فيقول «مش قادر يقرأ» */
+        var candidatesU = directDownloadCandidates(fileUrl.trim())
+        var arrayBuf: ArrayBuffer | null = null
+        var ct = ''
+        for (var cu = 0; cu < candidatesU.length; cu++) {
+          var fetchRes = await fetch(candidatesU[cu], { redirect: 'follow', cache: 'no-store' })
+          if (!fetchRes.ok) continue
+          var cti = fetchRes.headers.get('content-type') || ''
+          if (isHtmlContentType(cti)) continue /* صفحة HTML مش الملف — نجرب التالي */
+          arrayBuf = await fetchRes.arrayBuffer()
+          ct = cti
+          if (arrayBuf && arrayBuf.byteLength > 512) break
+        }
+        if (!arrayBuf || arrayBuf.byteLength < 128) throw new Error('drive-or-url-download-failed')
         var qBase64Url = Buffer.from(new Uint8Array(arrayBuf)).toString('base64')
-        var ct = fetchRes.headers.get('content-type') || ''
-        var qMime = ct.includes('pdf') ? 'application/pdf' : ct.includes('png') ? 'image/png' : ct.includes('webp') ? 'image/webp' : ct.includes('image') ? ct : 'image/jpeg'
+        var qMime = ct.includes('pdf') ? 'application/pdf' : ct.includes('png') ? 'image/png' : ct.includes('webp') ? 'image/webp' : ct.includes('image') ? ct : 'application/pdf'
         qPart = { inlineData: { mimeType: qMime, data: qBase64Url } }
         cropSrc = { base64: qBase64Url, name: fileUrl.trim().split('?')[0].split('/').pop() || 'source-link', mime: qMime }
       } catch (err) {
-        return NextResponse.json({ error: 'Failed to download question file' }, { status: 400 })
+        return NextResponse.json({ error: 'Failed to download question file — لو اللينك من جوجل درايف اتأكد إن مشاركة الملف «أي شخص لديه الرابط»' }, { status: 400 })
       }
     }
 
