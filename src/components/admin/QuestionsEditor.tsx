@@ -10,7 +10,7 @@
 // The teacher can fix a question that appeared wrong for a student, then
 // press "إعادة تصحيح بالذكاء" on the result — everything updates in place.
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -129,6 +129,11 @@ export function QuestionsEditorDialog({ open, onOpenChange, title, apiPath, item
   const [repairing, setRepairing] = useState(false)
   /* (Z-41) محرر القص من الأسئلة المحفوظة — بيتفتح من زرار ✂️ جنب أي رسمة */
   const [cropTarget, setCropTarget] = useState<FigureCropTarget | null>(null)
+  /* (Z-41) الاستخراجات القديمة مالهاش ملف مصدر مخزن — بنطلب الملف الأصلي
+     من المستر مرة واحدة ونقص منه فورًا (نفس محرر شاشة الاستخراج بيدعم source.file) */
+  const [cropFile, setCropFile] = useState<File | null>(null)
+  const pendingCropRef = useRef<FigureCropTarget | null>(null)
+  const cropFileInputRef = useRef<HTMLInputElement>(null)
   const adminIdQe = useAppStore(function (s) { return s.currentAdmin?.id || '' })
   /* ملف المصدر المخزن — id الميديا من filePath (‏/api/files/<id>‏) */
   var sourceMediaIdQe = ''
@@ -136,6 +141,19 @@ export function QuestionsEditorDialog({ open, onOpenChange, title, apiPath, item
     var mSrc = String(sourceFilePath || '').match(/\/api\/files\/([\w-]+)/)
     if (mSrc && mSrc[1]) sourceMediaIdQe = mSrc[1]
   } catch (eSrc) {}
+
+  /* (Z-41) فتح محرر القص: لو في ملف مخزن يفتح فورًا — لو مفيش يطلب الملف الأصلي */
+  var openCropFor = function (t: FigureCropTarget) {
+    if (sourceMediaIdQe) { setCropFile(null); setCropTarget(t); return }
+    pendingCropRef.current = t
+    if (cropFileInputRef.current) { cropFileInputRef.current.value = ''; cropFileInputRef.current.click() }
+  }
+  var onCropFilePicked = function (f: File | null) {
+    if (!f || !pendingCropRef.current) return
+    setCropFile(f)
+    setCropTarget(pendingCropRef.current)
+    pendingCropRef.current = null
+  }
 
   /* (Z-41) حفظ نتيجة القص على السؤال/الاختيار — نفس منطق شاشة الاستخراج */
   var applyFigureCropQe = function (t: FigureCropTarget, url: string, bbox: { x: number; y: number; w: number; h: number }, page: number) {
@@ -462,10 +480,8 @@ export function QuestionsEditorDialog({ open, onOpenChange, title, apiPath, item
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <p className="text-[9px] font-bold text-muted-foreground" dir="rtl" style={{ textAlign: 'right' }}>📐 رسمة السؤال:</p>
                       <div className="flex items-center gap-2">
-                        {/* (Z-41) عدّل القص من الأسئلة المحفوظة — يفتح صفحة الملف الأصلي المخزن */}
-                        {sourceMediaIdQe && (
-                          <button type="button" onClick={function () { setCropTarget({ qi: qi, kind: 'q', oi: -1, page: parseInt(String((q.figure && q.figure.page) || q.sourcePage || 1), 10) || 1, bbox: (q.figure && q.figure.bbox) || null }) }} className="text-[9px] font-bold text-violet-600 dark:text-violet-400 hover:underline">✂️ عدّل القص</button>
-                        )}
+                        {/* (Z-41) عدّل القص من الأسئلة المحفوظة — من الملف المخزن أو ملف يختاره */}
+                        <button type="button" onClick={function () { openCropFor({ qi: qi, kind: 'q', oi: -1, page: parseInt(String((q.figure && q.figure.page) || q.sourcePage || 1), 10) || 1, bbox: (q.figure && q.figure.bbox) || null }) }} className="text-[9px] font-bold text-violet-600 dark:text-violet-400 hover:underline">✂️ عدّل القص</button>
                         <label className="text-[9px] font-bold text-primary cursor-pointer hover:underline">
                           📷 استبدال
                           <input type="file" accept="image/*" hidden onChange={function (e) { var f = e.target.files && e.target.files[0]; e.target.value = ''; uploadQuestionFigure(qi, f) }} />
@@ -481,10 +497,8 @@ export function QuestionsEditorDialog({ open, onOpenChange, title, apiPath, item
                       📷 رفع رسمة للسؤال (اختياري)
                       <input type="file" accept="image/*" hidden onChange={function (e) { var f = e.target.files && e.target.files[0]; e.target.value = ''; uploadQuestionFigure(qi, f) }} />
                     </label>
-                    {/* (Z-41) مفيش رسمة أصلاً؟ يقص واحدة جديدة من الملف الأصلي المخزن */}
-                    {sourceMediaIdQe && (
-                      <button type="button" onClick={function () { setCropTarget({ qi: qi, kind: 'q', oi: -1, page: parseInt(String(q.sourcePage || 1), 10) || 1, bbox: null }) }} className="text-[9px] font-bold text-violet-600 dark:text-violet-400 hover:underline">✂️ قص من الملف الأصلي</button>
-                    )}
+                    {/* (Z-41) مفيش رسمة أصلاً؟ يقص واحدة جديدة من الأصل */}
+                    <button type="button" onClick={function () { openCropFor({ qi: qi, kind: 'q', oi: -1, page: parseInt(String(q.sourcePage || 1), 10) || 1, bbox: null }) }} className="text-[9px] font-bold text-violet-600 dark:text-violet-400 hover:underline">✂️ قص من الملف الأصلي</button>
                   </div>
                 )}
 
@@ -538,10 +552,8 @@ export function QuestionsEditorDialog({ open, onOpenChange, title, apiPath, item
                               📷
                               <input type="file" accept="image/*" hidden onChange={function (e) { var f = e.target.files && e.target.files[0]; e.target.value = ''; uploadOptionFigure(qi, oi, f) }} />
                             </label>
-                            {/* (Z-41) قص صورة الاختيار من الملف الأصلي المخزن */}
-                            {sourceMediaIdQe && (
-                              <button type="button" title="قص صورة الاختيار من صفحة الملف الأصلي" onClick={function () { var ofPrev = q.optionFigures && q.optionFigures[oi]; setCropTarget({ qi: qi, kind: 'of', oi: oi, page: parseInt(String((ofPrev && ofPrev.page) || q.sourcePage || 1), 10) || 1, bbox: (ofPrev && ofPrev.bbox) || null }) }} className="shrink-0 h-8 px-1.5 inline-flex items-center justify-center rounded-md border border-violet-400/50 text-[11px] text-violet-600 dark:text-violet-400 cursor-pointer transition-colors hover:bg-violet-500/10">✂️</button>
-                            )}
+                            {/* (Z-41) قص صورة الاختيار من الأصل */}
+                            <button type="button" title="قص صورة الاختيار من صفحة الملف الأصلي" onClick={function () { var ofPrev = q.optionFigures && q.optionFigures[oi]; openCropFor({ qi: qi, kind: 'of', oi: oi, page: parseInt(String((ofPrev && ofPrev.page) || q.sourcePage || 1), 10) || 1, bbox: (ofPrev && ofPrev.bbox) || null }) }} className="shrink-0 h-8 px-1.5 inline-flex items-center justify-center rounded-md border border-violet-400/50 text-[11px] text-violet-600 dark:text-violet-400 cursor-pointer transition-colors hover:bg-violet-500/10">✂️</button>
                           </div>
                           {ofImg && ofImg.url && (
                             <span className="relative inline-flex pr-6">
@@ -629,13 +641,15 @@ export function QuestionsEditorDialog({ open, onOpenChange, title, apiPath, item
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    {/* (Z-41) اختيار الملف الأصلي للاستخراجات القديمة اللي مالهاش مصدر مخزن */}
+    <input ref={cropFileInputRef} type="file" accept="application/pdf,image/*" hidden onChange={function (e) { var f = e.target.files && e.target.files[0]; e.target.value = ''; onCropFilePicked(f) }} />
     {/* (Z-41) محرر القص — برّه الدايلوج خالص عشان الـ fixed overlay ميتأثرش
        بأي transform/overflow — بنفس سلسلة المصادر الأربعة بتاعة شاشة الاستخراج
        (المستند → الملف → /api/files → رندر السيرفر /api/page-image) */}
-    {cropTarget && sourceMediaIdQe && (
+    {cropTarget && (
       <FigureCropEditor
         target={cropTarget}
-        source={{ file: null, doc: null }}
+        source={{ file: cropFile, doc: null }}
         sourceMediaId={sourceMediaIdQe}
         adminId={adminIdQe || ''}
         onSaved={function (url, bbox, page) { applyFigureCropQe(cropTarget, url, bbox, page) }}
