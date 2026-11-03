@@ -54,15 +54,14 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/* (و43) تحويل لينكات جوجل درايف للمشاركة إلى تحميل مباشر (direct download):
-   file/d/<id> أو open?id=<id> أو docs document/d/<id> → uc?export=download&id=<id> */
+/* (و43) التحقق من لينك الكتاب (Z-41): مش بنحوّل اللينك خالص — بنخزنه
+   زي ما هو (أي صيغة درايف file/d أو open?id أو uc?id أو أي موقع مباشر)
+   و/api/books/proxy هو اللي بيحول وقت التحميل لأحدث نقاط جوجل المباشرة
+   (usercontent + confirm=t + فك صفحة التأكيد). التحويل القديم لتعطيل
+   uc?export=download كان بيخلي الطالب يفتح صفحة HTML بدل الـ PDF. */
 function normalizeBookSourceUrl(raw: string): string | null {
   var url = String(raw || '').trim()
   if (!/^https?:\/\//i.test(url)) return null
-  var m = url.match(/drive\.google\.com\/file\/d\/([\w-]+)/)
-        || url.match(/drive\.google\.com\/open\?id=([\w-]+)/)
-        || url.match(/docs\.google\.com\/document\/d\/([\w-]+)/)
-  if (m && m[1]) return 'https://drive.google.com/uc?export=download&id=' + m[1]
   return url
 }
 

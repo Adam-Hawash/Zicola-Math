@@ -49,15 +49,20 @@ export function BooksTab({ grade }: { grade?: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [grade])
 
-  /* (و43) كتاب بلينك خارجي (sourceUrl) → الفتح/التحميل من اللينك مباشرة —
-     من غير dl=1 ولا ملف مخزن. الكتاب العادي زي ما هو filePath + dl=1 */
+  /* (و43) كتاب بلينك خارجي (sourceUrl) → (Z-41) الفتح/التحميل من خلال
+     /api/books/proxy — ممنوع نفتح لينك جوجل درايف مباشرة: جوجل بترجّع
+     صفحة عارض HTML (مش PDF) والطالب كان يشوف «الـ PDF مش بيفتح خالص».
+     البروكسي بيرجّع PDF نضيف same-origin ويفتح في العارض فورًا.
+     الكتاب العادي زي ما هو filePath + dl=1 */
   var openBook = function (b: any) {
-    var url = b.sourceUrl ? b.sourceUrl : b.filePath
+    var url = b.sourceUrl
+      ? '/api/books/proxy?url=' + encodeURIComponent(b.sourceUrl)
+      : b.filePath
     try { window.open(url, '_blank') } catch (e) {}
   }
   var downloadBook = function (b: any) {
     if (b.sourceUrl) {
-      try { window.open(b.sourceUrl, '_blank') } catch (e) {}
+      try { window.open('/api/books/proxy?url=' + encodeURIComponent(b.sourceUrl) + '&dl=1', '_blank') } catch (e) {}
       return
     }
     var url = b.filePath + (b.filePath.indexOf('?') !== -1 ? '&' : '?') + 'dl=1'

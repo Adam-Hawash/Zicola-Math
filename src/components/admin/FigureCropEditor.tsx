@@ -336,8 +336,8 @@ export default function FigureCropEditor({ target, source, sourceMediaId, adminI
         </div>
         <div className="flex items-center gap-2 p-3 border-t shrink-0">
           <p className="text-[10px] text-muted-foreground flex-1">القص بيتحفظ بجودة عالية (JPEG 92%) وبيوصل للطالب بالشكل ده بالظبط.</p>
-          {/* (Z-40d) علامة الإصدار — لو مش شايفها في النافذة يبقى المتصفح شغّل نسخة قديمة محمّلة قبل النشر */}
-          <span className="shrink-0 text-[10px] font-bold text-violet-500 bg-violet-500/10 border border-violet-500/30 rounded px-1.5 py-0.5">✓ v40e</span>
+          {/* (Z-41) علامة الإصدار — v41 = القص بقى شغال من الأسئلة المحفوظة كمان */}
+          <span className="shrink-0 text-[10px] font-bold text-violet-500 bg-violet-500/10 border border-violet-500/30 rounded px-1.5 py-0.5">✓ v41</span>
           <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={saving}>إلغاء</Button>
           <Button type="button" size="sm" onClick={save} disabled={saving || loading || !!loadErr || !pageUrl}>
             {saving ? <Loader2 className="h-4 w-4 ml-1 animate-spin" /> : <span>💾</span>}

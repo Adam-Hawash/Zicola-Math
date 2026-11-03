@@ -17,7 +17,7 @@ import { isWritingQuestion } from '@/lib/question-figures'
 /* (و53) القص السيرفري اتشال من وقت الاستخراج (قص المتصفح الأول بجودة أعلى
    والسيرفر بقى إنقاذ بس عبر /api/crop-figures) */
 import { db } from '@/lib/db'
-import { directDownloadCandidates, isHtmlContentType } from '@/lib/drive-url'
+import { directDownloadCandidates, isHtmlContentType, extractDriveFileId, buildConfirmedDriveUrl } from '@/lib/drive-url'
 
 export const runtime = 'nodejs'
 export const maxDuration = 180
@@ -129,15 +129,34 @@ export async function POST(request) {
     } else if (fileUrl.trim()) {
       try {
         /* (Z-40e) لينكات جوجل درايف بقت بتتحول لتحميل مباشر — الراو القديم كان
-           بيحمّل صفحة العارض HTML ويبعتها للـ AI فيقول «مش قادر يقرأ» */
+           بيحمّل صفحة العارض HTML ويبعتها للـ AI فيقول «مش قادر يقرأ»
+           (Z-41) + فكّ صفحة تأكيد جوجل للملفات الكبيرة (uuid من الفورم المخفي) */
         var candidatesU = directDownloadCandidates(fileUrl.trim())
+        var fileDriveId = extractDriveFileId(fileUrl.trim()) || ''
         var arrayBuf: ArrayBuffer | null = null
         var ct = ''
         for (var cu = 0; cu < candidatesU.length; cu++) {
           var fetchRes = await fetch(candidatesU[cu], { redirect: 'follow', cache: 'no-store' })
           if (!fetchRes.ok) continue
           var cti = fetchRes.headers.get('content-type') || ''
-          if (isHtmlContentType(cti)) continue /* صفحة HTML مش الملف — نجرب التالي */
+          if (isHtmlContentType(cti)) {
+            /* (Z-41) صفحة تأكيد الملفات الكبيرة فيها uuid — من غيره الفشل كان دايمًا */
+            try {
+              var htmlTxt = await fetchRes.text()
+              if (htmlTxt && htmlTxt.length <= 512 * 1024 && fileDriveId) {
+                var confU = buildConfirmedDriveUrl(htmlTxt, fileDriveId)
+                if (confU) {
+                  var confRes = await fetch(confU, { redirect: 'follow', cache: 'no-store' })
+                  var confCt = confRes.ok ? String(confRes.headers.get('content-type') || '') : ''
+                  if (confRes.ok && !isHtmlContentType(confCt)) {
+                    var confBuf = await confRes.arrayBuffer()
+                    if (confBuf && confBuf.byteLength > 512) { arrayBuf = confBuf; ct = confCt; break }
+                  }
+                }
+              }
+            } catch (eCf) {}
+            continue /* صفحة HTML مش الملف — نجرب التالي */
+          }
           arrayBuf = await fetchRes.arrayBuffer()
           ct = cti
           if (arrayBuf && arrayBuf.byteLength > 512) break

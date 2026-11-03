@@ -49,3 +49,24 @@ export function isHtmlContentType(ct: string): boolean {
   var s = String(ct || '').toLowerCase()
   return s.indexOf('text/html') !== -1 || s.indexOf('application/xhtml') !== -1
 }
+
+/* (Z-41) فكّ صفحة تأكيد جوجل للملفات الكبيرة (virus-scan interstitial):
+   لينكات درايف للملفات الكبيرة (>~25MB) بترجّع صفحة HTML فيها فورم hidden
+   (id/export/confirm/uuid) — من غير الـ uuid التحميل بيفضل HTML للأبد.
+   بنستخرج الـ uuid من الـ HTML ونبني لينك التحميل الحقيقي النهائي.
+   لو مفيش uuid (صفحة تسجيل دخول = الملف مش متشارك «أي شخص لديه الرابط»)
+   بنرجّع null والمستدعي يعرض رسالة «اتأكد من المشاركة». */
+export function buildConfirmedDriveUrl(html: string, fileId: string): string | null {
+  var h = String(html || '')
+  if (!h) return null
+  var mUuid = h.match(/name="uuid"\s+value="([^"]+)"/i)
+        || h.match(/name='uuid'\s+value='([^']+)'/i)
+        || h.match(/name="uuid"\s+value='([^']+)'/i)
+        || h.match(/name='uuid'\s+value="([^"]+)"/i)
+  if (!mUuid || !mUuid[1]) return null
+  /* قيم الفورم ممكن تكون HTML-encoded (&amp;) — نفكّها */
+  var uuid = String(mUuid[1]).replace(/&amp;/g, '&').replace(/&#38;/g, '&').trim()
+  if (!uuid) return null
+  return 'https://drive.usercontent.google.com/download?id=' + encodeURIComponent(String(fileId || ''))
+    + '&export=download&confirm=t&uuid=' + encodeURIComponent(uuid)
+}

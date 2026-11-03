@@ -24,6 +24,11 @@ import { WorksheetFigure, WorksheetTableEditor } from '@/components/worksheet/Wo
 import { repairCorruptMath } from '@/lib/math-text'
 /* (و46) رفع صورة اختيار من المحرر نفسه — نفس مسار شاشة الاستخراج */
 import { chunkedUpload } from '@/lib/chunked-upload'
+/* (Z-41) محرر قص الرسمات من الملف الأصلي المخزن — نفس محرر شاشة الاستخراج
+   بالظبط: طلب المستر «في أي تعديل يتعدل في السؤال أقدر أعدله» — دلوقتي
+   يفتح صفحة الأصل ويحرّك المربع ويحفظ حتى من الأسئلة المحفوظة قديم */
+import FigureCropEditor, { type FigureCropTarget } from './FigureCropEditor'
+import { useAppStore } from '@/stores/app-store'
 
 export interface EditableQuestion {
   type: string
@@ -110,15 +115,45 @@ interface Props {
   itemId: string
   initialQuestionsRaw: any
   onSaved?: () => void
+  /* (Z-41) مسار ملف المصدر المخزن (/api/files/<mediaId>) — الامتحان/الواجب
+     المحفوظ شايله من الاستخراج — منه بيشتغل زرار ✂️ عدّل القص هنا */
+  sourceFilePath?: string
 }
 
-export function QuestionsEditorDialog({ open, onOpenChange, title, apiPath, itemId, initialQuestionsRaw, onSaved }: Props) {
+export function QuestionsEditorDialog({ open, onOpenChange, title, apiPath, itemId, initialQuestionsRaw, onSaved, sourceFilePath }: Props) {
   const initial = useMemo(() => parseQuestionsRaw(initialQuestionsRaw), [initialQuestionsRaw, open])
   const [questions, setQuestions] = useState<EditableQuestion[]>(initial)
   const [saving, setSaving] = useState(false)
   /* (و50) إصلاح الرسمات الناقصة من ملف أصلي — للاستخراجات القديمة المحفوظة
      اللي رسماتها placeholders (اللي الطالب مش شايفها) */
   const [repairing, setRepairing] = useState(false)
+  /* (Z-41) محرر القص من الأسئلة المحفوظة — بيتفتح من زرار ✂️ جنب أي رسمة */
+  const [cropTarget, setCropTarget] = useState<FigureCropTarget | null>(null)
+  const adminIdQe = useAppStore(function (s) { return s.currentAdmin?.id || '' })
+  /* ملف المصدر المخزن — id الميديا من filePath (‏/api/files/<id>‏) */
+  var sourceMediaIdQe = ''
+  try {
+    var mSrc = String(sourceFilePath || '').match(/\/api\/files\/([\w-]+)/)
+    if (mSrc && mSrc[1]) sourceMediaIdQe = mSrc[1]
+  } catch (eSrc) {}
+
+  /* (Z-41) حفظ نتيجة القص على السؤال/الاختيار — نفس منطق شاشة الاستخراج */
+  var applyFigureCropQe = function (t: FigureCropTarget, url: string, bbox: { x: number; y: number; w: number; h: number }, page: number) {
+    setQuestions(function (prev) {
+      return prev.map(function (q, i) {
+        if (i !== t.qi) return q
+        if (t.kind === 'of') {
+          var ofs = Array.isArray(q.optionFigures) ? q.optionFigures.slice() : ['', '', '', ''].map(function () { return null })
+          while (ofs.length < 4) ofs.push(null)
+          ofs[t.oi] = { url: url, bbox: bbox, page: page }
+          return Object.assign({}, q, { optionFigures: ofs, type: q.type === 'writing' ? 'mcq' : q.type })
+        }
+        return Object.assign({}, q, { figure: { url: url, bbox: bbox, page: page } })
+      })
+    })
+    setCropTarget(null)
+    toast.success('الرسمة اتقصّت من الملف الأصلي واتحطّت في السؤال ✓ — اضغط «حفظ الأسئلة» تثبتها')
+  }
 
   /* (و50) عدد الرسمات الناقصة (bbox من غير url) */
   const missingFigs = useMemo(function () {
@@ -348,7 +383,10 @@ export function QuestionsEditorDialog({ open, onOpenChange, title, apiPath, item
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+    {/* (Z-41) لو محرر القص مفتوح: أي قفل من برّه (ESC أو كليك برّه) يقفل القص بس —
+       مش يقفل المحرر كله بالأسئلة اللي المستر عدلها */}
+    <Dialog open={open} onOpenChange={function (o) { if (!o && cropTarget) { setCropTarget(null); return } onOpenChange(o) }}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto custom-scrollbar">
         <DialogHeader>
           <DialogTitle className="text-base">✏️ تعديل الأسئلة — {title}</DialogTitle>
@@ -424,6 +462,10 @@ export function QuestionsEditorDialog({ open, onOpenChange, title, apiPath, item
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <p className="text-[9px] font-bold text-muted-foreground" dir="rtl" style={{ textAlign: 'right' }}>📐 رسمة السؤال:</p>
                       <div className="flex items-center gap-2">
+                        {/* (Z-41) عدّل القص من الأسئلة المحفوظة — يفتح صفحة الملف الأصلي المخزن */}
+                        {sourceMediaIdQe && (
+                          <button type="button" onClick={function () { setCropTarget({ qi: qi, kind: 'q', oi: -1, page: parseInt(String((q.figure && q.figure.page) || q.sourcePage || 1), 10) || 1, bbox: (q.figure && q.figure.bbox) || null }) }} className="text-[9px] font-bold text-violet-600 dark:text-violet-400 hover:underline">✂️ عدّل القص</button>
+                        )}
                         <label className="text-[9px] font-bold text-primary cursor-pointer hover:underline">
                           📷 استبدال
                           <input type="file" accept="image/*" hidden onChange={function (e) { var f = e.target.files && e.target.files[0]; e.target.value = ''; uploadQuestionFigure(qi, f) }} />
@@ -434,10 +476,16 @@ export function QuestionsEditorDialog({ open, onOpenChange, title, apiPath, item
                     <WorksheetFigure figure={q.figure} className="mt-0" />
                   </div>
                 ) : (
-                  <label className="text-[9px] font-bold text-muted-foreground cursor-pointer hover:text-foreground">
-                    📷 رفع رسمة للسؤال (اختياري)
-                    <input type="file" accept="image/*" hidden onChange={function (e) { var f = e.target.files && e.target.files[0]; e.target.value = ''; uploadQuestionFigure(qi, f) }} />
-                  </label>
+                  <div className="flex items-center gap-2">
+                    <label className="text-[9px] font-bold text-muted-foreground cursor-pointer hover:text-foreground">
+                      📷 رفع رسمة للسؤال (اختياري)
+                      <input type="file" accept="image/*" hidden onChange={function (e) { var f = e.target.files && e.target.files[0]; e.target.value = ''; uploadQuestionFigure(qi, f) }} />
+                    </label>
+                    {/* (Z-41) مفيش رسمة أصلاً؟ يقص واحدة جديدة من الملف الأصلي المخزن */}
+                    {sourceMediaIdQe && (
+                      <button type="button" onClick={function () { setCropTarget({ qi: qi, kind: 'q', oi: -1, page: parseInt(String(q.sourcePage || 1), 10) || 1, bbox: null }) }} className="text-[9px] font-bold text-violet-600 dark:text-violet-400 hover:underline">✂️ قص من الملف الأصلي</button>
+                    )}
+                  </div>
                 )}
 
                 {/* (2026-و55) محرر الجدول — المستر يعدل العناوين والخلايا، يمسح،
@@ -490,6 +538,10 @@ export function QuestionsEditorDialog({ open, onOpenChange, title, apiPath, item
                               📷
                               <input type="file" accept="image/*" hidden onChange={function (e) { var f = e.target.files && e.target.files[0]; e.target.value = ''; uploadOptionFigure(qi, oi, f) }} />
                             </label>
+                            {/* (Z-41) قص صورة الاختيار من الملف الأصلي المخزن */}
+                            {sourceMediaIdQe && (
+                              <button type="button" title="قص صورة الاختيار من صفحة الملف الأصلي" onClick={function () { var ofPrev = q.optionFigures && q.optionFigures[oi]; setCropTarget({ qi: qi, kind: 'of', oi: oi, page: parseInt(String((ofPrev && ofPrev.page) || q.sourcePage || 1), 10) || 1, bbox: (ofPrev && ofPrev.bbox) || null }) }} className="shrink-0 h-8 px-1.5 inline-flex items-center justify-center rounded-md border border-violet-400/50 text-[11px] text-violet-600 dark:text-violet-400 cursor-pointer transition-colors hover:bg-violet-500/10">✂️</button>
+                            )}
                           </div>
                           {ofImg && ofImg.url && (
                             <span className="relative inline-flex pr-6">
@@ -577,6 +629,20 @@ export function QuestionsEditorDialog({ open, onOpenChange, title, apiPath, item
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    {/* (Z-41) محرر القص — برّه الدايلوج خالص عشان الـ fixed overlay ميتأثرش
+       بأي transform/overflow — بنفس سلسلة المصادر الأربعة بتاعة شاشة الاستخراج
+       (المستند → الملف → /api/files → رندر السيرفر /api/page-image) */}
+    {cropTarget && sourceMediaIdQe && (
+      <FigureCropEditor
+        target={cropTarget}
+        source={{ file: null, doc: null }}
+        sourceMediaId={sourceMediaIdQe}
+        adminId={adminIdQe || ''}
+        onSaved={function (url, bbox, page) { applyFigureCropQe(cropTarget, url, bbox, page) }}
+        onClose={function () { setCropTarget(null) }}
+      />
+    )}
+    </>
   )
 }
 
