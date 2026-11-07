@@ -726,6 +726,19 @@ function VideosTab({ videos, watchedIds, approvedVideoIds, studentId, grade, vid
     })
   }, [orderedVideos])
 
+  /* المخفي عن الطالب (فيديو واحد أو درس كامل) مش موجود عنده أصلًا —
+     مش بيدخل سلسلة القفل خالص (إصلاح: «الفيديو اللي خفيته يتلغي من عند
+     الطالب يبقى أول فيديو ليه اللي هو الفيديو الموجود عنده» — نفس فلاتر
+     السيرفر بالحرف) */
+  const seqChain = useMemo(function () {
+    return seqOrdered.filter(function (v: any) {
+      if (hiddenVideoIds.has(v.id)) return false
+      var k = groupKeyOf(v)
+      if (k && hiddenGroupKeys.has(k)) return false
+      return true
+    })
+  }, [seqOrdered, hiddenVideoIds, hiddenGroupKeys])
+
   // قفل التسلسل (طلب المستر): الفيديو ميفتحش غير لما اللي قبله يتشاف كامل 100%
   // (و104) الترتيب التسلسلي دلوقتي واعي بالدروس متعددة الفيديوهات (seqOrdered)
   // (ز22) الفيديو اللي بفلوس اللي الطالب مالوش وصول له = اختياري صامت —
@@ -735,12 +748,15 @@ function VideosTab({ videos, watchedIds, approvedVideoIds, studentId, grade, vid
   const lockedMap = useMemo(function () {
     var map: Record<string, boolean> = {}
     var prevTrackable: string | null = null
-    seqOrdered.forEach(function (v) {
+    seqChain.forEach(function (v) {
       var k = videoKindOf(v)
       var trackable = k === 'youtube' || k === 'file'
       if (trackable && prevTrackable) {
         var pct = mergedProgress[prevTrackable] || 0
-        map[v.id] = pct < 99
+        /* اللي الطالب شافه أو بدأه قبل كده (أي نسبة > 0) عمره ما يتقفل تاني
+           — نفس قاعدة السيرفر بالحرف (مفيش «شفته 16% ومش راضي يفتح») */
+        var myPct = mergedProgress[v.id] || 0
+        map[v.id] = myPct <= 0 && pct < 99
       } else {
         map[v.id] = false
       }
@@ -748,7 +764,7 @@ function VideosTab({ videos, watchedIds, approvedVideoIds, studentId, grade, vid
       if (trackable && !paidNoAccess) prevTrackable = v.id
     })
     return map
-  }, [seqOrdered, mergedProgress, approvedVideoIds])
+  }, [seqChain, mergedProgress, approvedVideoIds])
 
   // الفيديو اللي قبل كل فيديو (عشان نعرض نسبته على كارت المقفول) — (و104) بترتيب المجموعات
   // (ز22) نفس قاعدة الاختياري الصامت: الفيديو اللي بفلوس من غير وصول ما بيعدّش
@@ -756,7 +772,7 @@ function VideosTab({ videos, watchedIds, approvedVideoIds, studentId, grade, vid
   const prevVideoMap = useMemo(function () {
     var map: Record<string, string> = {}
     var prevTrackable: string | null = null
-    seqOrdered.forEach(function (v) {
+    seqChain.forEach(function (v) {
       var k = videoKindOf(v)
       var trackable = k === 'youtube' || k === 'file'
       if (trackable && prevTrackable) map[v.id] = prevTrackable
@@ -764,7 +780,7 @@ function VideosTab({ videos, watchedIds, approvedVideoIds, studentId, grade, vid
       if (trackable && !paidNoAccess) prevTrackable = v.id
     })
     return map
-  }, [seqOrdered, approvedVideoIds])
+  }, [seqChain, approvedVideoIds])
 
   // أجزاء كل درس متعدد — مرتبين (orderIndex) ومفلترين من المخفيين بالجدولة
   const groupPartsMap = useMemo(function () {
@@ -1181,7 +1197,10 @@ function VideosTab({ videos, watchedIds, approvedVideoIds, studentId, grade, vid
               .then(function (d) {
                 var row = (d.progress || [])[0]
                 if (row && row.totalSeconds > 0) {
-                  var pct = Math.min(100, Math.round((row.watchedSeconds / row.totalSeconds) * 100))
+                  /* نفس تسنية GET /api/video-progress بالحرف: 97%+ بتتحسب 100%
+                     — عشان القفل يتحدّث فورًا بنفس حكم السيرفر (مفيش قفل كاذب) */
+                  var ratio = row.watchedSeconds / row.totalSeconds
+                  var pct = ratio >= 0.97 ? 100 : Math.min(100, Math.round(ratio * 100))
                   setProgressOverrides(function (prev) {
                     var n = Object.assign({}, prev)
                     n[vid] = pct

@@ -179,24 +179,28 @@ export async function computePlayback(videoId: string, studentId: string | null 
 }
 
 // ============================================================
-// التسلسل في المشاهدة (طلب المستر): لو فيه أكتر من فيديو على المنصة،
-// الفيديو اللي بعده ميقعش يتفتح غير لما الفيديو اللي قبله يتشاف كامل
-// — نسبة المشاهدة توصل 100% (أو 99% هامش أمان للتفاوت في مدة اليوتيوب).
-// الترتيب: من الأقدم للأحدث (ترتيب نزول الدروس نفسه).
-// الفيديوهات اللي مينفعش نتتبع نسبتها (لينك خارجي بس) بتتخطى عشان
-// التسلسل ميقلعش على فيديو مش قابل للقياس.
+// التسلسل في المشاهدة (طلب المستر): الفيديو ميفتحش غير لما اللي قبله
+// يتشاف كامل — والحاكم هو **سلسلة الطالب نفسها بالحرف** (إصلاح 2026-ص3):
+//   1) نفس الترتيب التسلسلي زي seqOrdered في البوابة بالحرف: مرساة الدرس
+//      متعدد الفيديوهات = أقدم جزء فيه، والأجزاء بينهم بـ orderIndex،
+//      والمفرد بوقته نفسه.
+//   2) **الفيديو المخفي عن الطالب مش بيدخل السلسلة أصلًا** — إصلاح مشكلة
+//      المستر: «الفيديو اللي خفيته يتلغي من عند الطالب يبقى أول فيديو
+//      ليه اللي هو الفيديو الموجود عنده». الإخفاء بكل أنواعه:
+//      أ) إخفاء فيديو واحد عن طالب (VideoSchedule.hiddenStudentIds)
+//      ب) إخفاء درس كامل عن طلاب (LessonHide — ز13)
+//      ج) فيديو مجموعات مش موجّه لمجموعته أو ميعاده مجاي (VideoGroupSchedule)
+//      ⇒ أول فيديو شايفه الطالب في قايمته = أول فيديو في السلسلة = مفتوح دايمًا،
+//        ومفيش رسالة «شوف اللي قبله» على فيديو أصلاً مش موجود عنده.
+//   3) اللي الطالب شافه أو بدأه قبل كده (أي نسبة > 0) عمره ما يتقفل تاني
+//      — حتى لو المستر نزل فيديو جديد أو أعاد الترتيب.
+//   4) الفيديو اللي بفلوس والطالب مالوش وصول له = اختياري صامت (ز22)
+//      — مش بيحجب اللي بعده ومش بيعدّ «اللي قبله».
+//   5) الحكم على «خلص» بنفس حساب البوابة بالحرف: 97%+ بتتحسب 100%
+//      (نفس تسنية /api/video-progress) — فالسيرفر والبوابة نفس الحكم.
+// الفيديوهات اللي مينفعش نتتبع نسبتها (لينك خارجي بس) بتتخطى.
 // ============================================================
-export const SEQ_UNLOCK_RATIO = 0.99
-
-/* (2026-ص5) الحصص البرايفت — نفس قاعدة الكلاينت في StudentPortal حرفيًا:
-   العنوان فيه قوسين وجواهم private بالإنجليزي (أو برايفت/بريفت) = برايفت.
-   السلسلة التسلسلية على السيرفر بتبقى مستقلة لكل نوع — حصص البرايفت
-   (اللي بتتعرض في تاب لوحدها) ما بتقفلش الدروس العادية والعكس */
-export function isPrivateLessonTitleServer(t: any): boolean {
-  var s = String(t || '').toLowerCase()
-  if (!s) return false
-  return /\(\s*private\s*\)/.test(s) || /[\(（]\s*private\s*[)）]/.test(s) || s.indexOf('private') >= 0 || s.indexOf('برايفت') >= 0 || s.indexOf('بريفت') >= 0
-}
+export const SEQ_UNLOCK_RATIO = 0.97
 
 export async function checkSequentialUnlock(
   videoId: string,
@@ -207,76 +211,167 @@ export async function checkSequentialUnlock(
   try {
     const video = await db.video.findUnique({ where: { id: videoId } })
     if (!video) return { ok: true }
-    const gradeVideosAll = await db.video.findMany({
+    var rows: any[] = await db.video.findMany({
       where: { grade: video.grade },
-      orderBy: { createdAt: 'asc' },
-      select: { id: true, title: true, url: true, filePath: true, fileType: true, groupKey: true, orderIndex: true, createdAt: true, price: true },
+      select: {
+        id: true, title: true, url: true, filePath: true, fileType: true,
+        price: true, groupKey: true, orderIndex: true, createdAt: true,
+      },
     })
-    /* (2026-ص5) سلسلة مستقلة لكل نوع: الفيديو المطلوب برايفت → السلسلة برايفت بس،
-       عادي → السلسلة العادية بس — تاب «برايفت» ما بيبوّظش قفل الدروس العادية */
-    const privSelf = isPrivateLessonTitleServer(video.title)
-    const gradeVideos = gradeVideosAll.filter(function (v: any) { return isPrivateLessonTitleServer(v.title) === privSelf })
-    if (gradeVideos.length === 0) return { ok: true }
-    /* (و104) ترتيب واعي بالدروس متعددة الفيديوهات:
-       - فيديو مفرد → مرساه createdAt بتاعته
-       - فيديو جوه درس متعدد (groupKey) → مرساه createdAt لأول جزء في الدرس،
-         وبعدين الأجزاء بترتب بينهم بـ orderIndex (١، ٢، ٣…)
-       كده لو المستر رتّب أجزاء الدرس بيدويًا، قفل التسلسل بيمشي مع نفس الترتيب اللي الطالب شايفه */
-    const anchor: Record<string, number> = {}
-    for (const v of gradeVideos) {
-      const t = new Date(v.createdAt || 0).getTime() || 0
-      const k = String(v.groupKey || '')
-      if (!k) continue
-      if (!(k in anchor) || t < anchor[k]) anchor[k] = t
+    var gkOf = function (v: any): string { return String((v && v.groupKey) || '') }
+
+    /* ===== (1) كل أنواع الإخفاء عن الطالب ده — نفس مصادر البوابة بالحرف ===== */
+    // أ) إخفاء فيديو واحد (VideoSchedule.hiddenStudentIds)
+    var hiddenVideoIds: Record<string, boolean> = {}
+    try {
+      var vsRows: any[] = await db.$queryRawUnsafe('SELECT videoId, hiddenStudentIds FROM VideoSchedule')
+      for (var vi = 0; vi < (vsRows || []).length; vi++) {
+        var vRow = vsRows[vi]
+        var hiddenIds: string[] = []
+        try { hiddenIds = JSON.parse(String(vRow.hiddenStudentIds || '[]')) } catch (e) {}
+        if (hiddenIds.indexOf(String(studentId)) !== -1) hiddenVideoIds[String(vRow.videoId || '')] = true
+      }
+    } catch (e) { /* جدول ناقص — من غير جدولة قديمة */ }
+    // ب) إخفاء درس كامل (LessonHide — ز13)
+    var hiddenGroupKeys: Record<string, boolean> = {}
+    try {
+      var lhRows: any[] = await db.$queryRawUnsafe('SELECT groupKey, studentIds FROM LessonHide')
+      for (var li = 0; li < (lhRows || []).length; li++) {
+        var lRow = lhRows[li]
+        var lIds: string[] = []
+        try { lIds = JSON.parse(String(lRow.studentIds || '[]')) } catch (e) {}
+        if (lIds.indexOf(String(studentId)) !== -1) hiddenGroupKeys[String(lRow.groupKey || '')] = true
+      }
+    } catch (e) { /* جدول ناقص — من غير إخفاء دروس */ }
+    // ج) جدولة المجموعات (VideoGroupSchedule) — نفس فلاتر /api/videos بالحرف
+    var plansByVideo: Record<string, { groupId: string; unlockAt: string | null }[]> = {}
+    var myGroup = ''
+    try {
+      var sgRows: any[] = await db.$queryRawUnsafe('SELECT groupId FROM Student WHERE id = ? LIMIT 1', studentId)
+      if (sgRows && sgRows.length > 0) myGroup = String(sgRows[0].groupId || '')
+    } catch (e) {}
+    try {
+      var schedRows: any[] = await db.$queryRawUnsafe('SELECT videoId, groupId, unlockAt FROM VideoGroupSchedule')
+      for (var ri = 0; ri < (schedRows || []).length; ri++) {
+        var sRow = schedRows[ri]
+        var sVid = String(sRow.videoId || '')
+        if (!plansByVideo[sVid]) plansByVideo[sVid] = []
+        plansByVideo[sVid].push({ groupId: String(sRow.groupId || ''), unlockAt: sRow.unlockAt ? String(sRow.unlockAt) : null })
+      }
+    } catch (e) { /* جدول ناقص — من غير جدولة مجموعات */ }
+    var groupVisible = function (vid: string): boolean {
+      var plans = plansByVideo[vid]
+      if (!plans || plans.length === 0) return true // من غير جدولة مجموعات = للكل
+      if (!myGroup) return false
+      for (var pi = 0; pi < plans.length; pi++) {
+        if (plans[pi].groupId !== myGroup) continue
+        if (!plans[pi].unlockAt) return true
+        var t = new Date(plans[pi].unlockAt as string).getTime()
+        if (isNaN(t)) return true
+        return Date.now() >= t
+      }
+      return false
     }
-    const seq = gradeVideos.slice().sort(function (a, b) {
-      const ka = String(a.groupKey || '')
-      const kb = String(b.groupKey || '')
-      const ta = ka ? (anchor[ka] ?? 0) : (new Date(a.createdAt || 0).getTime() || 0)
-      const tb = kb ? (anchor[kb] ?? 0) : (new Date(b.createdAt || 0).getTime() || 0)
-      if (ta !== tb) return ta - tb
-      return (a.orderIndex || 0) - (b.orderIndex || 0)
+
+    /* الهدف نفسه متخفي صراحةً عن الطالب؟ القايمة بتشيله عنده خالص —
+       أي محاولة تشغيل مباشرة (تاب قديم مثلًا) ترفض برسالة واضحة */
+    var targetRow: any = null
+    for (var ti = 0; ti < rows.length; ti++) { if (rows[ti].id === videoId) { targetRow = rows[ti]; break } }
+    if (targetRow) {
+      if (hiddenVideoIds[videoId]) {
+        return { ok: false, code: 403, reason: 'الفيديو ده مش متاح ليك حالياً — اتحذف من قايمتك' }
+      }
+      var tgk = gkOf(targetRow)
+      if (tgk && hiddenGroupKeys[tgk]) {
+        return { ok: false, code: 403, reason: 'الدرس ده مش متاح ليك حالياً — اتحذف من قايمتك' }
+      }
+    }
+
+    /* ===== نسب المشاهدة — طلبة واحدة + نفس تسنية /api/video-progress ===== */
+    var ratioOf: Record<string, number> = {}
+    try {
+      var progRows = await db.videoProgress.findMany({
+        where: { studentId: String(studentId) },
+        select: { videoId: true, watchedSeconds: true, totalSeconds: true },
+      })
+      for (var pIdx = 0; pIdx < progRows.length; pIdx++) {
+        var pRow = progRows[pIdx]
+        ratioOf[pRow.videoId] = pRow.totalSeconds > 0 ? pRow.watchedSeconds / pRow.totalSeconds : 0
+      }
+    } catch (e) { /* مفيش نسب مسجلة — السلسلة تطلب المشاهدة عادي */ }
+    // نفس حساب البوابة بالحرف: 97%+ بتتعرض 100% (تسنية GET /api/video-progress)
+    var pctOf = function (id: string): number {
+      var r = ratioOf[id] || 0
+      if (r >= SEQ_UNLOCK_RATIO) return 100
+      return Math.min(100, Math.round(r * 100))
+    }
+    /* القاعدة الأهم: اللي الطالب شافه أو بدأه قبل كده عمره ما يتقفل تاني
+       — الحماية المباشرة من «فيديو شفته 16% ومش راضي يفتح» */
+    if ((ratioOf[videoId] || 0) > 0) return { ok: true }
+
+    /* ===== (2) نفس seqOrdered في البوابة بالحرف: مرساة الجروب = أقدم جزء
+       فيه (من كل الفيديوهات — زي البوابة بالحرف)، والأجزاء بينهم بـ orderIndex ===== */
+    var anchor: Record<string, number> = {}
+    rows.forEach(function (v) {
+      var k = gkOf(v)
+      if (!k) return
+      var t = new Date(v.createdAt || 0).getTime() || 0
+      if (!(k in anchor) || t < anchor[k]) anchor[k] = t
     })
-    const idx = seq.findIndex((v) => v.id === videoId)
-    // أول فيديو في الترتيب دايمًا مفتوح
-    if (idx <= 0) return { ok: true }
-    // ندوّر على أقرب فيديو قبله قابل لتتبع النسبة (يوتيوب أو ملف مرفوع)
-    for (let i = idx - 1; i >= 0; i--) {
-      const v = seq[i]
-      const isYT = Boolean(getYouTubeId(v.url || ''))
-      const isFile = Boolean(v.filePath || v.fileType)
-      if (!isYT && !isFile) continue // لينك خارجي — مش قابل للتتبع، نتخطاه
-      /* (ز22) الفيديو اللي بفلوس والطالب مالوش وصول له — اختياري صامت
-         (طلب المستر الحرفي: «الفيديو اللي بفلوس ده يكون اختياري عادي بس
-         متكتبش ان هو اختياري — لو الطالب مشافش الفيديو الفيديو اللي بعده
-         يتفتح»): الطالب مش قادر يشوفه أصلًا (مفيش VideoAccess ولا دفعة
-         معتمدة) فمش منطقي يقف بياه الترتيب — نتخطاه ونكمل لورا لحد
-         أول فيديو الطالب يقدر فعلاً يشوفه. لو معاه وصول → بيحسب
-         زي أي فيديو عادي (لازم يشوفه عشان اللي بعده يفتح) */
-      if (v.price && Number(v.price) > 0) {
-        const acc = await db.videoAccess.findUnique({
+    var seq: any[] = rows.slice().sort(function (a: any, b: any) {
+      var ka = gkOf(a), kb = gkOf(b)
+      var ta = ka ? (anchor[ka] || 0) : (new Date(a.createdAt || 0).getTime() || 0)
+      var tb = kb ? (anchor[kb] || 0) : (new Date(b.createdAt || 0).getTime() || 0)
+      if (ta !== tb) return ta - tb
+      return (Number(a.orderIndex) || 0) - (Number(b.orderIndex) || 0)
+    })
+    // المخفي عن الطالب مش موجود عنده أصلًا → مش بيدخل السلسلة (فلترة بعد
+    // الترتيب زي البوابة بالحرف — عشان مراسي الجروب ما تتلخبطش)
+    var chain: any[] = seq.filter(function (v) {
+      if (hiddenVideoIds[v.id]) return false
+      var k = gkOf(v)
+      if (k && hiddenGroupKeys[k]) return false
+      return true
+    })
+
+    /* ===== (3) مشية البوابة نفسها (lockedMap): أول فيديو قابل للتتبع
+       في سلسلته مفتوح دايمًا، وكل اللي بعده محتاج اللي قبله (قابل للتتبع)
+       يكون خلص ≥99% — مفيش قفل دائري ولا رسالة على فيديو مش موجود عنده ===== */
+    var prevTrackable: any = null
+    for (var ci = 0; ci < chain.length; ci++) {
+      var v = chain[ci]
+      if (!groupVisible(v.id)) continue // مخفي بجدولة المجموعات — مش جزء من سلسلة الطالب
+      var isYT = Boolean(getYouTubeId(v.url || ''))
+      var isFile = Boolean(v.filePath || v.fileType)
+      var trackable = isYT || isFile
+      if (v.id === videoId) {
+        if (trackable && prevTrackable) {
+          var prevPct = pctOf(prevTrackable.id)
+          if (prevPct < 99) {
+            return {
+              ok: false,
+              code: 423,
+              reason: 'الفيديو ده هيتفتح أول ما تشوف فيديو «' + (prevTrackable.title || 'اللي قبله') + '» كامل (100%) — الفيديو ده مفتوح عندك دلوقتي، كمّله الأول',
+            }
+          }
+        }
+        return { ok: true }
+      }
+      /* (ز22) المُسعّر من غير وصول = اختياري صامت — مش بيحجب ومش بيعدّ «اللي قبله» */
+      if (trackable && v.price && Number(v.price) > 0) {
+        var acc = await db.videoAccess.findUnique({
           where: { videoId_studentId: { videoId: v.id, studentId: String(studentId) } },
         }).catch(() => null)
         if (!acc) {
-          const pay = await db.payment.findFirst({
+          var pay = await db.payment.findFirst({
             where: { studentId: String(studentId), videoId: v.id, status: 'approved' },
           }).catch(() => null)
-          if (!pay) continue // مش وصول له أصلاً — مش بيحجب اللي بعده
+          if (!pay) continue
         }
       }
-      const prog = await db.videoProgress.findUnique({
-        where: { studentId_videoId: { studentId, videoId: v.id } },
-      }).catch(() => null)
-      const ratio = prog && prog.totalSeconds > 0 ? prog.watchedSeconds / prog.totalSeconds : 0
-      if (ratio < SEQ_UNLOCK_RATIO) {
-        return {
-          ok: false,
-          code: 423,
-          reason: 'الفيديو ده هيتفتح أول ما تشوف الفيديو اللي قبله كامل (100%) — كمّل مشاهدة الفيديو اللي قبله الأول',
-        }
-      }
-      break // أقرب فيديو قبله قابل للتتبع خلص → الفيديو ده مفتوح
+      if (trackable) prevTrackable = v
     }
+    // الهدف مش في سلسلة الطالب (مخفي بجدولة مجموعات مثلًا) — الوصول بيتحكم فيه computePlayback
     return { ok: true }
   } catch (e) {
     // أي خطأ داخلي → ممنوع نمنع طالب بريء من المشاهدة بسبب عطل تقني
