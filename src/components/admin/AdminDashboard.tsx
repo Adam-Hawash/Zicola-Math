@@ -5016,6 +5016,55 @@ function ContentManager<T extends { id: string; grade: string; createdAt: string
   )
 }
 
+/* ========== (و119) تحليل قايمة الصفحات المكتوبة بإيدي المستر ==========
+   طلب المستر الحرفي: «عاوز آخذ الواجب صفحة 7 وصفحة 9، عاوز أشيل 8 —
+   اكتب صفحات الواجب … صفحة 7 صفحة 9 صفحة 20 أنا أكتب لكن اللي مش ضمنهم
+   أكيد مش عاوزه» — بيفهم:
+   • الصفحات المتفرقة: «7، 9، 20» أو «7 و9 و20» أو «7 9 20» أو «صفحة 7 صفحة 9»
+   • النطاقات المتتالية: «12-15» أو «12 إلى 15» أو «12 الي 15»
+   • الأرقام العربي: «٧، ٩، ٢٠»
+   النتيجة: قايمة مرتبة من غير تكرار — واللي مش مكتوب **عمره ما بيتقرا** */
+export function parsePageSpecRaw(text: string): number[] {
+  var t = String(text || '')
+  t = t.replace(/[\u0660-\u0669]/g, function (d: string) { return String(d.charCodeAt(0) - 0x0660) })
+  t = t.replace(/[\u06F0-\u06F9]/g, function (d: string) { return String(d.charCodeAt(0) - 0x06F0) })
+  t = t.replace(/صفحة|صفحات/g, ' ')
+  t = t.replace(/و/g, ',')
+  t = t.replace(/\s*(?:إلى|الي|\bto\b|–|—|-)\s*/gi, '-')
+  t = t.replace(/،/g, ',')
+  var out: Record<number, boolean> = {}
+  var parts = t.split(/[,;\s]+/)
+  for (var i = 0; i < parts.length; i++) {
+    var p = parts[i].trim()
+    if (!p) continue
+    var m = p.match(/^(\d+)\s*(?:[-–—]|to)\s*(\d+)$/i)
+    if (m) {
+      var a = parseInt(m[1], 10), b = parseInt(m[2], 10)
+      if (isNaN(a) || isNaN(b) || a < 1) continue
+      if (a > b) { var tmp = a; a = b; b = tmp }
+      if (b - a > 300) b = a + 300 /* أمان — نطاق مهول = غلطة كتابة */
+      for (var n = a; n <= b; n++) out[n] = true
+      continue
+    }
+    var n2 = parseInt(p, 10)
+    if (!isNaN(n2) && n2 > 0) out[n2] = true
+  }
+  var arr: number[] = []
+  for (var k in out) {
+    var v = parseInt(k, 10)
+    if (v >= 1) arr.push(v)
+  }
+  arr.sort(function (x: number, y: number) { return x - y })
+  return arr
+}
+
+/* نفس التحليل + حصر الصفحات بالموجود فعلًا في الكتاب (maxPage) */
+export function parsePageSpec(text: string, maxPage: number): number[] {
+  var listed = parsePageSpecRaw(text)
+  if (maxPage <= 0) return listed
+  return listed.filter(function (n: number) { return n <= maxPage })
+}
+
 /* ========== AI EXTRACTION PANEL ========== */
 function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; adminId?: string }) {
   const gradesList = useGradesList()
@@ -5045,8 +5094,11 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
      بفتح كتاب كبير، أحدد صفحات، يجيب كل الأسئلة أو أهم N سؤال بالترتيب) */
   const [bookFile, setBookFile] = useState<File | null>(null)
   const [bookNumPages, setBookNumPages] = useState(0)
-  const [bookFrom, setBookFrom] = useState(1)
-  const [bookTo, setBookTo] = useState(1)
+  /* (و119 — طلب المستر: «عاوز آخذ الواجب صفحة 7 وصفحة 9، عاوز أشيل 8»)
+     قايمة صفحات بإيدي المستر مش نطاق — اللي مش مكتوب عمره ما بيتقرا */
+  const [bookPagesText, setBookPagesText] = useState('')
+  /* (و119) زرار «احفظ في المكتبة» — بالملف (رفع) أو باللينك (من غير رفع) */
+  const [bookSaving, setBookSaving] = useState(false)
   const [bookMode, setBookMode] = useState<'all' | 'top'>('all')
   const [bookCount, setBookCount] = useState(10)
   const [bookName, setBookName] = useState('')
@@ -5243,7 +5295,7 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
     setLessonId('')
     setExamShowResult(false); setExamTimeLimit(''); setExamScheduledAt('')
     /* (2026-و40) تصفير وضع الكتاب */
-    setBookFile(null); setBookNumPages(0); setBookFrom(1); setBookTo(1)
+    setBookFile(null); setBookNumPages(0); setBookPagesText('')
     setBookMode('all'); setBookCount(10); setBookName(''); bookDocRef.current = null
     /* (2026-و40-w) تصفير وضع أكتر من ملف */
     setAppendingFile(false); setFileBatchCount(0)
@@ -5345,7 +5397,7 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
   var startAppendFile = function () {
     setAppendingFile(true)
     setFile(null); setFileUrl(''); sourceMediaRef.current = ''
-    setBookFile(null); setBookNumPages(0); setBookFrom(1); setBookTo(1); bookDocRef.current = null
+    setBookFile(null); setBookNumPages(0); setBookPagesText(''); bookDocRef.current = null
     setStatusMsg('اختار الملف التاني وابعت استخراج — أسئلته هتتنزّل تحت الحالية (' + extractedQuestions.length + ' سؤال)')
     setStep(2)
   }
@@ -5356,8 +5408,15 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
   /* (2026-و106) جاهزية وضع «من درس» — درس مختار */
   var canExtractLesson = !!lessonId
   /* (2026-و40) جاهزية وضع الكتاب: ملف مفتوح + نطاق صالح (≤30 صفحة) */
-  var bookPagesSelected = bookNumPages > 0 ? (bookTo - bookFrom + 1) : 0
-  var canExtractBook = !!bookFile && bookNumPages > 0 && bookFrom >= 1 && bookTo >= bookFrom && bookTo <= bookNumPages && bookPagesSelected <= 30
+  var bookPages = bookNumPages > 0 ? parsePageSpec(bookPagesText, bookNumPages) : []
+  var bookPagesSelected = bookPages.length
+  var bookPagesOutOfRange = bookNumPages > 0 && bookPagesText.trim() !== '' && (function () {
+    var listed = parsePageSpecRaw(bookPagesText)
+    for (var i = 0; i < listed.length; i++) { if (listed[i] < 1 || listed[i] > bookNumPages) return true }
+    return false
+  })()
+  /* (و119) جاهزية الاستخراج: ملف مفتوح + قايمة صفحات مفهومة — من غير حد أقصى */
+  var canExtractBook = !!bookFile && bookPagesSelected >= 1 && !bookPagesOutOfRange
   var canExtract = inputMode === 'youtube' ? canExtractYoutube : inputMode === 'book' ? canExtractBook : inputMode === 'lesson' ? canExtractLesson : canExtractFile
 
   var handleExtract = async function() {
@@ -5775,7 +5834,7 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
 
   /* ===== (2026-و40) وضع الكتاب ===== */
   var handleBookFile = async function(f: File | null) {
-    setBookFile(f); bookDocRef.current = null; setBookNumPages(0); setBookFrom(1); setBookTo(1)
+    setBookFile(f); bookDocRef.current = null; setBookNumPages(0); setBookPagesText('')
     if (!f) return
     setBookPdfLoading(true)
     try {
@@ -5818,12 +5877,12 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
       } catch (eH) {}
       var baseName = (realName || 'كتاب من رابط').replace(/\.pdf$/i, '').trim() || 'كتاب من رابط'
       var file = new File([blob], realName ? realName : ('book-' + Date.now() + '.pdf'), { type: 'application/pdf' })
-      setBookFile(file); bookDocRef.current = null; setBookNumPages(0); setBookFrom(1); setBookTo(1)
+      setBookFile(file); bookDocRef.current = null; setBookNumPages(0); setBookPagesText('')
       var opened = await openPdf(file)
       bookDocRef.current = opened.doc
       setBookNumPages(opened.numPages)
       setBookName(baseName); setTitle(function (t: string) { return (t && String(t).trim()) || baseName })
-      setBookFrom(1); setBookTo(Math.min(opened.numPages, 30))
+      setBookPagesText('')
       toast.success('اتفتح الكتاب من الرابط — عدد الصفحات: ' + opened.numPages + ' — حدد الصفحات واضغط استخراج')
     } catch (e: any) {
       toast.error('الرابط ما اتنفذش: ' + (e && e.message ? e.message : 'حصلت مشكلة'))
@@ -5868,14 +5927,82 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
       var opened = await openPdf(file)
       bookDocRef.current = opened.doc
       setBookNumPages(opened.numPages)
-      setBookFrom(1)
-      setBookTo(Math.min(opened.numPages, 30))
+      setBookPagesText('')
       toast.success('اتفتح «' + (b.title || 'الكتاب') + '» — ' + opened.numPages + ' صفحة — حدد الصفحات واضغط استخراج من الصفحات')
       setShowSavedBooks(false)
     } catch (e: any) {
       toast.error(e && e.message ? e.message : 'حصلت مشكلة في فتح الكتاب')
     }
     setBookPdfLoading(false)
+  }
+
+  /* ===== (و119) «احفظ في المكتبة» — طلب المستر الحرفي: «لما أحط اللينك أول ما
+     أدوس يكون في زرار صغير زي Math Genius أدوس أحفظ في المكتبة» — وضعين:
+     بملف (رفع فعلي) أو بلينك بس (من غير رفع — درايف وأي موقع) ===== */
+  var saveLinkBookToLibrary = async function () {
+    if (!adminId) { toast.error('مفيش جلسة أدمن — سجل دخول تاني'); return }
+    if (bookSaving) return
+    if (!bookUrl.trim()) { toast.error('الصق لينك الكتاب الأول'); return }
+    var t = (bookName.trim() || title.trim() || '').trim()
+    if (!t) {
+      var typedL = window.prompt('اكتب عنوان الكتاب عشان يتخزن في المكتبة:', 'كتاب من رابط') || ''
+      t = typedL.trim()
+    }
+    if (!t) return
+    var g = bookGradeFilter || grade || ''
+    setBookSaving(true)
+    setStatusMsg('جاري حفظ «' + t + '» في المكتبة باللينك…')
+    try {
+      var resL = await fetch('/api/admin/books?adminId=' + encodeURIComponent(adminId), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: t, description: '', sourceUrl: bookUrl.trim(), grade: g, usage: 'both' }),
+      })
+      var dL = await resL.json()
+      if (!resL.ok) throw new Error(dL.error || 'فشل حفظ الكتاب في المكتبة')
+      toast.success('اتحفظ «' + t + '» في المكتبة باللينك ✓ — هيفضل ثابت في قايمة «الكتب المحفوظة» هنا وفي تاب «الكتب والملازم» — وكل مرة تفتحه بالضغط عليه بس وتطلع منه واجبات وامتحانات زي ما أنت عايز', { duration: 10000 })
+      await loadSavedBooks()
+      setShowSavedBooks(true)
+    } catch (e: any) {
+      toast.error('مقدرتش أحفظ الكتاب: ' + String((e && e.message) || e), { duration: 8000 })
+    }
+    setStatusMsg('')
+    setBookSaving(false)
+  }
+
+  var saveBookToLibrary = async function () {
+    if (!bookFile) { toast.error('افتح الكتاب الأول (ملف أو لينك) وبعدين احفظه'); return }
+    if (!adminId) { toast.error('مفيش جلسة أدمن — سجل دخول تاني'); return }
+    if (bookSaving) return
+    var t = (bookName.trim() || title.trim() || '').trim()
+    if (!t) {
+      var typed = window.prompt('اكتب عنوان الكتاب عشان يتخزن في المكتبة:', (bookFile as File).name.replace(/\.pdf$/i, '') || '') || ''
+      t = typed.trim()
+    }
+    if (!t) return
+    var g = bookGradeFilter || grade || ''
+    setBookSaving(true)
+    setStatusMsg('جاري حفظ «' + t + '» في المكتبة… بيرفع الملف')
+    try {
+      var up = await chunkedUpload(bookFile as File, 'books', function (p: number) {
+        setStatusMsg('جاري حفظ الكتاب في المكتبة… ' + p + '%')
+      })
+      if (!up || !up.filePath) throw new Error('فشل رفع ملف الكتاب')
+      var res = await fetch('/api/admin/books?adminId=' + encodeURIComponent(adminId), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: t, description: '', filePath: up.filePath, fileName: (bookFile as File).name, fileType: 'application/pdf', sizeBytes: (bookFile as File).size, grade: g, usage: 'both' }),
+      })
+      var d = await res.json()
+      if (!res.ok) throw new Error(d.error || 'فشل حفظ الكتاب في المكتبة')
+      toast.success('اتحفظ «' + t + '» في المكتبة ✓ — هيفضل ثابت في قايمة «الكتب المحفوظة» هنا وفي تاب «الكتب والملازم» — وكل مرة تفتحه بالضغط عليه بس وتطلع منه واجبات وامتحانات زي ما أنت عايز', { duration: 10000 })
+      await loadSavedBooks()
+      setShowSavedBooks(true)
+    } catch (e: any) {
+      toast.error('مقدرتش أحفظ الكتاب: ' + String((e && e.message) || e), { duration: 8000 })
+    }
+    setStatusMsg('')
+    setBookSaving(false)
   }
 
   /* مفتاح منع التكرار: نص السؤال مطبّع (فراغات/ترقيم/طول 120) */
@@ -5887,8 +6014,9 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
     if (!canExtractBook || extracting) return
     var doc = bookDocRef.current
     if (!doc) { toast.error('افتح ملف الكتاب الأول'); return }
-    var from = bookFrom, to = bookTo
-    var total = to - from + 1
+    if (bookPages.length === 0) { toast.error('اكتب أرقام الصفحات الأول — مثال: 7، 9، 12-15'); return }
+    var pagesList = bookPages.slice()
+    var total = pagesList.length
     var CHUNK = 5
     var chunks = Math.ceil(total / CHUNK)
     setExtracting(true)
@@ -5897,14 +6025,13 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
       var seenKeys: any = {}
       var skippedChunks = 0
       for (var c = 0; c < chunks; c++) {
-        var cFrom = from + c * CHUNK
-        var cTo = Math.min(to, cFrom + CHUNK - 1)
-        setStatusMsg('جاري قراءة الصفحات ' + cFrom + '–' + cTo + '… (' + (c + 1) + '/' + chunks + ')')
+        var batch = pagesList.slice(c * CHUNK, c * CHUNK + CHUNK)
+        setStatusMsg('جاري قراءة الصفحات ' + batch.join('، ') + '… (' + (c + 1) + '/' + chunks + ')')
         var pages: any[] = []
-        for (var pn = cFrom; pn <= cTo; pn++) {
+        for (var pi = 0; pi < batch.length; pi++) {
           /* (و52) 1700/0.85 — نفس الصور مصدر للقص السيرفري */
-          var img = await renderPageToJpeg(doc, pn, 1700, 0.85)
-          pages.push({ n: pn, image: img })
+          var img = await renderPageToJpeg(doc, batch[pi], 1700, 0.85)
+          pages.push({ n: batch[pi], image: img })
         }
         var extractedChunk: any = null
         /* (Z-40) نفس المعالجة: مهلات متدرجة + 3 محاولات — القطعة العالقة بنتجاوز بالفعل هنا */
@@ -5958,17 +6085,17 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
         collected = picked || collected.slice(0, bookCount)
       }
       if (collected.length === 0) {
-        toast.error('مقدرتش أستخرج أسئلة من الصفحات دي — جرب نطاق تاني أو تأكد إن الصفحات فيها أسئلة مطبوعة واضحة')
+        toast.error('مقدرتش أستخرج أسئلة من الصفحات دي — جرب صفحات تانية أو تأكد إن الصفحات فيها أسئلة مطبوعة واضحة')
         setStatusMsg('')
         setExtracting(false)
         return
       }
-      if (!title.trim() && !appendingFile) setTitle(bookName.trim() || ('كتاب — صفحات ' + from + '–' + to))
+      if (!title.trim() && !appendingFile) setTitle(bookName.trim() || ('كتاب — صفحات ' + pagesList.join('، ')))
       setStatusMsg('')
       /* (2026-و40-w) قص الرسومات من مستند الكتاب المفتوح + دمج أكتر من ملف */
       await finishExtraction(collected, { doc: doc, file: bookFile })
-      var okMsg = (appendingFile ? 'تمت إضافة ' : 'تم استخراج ') + collected.length + (appendingFile ? ' سؤال من الملف الجديد!' : ' سؤال من صفحات الكتاب!')
-      if (skippedChunks > 0) okMsg += ' (فشلت ' + skippedChunks + ' دفعة صفحات — جرب نطاقها تاني)'
+      var okMsg = (appendingFile ? 'تمت إضافة ' : 'تم استخراج ') + collected.length + (appendingFile ? ' سؤال من الملف الجديد!' : (' سؤال من ' + total + ' صفحة من الكتاب!'))
+      if (skippedChunks > 0) okMsg += ' (فشلت ' + skippedChunks + ' دفعة صفحات — جرب صفحاتها تاني)'
       toast.success(okMsg)
     } catch (err: any) {
       if (err && err.name === 'AbortError') { toast.error('انتهت مهلة الاستخراج - حاول مرة أخرى') }
@@ -6176,6 +6303,13 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
                 {bookPdfLoading ? <Loader2 className="h-4 w-4 ml-2 animate-spin" /> : <BookOpen className="h-4 w-4 ml-2" />}
                 {bookFile ? bookFile.name : 'اختر ملف الكتاب (PDF)'}
               </Button>
+              {/* (و119) زرار «احفظ في المكتبة» — يظهر أول ما ملف الكتاب يفتح */}
+              {bookFile && (
+                <Button type="button" variant="outline" onClick={saveBookToLibrary} disabled={bookSaving} title="حفظ الكتاب في المكتبة — هيفضل ثابت هنا وفي تاب الكتب والملازم، وكل مرة تفتحه بالضغط عليه بس" className="border-emerald-400/50 text-emerald-700 dark:text-emerald-400 shrink-0">
+                  {bookSaving ? <Loader2 className="h-4 w-4 ml-1 animate-spin" /> : <Save className="h-4 w-4 ml-1" />}
+                  احفظ في المكتبة
+                </Button>
+              )}
             </div>
             {/* (و45 بطلب المستر) الاستخراج بملف أو لينك — في وضع الكتاب كمان:
                لو الكتاب على لينك (Drive أو أي موقع) حط اللينك وهيتحمل من خلال
@@ -6190,6 +6324,13 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
                   افتح الرابط
                 </Button>
               </div>
+              {/* (و119) زرار «احفظ في المكتبة» بلصق اللينك — بيتحفظ باللينك من غير رفع */}
+              {bookUrl.trim() && (
+                <Button type="button" variant="outline" onClick={saveLinkBookToLibrary} disabled={bookSaving} title="حفظ الكتاب بالمكتبة باللينك — من غير رفع — هيفضل ثابت في الكتب المحفوظة وكل مرة تفتحه بالضغط عليه بس" className="w-full border-emerald-400/50 text-emerald-700 dark:text-emerald-400">
+                  {bookSaving ? <Loader2 className="h-4 w-4 ml-2 animate-spin" /> : <Save className="h-4 w-4 ml-2" />}
+                  احفظ في المكتبة
+                </Button>
+              )}
               <p className="text-[10px] text-muted-foreground">لو حطيت ملف ورابط، الملف هو اللي هيفتح. اللينك بيتحمل عن طريق المنصة (حماية + بلا مشاكل CORS) — مستحسن للكتب الكبيرة على Drive</p>
             </div>
             {/* (2026-و44 + و107) الكتب المحفوظة — تدفق مرتب بطلب المستر:
@@ -6227,20 +6368,22 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
             </div>
             {bookFile && <p className="text-xs text-muted-foreground text-center">{(bookFile.size / 1024 / 1024).toFixed(1)} MB</p>}
             {bookNumPages > 0 && <p className="text-xs text-center font-medium text-sky-600 dark:text-sky-400">عدد صفحات الكتاب: {bookNumPages}</p>}
-            {/* (و107) ٣ — تحديد نطاق الصفحات */}
-            <p className="text-xs font-bold text-sky-700 dark:text-sky-300">٣) حدد الصفحات المطلوبة</p>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label className="text-xs">من صفحة</Label>
-                <Input type="number" min={1} max={bookNumPages || undefined} value={bookFrom} onChange={function(e) { var v = parseInt(e.target.value) || 1; setBookFrom(v); if (bookTo < v) setBookTo(v) }} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">إلى صفحة</Label>
-                <Input type="number" min={1} max={bookNumPages || undefined} value={bookTo} onChange={function(e) { setBookTo(parseInt(e.target.value) || 1) }} />
-              </div>
+            {/* (و119) ٣ — قايمة الصفحات بإيدي المستر — طلب المستر الحرفي:
+                «عاوز آخذ الواجب صفحة 7 وصفحة 9، عاوز أشيل 8» — اللي مش مكتوب مش بيتقرا أبدًا */}
+            <p className="text-xs font-bold text-sky-700 dark:text-sky-300">٣) اكتب أرقام الصفحات المطلوبة</p>
+            <div className="space-y-1.5">
+              <Input value={bookPagesText} onChange={function(e) { setBookPagesText(e.target.value) }} placeholder="مثال: 7، 9، 12-15، 20 — أو 1-30 لنطاق كامل" />
+              <p className="text-[10px] text-muted-foreground leading-relaxed">
+                اكتب كل صفحة مفصولة بفاصلة أو مسافة أو «و» — ولو صفحات متتالية اكتب أولها وآخرها بشرطة (مثال: 12-15) — والأرقام العربي (٧) بتتفهم عادي. اللي مش مكتوب عمره ما هيتقرا.
+              </p>
             </div>
-            {bookNumPages > 0 && (bookFrom < 1 || bookTo > bookNumPages || bookTo < bookFrom) && (
-              <p className="text-[11px] text-red-500">النطاق غير صحيح — الصفحات من 1 إلى {bookNumPages}</p>
+            {bookNumPages > 0 && bookPagesOutOfRange && (
+              <p className="text-[11px] text-red-500">فيه رقم صفحة خارج الكتاب — الصفحات من 1 إلى {bookNumPages}</p>
+            )}
+            {bookPagesSelected > 0 && (
+              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 p-2 rounded-md">
+                هيتستخرج {bookPagesSelected} صفحة: {bookPages.slice(0, 12).join('، ')}{bookPages.length > 12 ? ' …' : ''}
+              </p>
             )}
             {bookPagesSelected > 30 && (
               <p className="text-[11px] text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 p-2 rounded-md">اخترت {bookPagesSelected} صفحة — دي كتير. اشتغل على مراحل (مثلاً 1–30 وبعدين 31–60) عشان الذاكرة والوقت.</p>
