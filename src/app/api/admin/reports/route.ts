@@ -90,11 +90,25 @@ export async function GET(request: NextRequest) {
 
       /* الواجبات اللي قدمها */
       var hwRaw = await db.$queryRawUnsafe(
-        `SELECT hr.score, hr.maxScore, hr.submittedAt, h.title AS hwTitle
+        `SELECT hr.homeworkId, hr.attemptNumber, hr.score, hr.maxScore, hr.submittedAt, h.title AS hwTitle
          FROM HomeworkResult hr INNER JOIN Homework h ON hr.homeworkId = h.id
          WHERE hr.studentId = ? ORDER BY hr.submittedAt DESC`,
         id
       ) || []
+
+      /* (ز30) المحاولات السبع: آخر محاولة بس لكل واجب في التقرير */
+      ;(function () {
+        var bestR: Record<string, any> = {}
+        hwRaw.forEach(function (r: any) {
+          var hid = String(r.homeworkId || '')
+          var prev = bestR[hid]
+          if (!prev) { bestR[hid] = r; return }
+          var aNew = Number(r.attemptNumber) || 0
+          var aOld = Number(prev.attemptNumber) || 0
+          if (aNew > aOld || String(r.submittedAt || '') > String(prev.submittedAt || '')) bestR[hid] = r
+        })
+        hwRaw = Object.keys(bestR).map(function (k) { return bestR[k] })
+      })()
 
       /* كل فيديوهات صفه + تقدمه فيها (المشاهدة لكل فيديو) */
       var allVideos = await db.$queryRawUnsafe('SELECT id, title, grade FROM Video') || []
@@ -224,11 +238,25 @@ export async function GET(request: NextRequest) {
         ...ids
       ) || []
       var hwAll = await db.$queryRawUnsafe(
-        `SELECT hr.studentId, hr.score, hr.maxScore, hr.submittedAt, h.title
+        `SELECT hr.studentId, hr.homeworkId, hr.attemptNumber, hr.score, hr.maxScore, hr.submittedAt, h.title
          FROM HomeworkResult hr INNER JOIN Homework h ON hr.homeworkId = h.id
          WHERE hr.studentId IN (${ph})`,
         ...ids
       ) || []
+
+      /* (ز30) المحاولات السبع: آخر محاولة بس لكل (طالب × واجب) في التقرير المجمع */
+      ;(function () {
+        var bestAgg: Record<string, any> = {}
+        hwAll.forEach(function (r: any) {
+          var key = String(r.studentId || '') + '::' + String(r.homeworkId || '')
+          var prev = bestAgg[key]
+          if (!prev) { bestAgg[key] = r; return }
+          var aNew = Number(r.attemptNumber) || 0
+          var aOld = Number(prev.attemptNumber) || 0
+          if (aNew > aOld || String(r.submittedAt || '') > String(prev.submittedAt || '')) bestAgg[key] = r
+        })
+        hwAll = Object.keys(bestAgg).map(function (k) { return bestAgg[k] })
+      })()
 
       /* كل الفيديوهات + كل التقدم — والمطابقة بالصف في الذاكرة
          (كل طالب بيتحسب against فيديوهات صفه هو) */

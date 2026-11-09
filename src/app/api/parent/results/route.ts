@@ -81,11 +81,22 @@ export async function GET(request: NextRequest) {
     var hwResults: any[] = []
     var examResults: any[] = []
     try {
-      hwResults = await db.homeworkResult.findMany({
+      var allHwRes = await db.homeworkResult.findMany({
         where: { studentId: student.id },
         orderBy: { submittedAt: 'desc' },
-        take: 100,
+        take: 300,
       })
+      /* (ز30) المحاولات السبع: نعرض آخر محاولة بس لكل واجب (هي النهائية) */
+      var bestHw: Record<string, any> = {}
+      ;(allHwRes || []).forEach(function (r: any) {
+        var hid = String(r.homeworkId || '')
+        var prev = bestHw[hid]
+        if (!prev) { bestHw[hid] = r; return }
+        var aNew = Number(r.attemptNumber) || 1
+        var aOld = Number(prev.attemptNumber) || 1
+        if (aNew > aOld) bestHw[hid] = r
+      })
+      hwResults = Object.keys(bestHw).map(function (k) { return bestHw[k] })
     } catch (hErr) { hwResults = [] }
     try {
       examResults = await db.examResult.findMany({

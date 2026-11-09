@@ -96,7 +96,8 @@ export async function GET(request: NextRequest) {
         for (var i1 = 0; i1 < g1.length; i1++) examCounts[String(g1[i1].examId)] = Number(g1[i1].c) || 0
       } catch (e) {}
       try {
-        var g2: any[] = await db.$queryRawUnsafe('SELECT homeworkId, COUNT(*) AS c FROM HomeworkResult GROUP BY homeworkId')
+        /* (ز30) المحاولات السبع: عدد اللي سلّموا = عدد الطلاب الفريدين مش عدد المحاولات */
+        var g2: any[] = await db.$queryRawUnsafe('SELECT homeworkId, COUNT(DISTINCT studentId) AS c FROM HomeworkResult GROUP BY homeworkId')
         for (var i2 = 0; i2 < g2.length; i2++) hwCounts[String(g2[i2].homeworkId)] = Number(g2[i2].c) || 0
       } catch (e) {}
 
@@ -238,7 +239,18 @@ export async function GET(request: NextRequest) {
       baseQuestions = parseJson(hw.questions) || []
       var hwResults: any[] = []
       try {
-        hwResults = await db.$queryRawUnsafe('SELECT id, studentId, score, maxScore, answers, writingResults, submittedAt FROM HomeworkResult WHERE homeworkId = ? ORDER BY submittedAt DESC', id)
+        var hwRowsAll = await db.$queryRawUnsafe('SELECT id, studentId, homeworkId, attemptNumber, score, maxScore, answers, writingResults, submittedAt FROM HomeworkResult WHERE homeworkId = ? ORDER BY submittedAt DESC', id)
+        /* (ز30) المحاولات السبع: تحليل الأسئلة على آخر محاولة لكل طالب بس */
+        var bestSt: Record<string, any> = {}
+        ;(hwRowsAll || []).forEach(function (r: any) {
+          var sid = String(r.studentId || '')
+          var prev = bestSt[sid]
+          if (!prev) { bestSt[sid] = r; return }
+          var aNew = Number(r.attemptNumber) || 0
+          var aOld = Number(prev.attemptNumber) || 0
+          if (aNew > aOld || String(r.submittedAt || '') > String(prev.submittedAt || '')) bestSt[sid] = r
+        })
+        hwResults = Object.keys(bestSt).map(function (k) { return bestSt[k] })
       } catch (e) {
         try {
           var pr2 = await (db as any).homeworkResult.findMany({ where: { homeworkId: id }, orderBy: { submittedAt: 'desc' } })

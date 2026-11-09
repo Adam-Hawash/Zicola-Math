@@ -58,6 +58,9 @@ export async function GET(request: NextRequest) {
       try { await db.$executeRawUnsafe('ALTER TABLE HomeworkResult ADD COLUMN answers TEXT DEFAULT ""') } catch (e) {}
       try { await db.$executeRawUnsafe('ALTER TABLE HomeworkResult ADD COLUMN submittedAt DATETIME DEFAULT CURRENT_TIMESTAMP') } catch (e) {}
       try { await db.$executeRawUnsafe('ALTER TABLE HomeworkResult ADD COLUMN writingResults TEXT DEFAULT ""') } catch (e) {}
+      /* (ز30) أعمدة المحاولات السبع — متسامحة لو موجودة */
+      try { await db.$executeRawUnsafe('ALTER TABLE HomeworkResult ADD COLUMN attemptNumber INTEGER NOT NULL DEFAULT 1') } catch (e) {}
+      try { await db.$executeRawUnsafe('ALTER TABLE HomeworkResult ADD COLUMN penaltyPoints REAL NOT NULL DEFAULT 0') } catch (e) {}
 
       // Get homework info first (title, questions)
       var hwInfo: any = null
@@ -78,11 +81,13 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Homework not found' }, { status: 404 })
       }
 
-      // Get all results for this homework using RAW SQL with answers + stored writing verdicts
+      /* (ز30) المحاولات السبع: الطالب ممكن يكون ليه أكتر من محاولة على نفس
+         الواجب — الأدمن يشوف آخر محاولة بس (هي الدرجة النهائية) + عدد
+         محاولاته، من غير تكرار صفوف لكل محاولة */
       var rawResults: any[] = []
       try {
         rawResults = await db.$queryRawUnsafe(
-          'SELECT id, homeworkId, studentId, score, maxScore, submittedAt, answers, writingResults FROM HomeworkResult WHERE homeworkId = ? ORDER BY submittedAt DESC',
+          'SELECT id, homeworkId, studentId, score, maxScore, submittedAt, answers, writingResults, attemptNumber, penaltyPoints FROM HomeworkResult WHERE homeworkId = ? ORDER BY submittedAt DESC',
           homeworkId
         ) || []
       } catch (e) {
@@ -102,6 +107,22 @@ export async function GET(request: NextRequest) {
           } catch (e2) { rawResults = [] }
         }
       }
+
+      /* (ز30) تجميع المحاولات: آخر محاولة لكل طالب + عدّاد محاولاته */
+      var attemptsCountMap: Record<string, number> = {}
+      ;(function () {
+        var best: Record<string, any> = {}
+        ;(rawResults || []).forEach(function (r: any) {
+          var sid = String(r.studentId || '')
+          attemptsCountMap[sid] = (attemptsCountMap[sid] || 0) + 1
+          var prev = best[sid]
+          if (!prev) { best[sid] = r; return }
+          var aNew = Number(r.attemptNumber) || 1
+          var aOld = Number(prev.attemptNumber) || 1
+          if (aNew > aOld || (!r.attemptNumber && !prev.attemptNumber && String(r.submittedAt || '') > String(prev.submittedAt || ''))) best[sid] = r
+        })
+        rawResults = Object.keys(best).map(function (k) { return best[k] })
+      })()
 
       /* (2026-و111) وضع فحص الطالب: studentId + homeworkId مع بعض =
          «هل سلّم الطالب ده الواجب ده؟» — الفحص اللي بيحصل قبل فتح الواجب
@@ -300,6 +321,11 @@ export async function GET(request: NextRequest) {
         results.push({
           id: r.id,
           studentId: r.studentId,
+          /* (ز30) عدد محاولات الطالب على الواجب ده — بورتال الطالب بيستخدمه
+             عشان يفتح إعادة المحاولة لحد 7 */
+          attempts: attemptsCountMap[String(r.studentId)] || 1,
+          attemptNumber: Number(r.attemptNumber) || 1,
+          penaltyPoints: Number(r.penaltyPoints) || 0,
           student: {
             name: student.name || 'طالب محذوف',
             phone: student.phone || '',
@@ -382,7 +408,7 @@ export async function GET(request: NextRequest) {
       try {
         rows = await withRetry(function() {
           return db.$queryRawUnsafe(
-            'SELECT id, homeworkId, studentId, score, maxScore FROM HomeworkResult WHERE studentId = ?',
+            'SELECT id, homeworkId, studentId, score, maxScore, submittedAt, attemptNumber FROM HomeworkResult WHERE studentId = ?',
             studentId
           )
         }) as any[]
@@ -393,6 +419,23 @@ export async function GET(request: NextRequest) {
       console.error('Homework results (student) read failed after retry:', lastReadErr)
       return NextResponse.json({ results: [], error: 'retry' })
     }
+
+    /* (ز30) المحاولات السبع: الطالب ممكن يعيد نفس الواجب لحد 7 مرات —
+       بنرجّع **آخر محاولة بس** لكل واجب (هي الدرجة النهائية) + خريطة
+       عدد المحاولات (homeworkId → عدد) عشان العميل يفتح زرار
+       «حاول تاني» ويحسب المحاولة السابعة التلقائية */
+    var attemptsMap: Record<string, number> = {}
+    var latest: Record<string, any> = {}
+    ;(rows || []).forEach(function(r: any) {
+      var hid = String(r.homeworkId || '')
+      attemptsMap[hid] = (attemptsMap[hid] || 0) + 1
+      var prev = latest[hid]
+      if (!prev) { latest[hid] = r; return }
+      var aNew = Number(r.attemptNumber) || 1
+      var aOld = Number(prev.attemptNumber) || 1
+      if (aNew > aOld || (!r.attemptNumber && !prev.attemptNumber && String(r.submittedAt || '') > String(prev.submittedAt || ''))) latest[hid] = r
+    })
+    rows = Object.keys(latest).map(function(k) { return latest[k] })
 
     /* (2026-و60) self-heal من ناحية الطالب — ده أهم مشغل للإصلاح:
        أول ما الطالب (أو ولي الأمر) يفتح واجباته وأي سؤال مقالي فضل ناقص
@@ -426,7 +469,7 @@ export async function GET(request: NextRequest) {
       }
     } catch (e) {}
 
-    return NextResponse.json({ results: rows || [] })
+    return NextResponse.json({ results: rows || [], attempts: attemptsMap })
   } catch (error) {
     console.error('Homework results error:', error)
     return NextResponse.json({ results: [] })

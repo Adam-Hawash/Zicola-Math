@@ -128,16 +128,20 @@ model Homework {
 }
 
 model HomeworkResult {
-  id          String   @id @default(cuid())
-  homeworkId  String
-  studentId   String
-  score       Float    @default(0)
-  maxScore    Float    @default(100)
-  answers     String   @default("")
-  submittedAt DateTime @default(now())
-  homework    Homework @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  id            String   @id @default(cuid())
+  homeworkId    String
+  studentId     String
+  score         Float    @default(0)
+  maxScore      Float    @default(100)
+  answers       String   @default("")
+  /* (ز30) المحاولات السبع — طلب المستر: 7 محاولات للكويز، من التالتة −2
+     ومن الخامسة −4، والسابعة بتتسلم تلقائي */
+  attemptNumber Int      @default(1)
+  penaltyPoints Float    @default(0)
+  submittedAt   DateTime @default(now())
+  homework      Homework @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
 
-  @@unique([studentId, homeworkId])
+  @@unique([studentId, homeworkId, attemptNumber])
 }
 
 model Exam {

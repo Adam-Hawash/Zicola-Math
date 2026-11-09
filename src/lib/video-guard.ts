@@ -357,18 +357,14 @@ export async function checkSequentialUnlock(
         }
         return { ok: true }
       }
-      /* (ز22) المُسعّر من غير وصول = اختياري صامت — مش بيحجب ومش بيعدّ «اللي قبله» */
-      if (trackable && v.price && Number(v.price) > 0) {
-        var acc = await db.videoAccess.findUnique({
-          where: { videoId_studentId: { videoId: v.id, studentId: String(studentId) } },
-        }).catch(() => null)
-        if (!acc) {
-          var pay = await db.payment.findFirst({
-            where: { studentId: String(studentId), videoId: v.id, status: 'approved' },
-          }).catch(() => null)
-          if (!pay) continue
-        }
-      }
+      /* (ز41) المُسعّر اختياري مطلق — مش بيحجب اللي بعده ومش بيعدّ «اللي قبله»
+         (طلب المستر الحرفي: «الفيديوهات المدفوعة تبقى اختياري، لو الطالب
+         ما شافوش يخش على الفيديو اللي بعده عادي، اللي أنا أحدد له سعر
+         يكون اختياري — أكد عليه عشان هي ساعات بتشتغل وساعات ما بتشتغلش»)
+         سبب التذبذب: القاعدة القديمة كانت بتستثني المدفوع بس لو مالوش وصول —
+         لو اشتراه وما شافوش كان يلزق. بقى: أي سعر أكبر من صفر = اختياري
+         (الدفع نفسه لسه مطلوب لفتح الفيديو نفسه زي ما هو) */
+      if (trackable && v.price && Number(v.price) > 0) continue
       if (trackable) prevTrackable = v
     }
     // الهدف مش في سلسلة الطالب (مخفي بجدولة مجموعات مثلًا) — الوصول بيتحكم فيه computePlayback
