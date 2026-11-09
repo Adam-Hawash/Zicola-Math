@@ -105,19 +105,31 @@ async function ensureTable() {
     // writingResults column — persisted AI verdicts (single source of truth)
     try { await db.$executeRawUnsafe('ALTER TABLE HomeworkResult ADD COLUMN writingResults TEXT DEFAULT \'\'') } catch (e) {}
 
-    /* (ز30) المحاولات السبع — طلب المستر: 7 محاولات للكويز بتاعة الواجب،
-       من أول المحاولة التالتة خصم درجتين، ومن أول الخامسة خصم 4 درجات،
-       والمحاولة السابعة بتتسلم تلقائي. العمودين الجداد + إسقاط القيد
-       القديم اللي كان بمنع أكتر من تسليم لنفس الطالب على نفس الواجب
-       (UNIQUE studentId+homeworkId) واستبداله بقيد بيشمل رقم المحاولة —
-       كل خطوة متسامحة (لو العمود موجود/الاندكس مش موجود ما يبوّظش حاجة) */
-    try { await db.$executeRawUnsafe('ALTER TABLE HomeworkResult ADD COLUMN attemptNumber INTEGER NOT NULL DEFAULT 1') } catch (e) {}
-    try { await db.$executeRawUnsafe('ALTER TABLE HomeworkResult ADD COLUMN penaltyPoints REAL NOT NULL DEFAULT 0') } catch (e) {}
-    try { await db.$executeRawUnsafe('DROP INDEX IF EXISTS "HomeworkResult_studentId_homeworkId_key"') } catch (e) {}
-    try { await db.$executeRawUnsafe('DROP INDEX IF EXISTS "HomeworkResult_studentId_homeworkId_attemptNumber_key"') } catch (e) {}
+    /* (محاولات 7) أعمدة المحاولات — ALTERs متسامحة (العمود موجود = الخطأ بيتتجاهل) */
+    try { await db.$executeRawUnsafe('ALTER TABLE HomeworkResult ADD COLUMN attemptNo INTEGER DEFAULT 1') } catch (e) {}
+    try { await db.$executeRawUnsafe('ALTER TABLE HomeworkResult ADD COLUMN attemptPenalty REAL DEFAULT 0') } catch (e) {}
+    try { await db.$executeRawUnsafe('ALTER TABLE HomeworkResult ADD COLUMN autoSubmitted INTEGER DEFAULT 0') } catch (e) {}
+
+    /* (ز41 interop) تسوية آمنة لأي صفوف كتبتها نسخة أقدم بنظام «صف لكل محاولة»
+       (أعمدة attemptNumber/penaltyPoints) — نظام المحاولات الحالي بيشيل صف واحد
+       لكل (طالب، واجب): بنحتفظ بآخر/أعلى محاولة لكل زوج ونحذف الباقي، وبعدها
+       بننقل رقم المحاولة والخصم لأعمدة النظام الحالي. على قاعدة نظيفة الخطوتين
+       no-op — وكلها متسامحة (أي خطأ ما يبوّظش التسليم) */
     try {
-      await db.$executeRawUnsafe('CREATE UNIQUE INDEX IF NOT EXISTS "HomeworkResult_studentId_homeworkId_attemptNumber_key" ON "HomeworkResult"("studentId", "homeworkId", "attemptNumber")')
-    } catch (e) {}
+      await db.$executeRawUnsafe(
+        'DELETE FROM HomeworkResult WHERE id IN (' +
+        'SELECT a.id FROM HomeworkResult a WHERE EXISTS (' +
+        'SELECT 1 FROM HomeworkResult b WHERE b.studentId = a.studentId AND b.homeworkId = a.homeworkId' +
+        ' AND (COALESCE(b.attemptNumber,0) > COALESCE(a.attemptNumber,0)' +
+        ' OR (COALESCE(b.attemptNumber,0) = COALESCE(a.attemptNumber,0) AND COALESCE(b.submittedAt,\'\') > COALESCE(a.submittedAt,\'\'))' +
+        ' OR (COALESCE(b.attemptNumber,0) = COALESCE(a.attemptNumber,0) AND COALESCE(b.submittedAt,\'\') = COALESCE(a.submittedAt,\'\') AND b.rowid > a.rowid))))'
+      )
+    } catch (eConsol) {}
+    try {
+      await db.$executeRawUnsafe(
+        'UPDATE HomeworkResult SET attemptNo = attemptNumber, attemptPenalty = penaltyPoints WHERE COALESCE(attemptNumber,0) > 1 AND COALESCE(attemptNo,1) <= 1'
+      )
+    } catch (eBackfill) {}
   } catch (e) {
     console.error('Ensure HomeworkResult table error:', e)
   }
@@ -148,42 +160,79 @@ export async function POST(request) {
 
     await ensureTable()
 
-    // Check attempts (ز30 — المحاولات السبع): بدل منع إعادة التسليم نهائيًا،
-    // بنعد المحاولات السابقة ونسلم محاولة جديدة برقمها لحد 7 — بعد كده يقفل
+    /* (محاولات 7) آلة حالات المحاولات — بدل الرفض المبكر المطلق:
+       - مفيش صف = محاولة 1 عادية
+       - محاولات 1-6 يدوية بخصومة درجات (1-2:0 / 3-4:2 / 5-6:4)
+       - attemptsUsed == 6 → التسليم التلقائي: الصف بيتعلّم attemptNo=7
+         و autoSubmitted=1 بأفضل نتيجة محفوظة (من غير إعادة تصحيح)
+       - attemptsUsed >= 7 → الواجب مقفول — رد 200 exhausted بالنتيجة المحفوظة */
     var attemptsUsed = 0
+    var prevBest: any = null
     try {
-      var cntRows = await db.$queryRawUnsafe(
-        'SELECT COUNT(*) AS cnt FROM HomeworkResult WHERE studentId = ? AND homeworkId = ?',
+      var existing = await db.$queryRawUnsafe(
+        'SELECT id, score, maxScore, attemptNo, attemptPenalty, autoSubmitted FROM HomeworkResult WHERE studentId = ? AND homeworkId = ? LIMIT 1',
         studentId, homeworkId
-      )
-      attemptsUsed = cntRows && cntRows.length > 0 ? (Number(cntRows[0].cnt) || 0) : 0
-    } catch (e) {
-      console.error('Count hw attempts error:', e)
-    }
-    if (attemptsUsed >= 7) {
-      /* خلصت المحاولات السبع — نرجّع آخر محاولة كأنها التسليم النهائي */
-      var finalRow: any = null
+      ) as any[]
+      if (existing && existing.length > 0) {
+        prevBest = existing[0]
+        var exNoRaw = Number(prevBest.attemptNo)
+        /* fallback: صف من قبل نظام المحاولات (عمود ناقص/فاضي) = محاولة 1 */
+        attemptsUsed = (!isNaN(exNoRaw) && exNoRaw > 0) ? exNoRaw : 1
+      }
+    } catch (eNoAttemptCols) {
+      /* أعمدة المحاولات مش متضافة (جدول قديم) — قراءة بالأعمدة الأساسية بس */
+      console.error('Check existing hw (attempt cols missing):', eNoAttemptCols)
       try {
-        var fr = await db.$queryRawUnsafe(
-          'SELECT id, score, maxScore FROM HomeworkResult WHERE studentId = ? AND homeworkId = ? ORDER BY attemptNumber DESC, submittedAt DESC LIMIT 1',
+        var existing2 = await db.$queryRawUnsafe(
+          'SELECT id, score, maxScore FROM HomeworkResult WHERE studentId = ? AND homeworkId = ? LIMIT 1',
           studentId, homeworkId
-        )
-        finalRow = fr && fr.length > 0 ? fr[0] : null
-      } catch (e) {}
+        ) as any[]
+        if (existing2 && existing2.length > 0) { attemptsUsed = 1; prevBest = existing2[0] }
+      } catch (e2) {
+        console.error('Check existing hw error:', e2)
+      }
+    }
+
+    if (attemptsUsed >= 7) {
       return NextResponse.json({
         success: true,
         alreadySubmitted: true,
-        attemptsUsed: 7,
-        attemptsLeft: 0,
-        result: finalRow
-          ? { id: finalRow.id, score: finalRow.score, maxScore: finalRow.maxScore }
-          : { id: '', score: 0, maxScore: 0 },
+        exhausted: true,
+        attemptNo: attemptsUsed,
+        attemptPenalty: Number((prevBest && prevBest.attemptPenalty) || 0) || 0,
+        autoSubmitted: Number((prevBest && prevBest.autoSubmitted) || 0) || 1,
+        note: 'خلصت محاولاتك للواجب ده — أعلى نتيجة اتحفظت ليك هي اللي هتظهر',
+        result: { id: prevBest.id, score: prevBest.score, maxScore: prevBest.maxScore },
       }, { status: 200 })
     }
-    var attemptNumber = attemptsUsed + 1
-    /* (ز30) خصم المحاولات: من المحاولة التالتة −2، من الخامسة −4 (والسابعة آخر محاولة)
-       — الخصم بيتطبق على الدرجة المحفوظة والمعروضة والمشعونة كلها (عرض صادق) */
-    var penaltyPoints = attemptNumber >= 5 ? 4 : (attemptNumber >= 3 ? 2 : 0)
+
+    if (attemptsUsed === 6) {
+      /* المحاولة السابعة تلقائية: أفضل نتيجة محفوظة تتسلم من غير إعادة تصحيح */
+      try {
+        await db.$executeRawUnsafe(
+          'UPDATE HomeworkResult SET attemptNo = 7, autoSubmitted = 1 WHERE id = ?',
+          prevBest.id
+        )
+      } catch (eAutoCols) {
+        try { await db.$executeRawUnsafe('UPDATE HomeworkResult SET autoSubmitted = 1 WHERE id = ?', prevBest.id) } catch (eAuto2) {}
+      }
+      return NextResponse.json({
+        success: true,
+        alreadySubmitted: true,
+        autoDelivered: true,
+        attemptNo: 7,
+        attemptPenalty: Number(prevBest.attemptPenalty || 0) || 0,
+        autoSubmitted: 1,
+        note: 'خلصت المحاولات الستة المسموحة — اتسلّمت تلقائيًا بأفضل نتيجة (المحاولة السابعة)',
+        result: { id: prevBest.id, score: prevBest.score, maxScore: prevBest.maxScore },
+      }, { status: 200 })
+    }
+
+    /* المحاولة الجاية رقمها كام + خصومة الدرجات: 1-2 مجانًا، 3-4 بدرجتين، 5-6 بأربع درجات */
+    var nextAttemptNo = attemptsUsed + 1
+    var attemptPenalty = 0
+    if (nextAttemptNo >= 5) attemptPenalty = 4
+    else if (nextAttemptNo >= 3) attemptPenalty = 2
 
     // الترتيب التسلسلي (نفس نظام الفيديوهات — طلب المستر):
     // الواجب مينفعش يتسلّم غير لما الواجب اللي قبله يكون متسلّم
@@ -333,9 +382,6 @@ export async function POST(request) {
 
     if (maxScore === 0) { maxScore = mcq.length }
     var mcqScore = score
-    /* (ز30) الدرجة النهائية للإدراج = درجة الاختيارات − خصم المحاولة (حد أدنى صفر)
-       — التصحيح الخلفي للمقالي بيجمع على mcqScore وبيخصم penaltyPoints برضه */
-    var scoreFinal = Math.max(0, score - penaltyPoints)
 
     // ============ Writing questions: saved as PENDING, graded in background (بالفهرس الأصلي) ============
     var writingAnswers: any[] = []
@@ -383,24 +429,50 @@ export async function POST(request) {
     }
 
     var inserted = false
-    try {
-      /* (ز30) رقم المحاولة + الخصم بيتخزنوا مع النتيجة — كل محاولة صف مستقل */
-      await db.$executeRawUnsafe(
-        'INSERT INTO HomeworkResult (id, studentId, homeworkId, score, maxScore, answers, writingResults, attemptNumber, penaltyPoints, submittedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
-        resultId, studentId, homeworkId, scoreFinal, maxScore, answersJson, JSON.stringify(writingAnswers), attemptNumber, penaltyPoints
-      )
-      inserted = true
-    } catch (insertErr) {
-      console.error('Insert homework result error:', insertErr)
+    if (attemptsUsed === 0) {
+      /* أول محاولة — صف جديد (INSERT) بأعمدة المحاولات */
       try {
         await db.$executeRawUnsafe(
-          'INSERT INTO HomeworkResult (id, studentId, homeworkId, score, maxScore, answers, submittedAt) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
-          resultId, studentId, homeworkId, scoreFinal, maxScore, answersJson
+          'INSERT INTO HomeworkResult (id, studentId, homeworkId, score, maxScore, answers, writingResults, attemptNo, attemptPenalty, autoSubmitted, submittedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP)',
+          resultId, studentId, homeworkId, score, maxScore, answersJson, JSON.stringify(writingAnswers), nextAttemptNo, attemptPenalty
         )
         inserted = true
-      } catch (retryErr) {
-        console.error('Retry insert homework result error:', retryErr)
-        return NextResponse.json({ error: 'حصلت مشكلة في حفظ النتيجة' }, { status: 500 })
+      } catch (insertErr) {
+        console.error('Insert homework result error:', insertErr)
+        try {
+          await db.$executeRawUnsafe(
+            'INSERT INTO HomeworkResult (id, studentId, homeworkId, score, maxScore, answers, attemptNo, attemptPenalty, autoSubmitted, submittedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP)',
+            resultId, studentId, homeworkId, score, maxScore, answersJson, nextAttemptNo, attemptPenalty
+          )
+          inserted = true
+        } catch (retryErr) {
+          console.error('Retry insert homework result error:', retryErr)
+          return NextResponse.json({ error: 'حصلت مشكلة في حفظ النتيجة' }, { status: 500 })
+        }
+      }
+    } else {
+      /* (محاولات 7) إعادة تسليم — best-of على نفس الصف: الدرجة مبتنزلش (MAX)
+         والإجابات/المقالي الجداد بيتسجلوا، والتصحيح الخلفي تحت بيكمل على نفس
+         الصف — أعلى نتيجة هي اللي بتفضل محفوظة */
+      resultId = String(prevBest.id)
+      try {
+        await db.$executeRawUnsafe(
+          'UPDATE HomeworkResult SET score = MAX(score, ?), maxScore = ?, answers = ?, writingResults = ?, attemptNo = ?, attemptPenalty = ? WHERE id = ?',
+          Math.max(0, score - attemptPenalty), maxScore, answersJson, JSON.stringify(writingAnswers), nextAttemptNo, attemptPenalty, resultId
+        )
+        inserted = true
+      } catch (updateErr) {
+        console.error('Update homework result (retake) error:', updateErr)
+        try {
+          await db.$executeRawUnsafe(
+            'UPDATE HomeworkResult SET score = MAX(score, ?), maxScore = ?, answers = ? WHERE id = ?',
+            Math.max(0, score - attemptPenalty), maxScore, answersJson, resultId
+          )
+          inserted = true
+        } catch (updateErr2) {
+          console.error('Retry update homework result (retake) error:', updateErr2)
+          return NextResponse.json({ error: 'حصلت مشكلة في حفظ النتيجة' }, { status: 500 })
+        }
       }
     }
 
@@ -421,7 +493,7 @@ export async function POST(request) {
             studentId: studentId,
             kind: 'homework',
             title: String((homework as any).title || 'واجب'),
-            score: Number(scoreFinal) || 0,
+            score: Number(score) || 0,
             maxScore: Number(maxScore) || 0,
             siteUrl: requestOrigin,
           })
@@ -432,7 +504,7 @@ export async function POST(request) {
             studentId,
             'homework_result',
             '✅ نتيجة واجبك ظهرت',
-            hwStudentResultBody(String((homework as any).title || 'واجب'), Number(scoreFinal) || 0, Number(maxScore) || 0)
+            hwStudentResultBody(String((homework as any).title || 'واجب'), Number(score) || 0, Number(maxScore) || 0)
           )
         } catch (snErr) { console.error('[hw-submit] student notify error (ignored):', snErr) }
       })
@@ -463,14 +535,12 @@ export async function POST(request) {
     var responsePayload = {
       success: true,
       submitted: true,
-      /* (ز30) معلومات المحاولة — العميل بيعرض عداد المحاولات والتسليم التلقائي في السابعة */
-      attemptNumber: attemptNumber,
-      attemptsLeft: Math.max(0, 7 - attemptNumber),
-      penaltyPoints: penaltyPoints,
       pendingGrading: hasWriting,
+      attemptNo: nextAttemptNo,
+      attemptPenalty: attemptPenalty,
       result: {
         id: resultId,
-        score: scoreFinal,
+        score: score,
         maxScore: maxScore,
         submittedAt: new Date().toISOString(),
         wrongQuestions: wrongQuestions,
@@ -682,16 +752,17 @@ export async function POST(request) {
           for (var s = 0; s < gradedList.length; s++) {
             writingScore += Number((gradedList[s] && gradedList[s].awardedPoints) || 0)
           }
+          /* (محاولات 7) best-of: الدرجة مبتنزلش — أعلى من (اختياري + مقالي - الخصومة) */
           await db.$executeRawUnsafe(
-            'UPDATE HomeworkResult SET score = ?, writingResults = ? WHERE id = ?',
-            Math.max(0, mcqScore + writingScore - penaltyPoints), JSON.stringify(gradedList), resultId
+            'UPDATE HomeworkResult SET score = MAX(score, ?), writingResults = ? WHERE id = ?',
+            Math.max(0, mcqScore + writingScore - attemptPenalty), JSON.stringify(gradedList), resultId
           )
         } catch (pErr) {
           console.error('[HW BG] Partial persist error:', pErr)
           try {
             await db.$executeRawUnsafe(
-              'UPDATE HomeworkResult SET score = ? WHERE id = ?',
-              Math.max(0, mcqScore + writingScore - penaltyPoints), resultId
+              'UPDATE HomeworkResult SET score = MAX(score, ?) WHERE id = ?',
+              Math.max(0, mcqScore + writingScore - attemptPenalty), resultId
             )
           } catch (pErr2) {}
         }
@@ -753,7 +824,7 @@ export async function POST(request) {
           studentId: studentId,
           kind: 'homework',
           title: String((homework as any).title || 'واجب'),
-          score: Math.max(0, mcqScore + writingScore - penaltyPoints),
+          score: mcqScore + writingScore,
           maxScore: Number(maxScore) || 0,
           siteUrl: requestOriginBg,
         })
@@ -763,14 +834,14 @@ export async function POST(request) {
             studentId,
             'homework_result',
             '✅ نتيجة واجبك ظهرت',
-            hwStudentResultBody(String((homework as any).title || 'واجب'), Math.max(0, mcqScore + writingScore - penaltyPoints), Number(maxScore) || 0)
+            hwStudentResultBody(String((homework as any).title || 'واجب'), mcqScore + writingScore, Number(maxScore) || 0)
           )
         } catch (snErrBg) { console.error('[hw-submit] student notify bg error (ignored):', snErrBg) }
       } catch (pnErr) {
         console.error('w-submit] parent notify bg error (ignored):', pnErr)
       }
 
-      console.log('[HW BG] Grading done for', resultId, '— final score', Math.max(0, mcqScore + writingScore - penaltyPoints) + '/' + maxScore + ' (attempt ' + attemptNumber + ', penalty −' + penaltyPoints + ')')
+      console.log('[HW BG] Grading done for', resultId, '— final score', (mcqScore + writingScore) + '/' + maxScore)
     }
 
     if (hasWriting && inserted) {
