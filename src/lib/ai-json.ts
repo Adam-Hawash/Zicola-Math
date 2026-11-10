@@ -16,11 +16,11 @@
 // كل استراتيجية معزولة في try/catch — فشل واحدة عمره ما يمنع اللي بعدها.
 // ============================================================
 
-import { repairModelJson, cleanTextDeep } from '@/lib/math-text'
-
-/* (ز43) تنظيف عميق لكل نصوص النتيجة بعد النجاح — حرف الـ N وبقايا
+import { repairModelJson } from '@/lib/math-text'
+/* (وN5) تنظيف عميق لكل نصوص النتيجة بعد النجاح — حرف الـ N وبقايا
    \n \a \b بتموت هنا قبل ما أي حاجة تتخزن — كل الاستخراجات الجديدة
-   بتنزل نضيفة من المصدر */
+   بتنزل نضيفة من المصدر (منقولة من منصة مستر شريف بالحرف) */
+import { cleanTextDeep } from '@/lib/math-text-n5'
 function sanitizeParsed(obj: any): any {
   try {
     var r = cleanTextDeep(obj)

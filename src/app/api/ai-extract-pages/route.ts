@@ -29,7 +29,10 @@ import { repairModelJson, repairCorruptMath } from '@/lib/math-text'
 /* (و51) المحللات المقاومة */
 import { parseAIJsonArrayRobust } from '@/lib/ai-json'
 /* (و45) تصنيف موحّد اختياري/مقالي — سؤال له اختيارات صور = اختياري مش مقالي */
-import { isWritingQuestion, splitEmbeddedOptions } from '@/lib/question-figures'
+import { isWritingQuestion } from '@/lib/question-figures'
+/* (وN5) تنظيف حرف الـ N وبقايا \n الحرفية + تفكيك الاختيارات المدموجة */
+import { cleanTextDeep } from '@/lib/math-text-n5'
+import { splitEmbeddedOptions } from '@/lib/question-split'
 /* (و53) القص من صور الصفحات الواطية اتشال — قص المتصفح من المستند المفتوح
    بجودة كاملة هو المصدر الأساسي، والسيرفر إنقاذ بس (/api/crop-figures) */
 
@@ -196,6 +199,8 @@ async function extractBatch(pages: any[], mode: 'all' | 'top', count: number): P
         var finalized: any[] = []
         for (var qi = 0; qi < arr.length; qi++) {
           var fq = finalizeQuestion(arr[qi])
+          /* (وN5) لكل سؤال قبل العرض/الحفظ: تنظيف عميق + تفكيك الاختيارات المدموجة */
+          if (fq) fq = splitEmbeddedOptions(cleanTextDeep(fq).val)
           if (fq) finalized.push(fq)
         }
         /* (و53) مفيش قص من صور الصفحات الواطية (1700/0.85) — دي كانت بتنزل

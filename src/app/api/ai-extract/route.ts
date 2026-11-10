@@ -13,7 +13,10 @@ import { repairModelJson, repairCorruptMath } from '@/lib/math-text'
 /* (و51) parser مقاوم لأي JSON مكسور — إصلاح جذري لـ «Could not parse AI response» */
 import { parseAIJsonRobust } from '@/lib/ai-json'
 /* (و45) تصنيف موحّد اختياري/مقالي — سؤال له اختيارات (حتى لو صور) = اختياري */
-import { isWritingQuestion, splitEmbeddedOptions } from '@/lib/question-figures'
+import { isWritingQuestion } from '@/lib/question-figures'
+/* (وN5) تنظيف حرف الـ N وبقايا \n الحرفية + تفكيك الاختيارات المدموجة */
+import { cleanTextDeep } from '@/lib/math-text-n5'
+import { splitEmbeddedOptions } from '@/lib/question-split'
 /* (و53) القص السيرفري اتشال من وقت الاستخراج (قص المتصفح الأول بجودة أعلى
    والسيرفر بقى إنقاذ بس عبر /api/crop-figures) */
 import { db } from '@/lib/db'
@@ -461,6 +464,9 @@ function finalizeExtracted(extracted: any, type: string, grade: string, twoFiles
       modelAnswer: normalizeMath(q.modelAnswer || '')
     })
   })
+
+  /* (وN5) لكل سؤال قبل الحفظ: تنظيف عميق + تفكيك الاختيارات المدموجة */
+  extracted.questions = extracted.questions.map(function(q: any) { return splitEmbeddedOptions(cleanTextDeep(q).val) })
 
   var mcqCount = extracted.questions.filter(function(q) { return q.type === 'mcq' }).length
   var writingCount = extracted.questions.filter(function(q) { return q.type === 'writing' }).length

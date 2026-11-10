@@ -14,6 +14,9 @@ import { repairModelJson, repairCorruptMath } from '@/lib/math-text'
 import { callGemini as callGeminiCentral, hasGeminiKey } from '@/lib/gemini'
 /* (و51) parser مقاوم لأي JSON مكسور */
 import { parseAIJsonRobust } from '@/lib/ai-json'
+/* (وN5) تنظيف حرف الـ N وبقايا \n الحرفية + تفكيك الاختيارات المدموجة — قبل الحفظ */
+import { cleanTextDeep } from '@/lib/math-text-n5'
+import { splitEmbeddedOptions } from '@/lib/question-split'
 
 export const runtime = 'nodejs'
 export const maxDuration = 120
@@ -187,6 +190,9 @@ export async function POST(request) {
         correct: q.correct
       }
     })
+
+    /* (وN5) لكل سؤال قبل الحفظ: تنظيف عميق + تفكيك الاختيارات المدموجة */
+    dbQuestions = dbQuestions.map(function(q: any) { return splitEmbeddedOptions(cleanTextDeep(q).val) })
 
     var questionsStr = JSON.stringify(dbQuestions)
     var savedItem = null
