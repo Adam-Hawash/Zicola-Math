@@ -29,7 +29,7 @@ import { repairModelJson, repairCorruptMath } from '@/lib/math-text'
 /* (و51) المحللات المقاومة */
 import { parseAIJsonArrayRobust } from '@/lib/ai-json'
 /* (و45) تصنيف موحّد اختياري/مقالي — سؤال له اختيارات صور = اختياري مش مقالي */
-import { isWritingQuestion } from '@/lib/question-figures'
+import { isWritingQuestion, splitEmbeddedOptions } from '@/lib/question-figures'
 /* (و53) القص من صور الصفحات الواطية اتشال — قص المتصفح من المستند المفتوح
    بجودة كاملة هو المصدر الأساسي، والسيرفر إنقاذ بس (/api/crop-figures) */
 
@@ -132,6 +132,8 @@ async function callGeminiParts(parts: any[]): Promise<{ ok: boolean; text?: stri
 /* توحيد سؤال على شكل المنصة القانوني + الحفاظ على sourcePage + حقول ورقة العمل (و40-w) */
 function finalizeQuestion(q: any): any | null {
   if (!q || typeof q !== 'object') return null
+  /* (ز43) العقل الذكي: تفكيك الاختيارات المدموجة جوه نص السؤال */
+  q = splitEmbeddedOptions(q)
   var qText = normalizeMath(q.question || q.q || '')
   if (!qText || !String(qText).trim()) return null
   var sourcePage = typeof q.sourcePage === 'number' ? q.sourcePage : (parseInt(String(q.sourcePage), 10) || 0)
@@ -141,6 +143,8 @@ function finalizeQuestion(q: any): any | null {
   if (q.table && Array.isArray(q.table.rows)) ws.table = q.table
   if (q.figure && q.figure.bbox) ws.figure = q.figure
   if (Array.isArray(q.optionFigures)) ws.optionFigures = q.optionFigures
+  /* (ز43) علامة تقطيع الرسمة العريضة لرسومات اختيارات — بتتصرف في مرحلة القص */
+  if (q._figureSplitPending) ws._figureSplitPending = q._figureSplitPending
   /* (و45) سؤال له اختيارات (نص أو صور/رسومات) = اختياري دايمًا — ممنوع يتحول مقالي */
   var isWriting = isWritingQuestion(q)
   if (isWriting) {
@@ -161,7 +165,8 @@ function finalizeQuestion(q: any): any | null {
   var opts = (q.options || []).map(function (o: any) { return normalizeMath(String(o == null ? '' : o)) })
   if (!hasOf) { opts = opts.filter(function (o: string) { return o.trim() !== '' }) }
   if (opts.length === 0 && hasOf) { for (var oiE = 0; oiE < q.optionFigures.length; oiE++) opts.push('') }
-  opts = opts.slice(0, 4)
+  /* (ز43) سقف 8 اختيارات بدل 4 — كتب بتيجي بـ 5 و7 اختيارات */
+  opts = opts.slice(0, 8)
   var correct = typeof q.correct === 'number' ? q.correct : (parseInt(String(q.correct), 10) || -1)
   if (correct >= opts.length) correct = -1
   return Object.assign({

@@ -5168,6 +5168,31 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
     }
     setBackfillBusy(false)
   }
+  /* (ز43) تنظيف رموز الاستخراج — حرف الـ N وبقايا \n \a \b + تفكيك الاختيارات المدموجة
+     — ضغطة واحدة بتنضف كل الواجبات والامتحانات ونماذجها المتخزنة */
+  const [cleanupBusy, setCleanupBusy] = useState(false)
+  var runCleanupGarbage = async function () {
+    if (cleanupBusy) return
+    if (!adminId) { toast.error('مفيش جلسة أدمن — سجل دخول تاني', { duration: 8000 }); return }
+    setCleanupBusy(true)
+    try {
+      var resC = await fetch('/api/cleanup-extraction', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminId: adminId }),
+      })
+      var dC = await resC.json()
+      if (!resC.ok) { toast.error(dC.error || 'فشل التنظيف — جرب تاني', { duration: 8000 }); return }
+      if (dC.fixed > 0) {
+        toast.success('اتنضفت ' + dC.fixed + ' سجل (اتفحص ' + dC.scanned + ') ✓ — واجبات: ' + dC.homeworks + ' • امتحانات: ' + dC.exams + ' • نماذج: ' + dC.models + ' — حرف الـ N وكل الرموز الغريبة اتشالوا والاختيارات المدموجة اتفككت', { duration: 12000 })
+      } else {
+        toast.success('كل الأسئلة نضيفة أصلًا — مفيش رموز غريبة في ' + dC.scanned + ' سجل ✓', { duration: 8000 })
+      }
+      onRefresh()
+    } catch (e) {
+      toast.error('فشل التنظيف — جرب تاني', { duration: 8000 })
+    }
+    setCleanupBusy(false)
+  }
   const [retryingCrop, setRetryingCrop] = useState<boolean>(false)
   /* (و52) محرر القص اليدوي — الهدف المفتوح دلوقتي (سؤال أو اختيار) */
   const [cropEdit, setCropEdit] = useState<FigureCropTarget | null>(null)
@@ -6170,11 +6195,21 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
             <MonitorPlay className="h-4 w-4" /> من درس
           </button>
           {/* (2026-و40) وضع الكتاب — صفحات محددة من كتاب كبير */}
-          <button type="button" onClick={function() { setInputMode('book'); if (savedBooks.length === 0 && !savedBooksLoading) loadSavedBooks() }} className={"flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition-all " + (inputMode === 'book' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground')}>
+          <button type="button" onClick={function() { setInputMode('book'); if (grade && !bookGradeFilter) setBookGradeFilter(grade); if (savedBooks.length === 0 && !savedBooksLoading) loadSavedBooks() }} className={"flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition-all " + (inputMode === 'book' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground')}>
             <BookOpen className="h-4 w-4" /> كتاب
           </button>
         </div>
 
+        {/* (ز43) تنظيف رموز الاستخراج — حرف الـ N وبقايا escapes + تفكيك الاختيارات المدموجة */}
+        <button
+          type="button"
+          onClick={runCleanupGarbage}
+          disabled={cleanupBusy}
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-rose-300 bg-rose-50 dark:bg-rose-950/30 dark:border-rose-800 text-rose-800 dark:text-rose-200 text-xs font-medium hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors disabled:opacity-60"
+        >
+          {cleanupBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <span>🧹</span>}
+          {cleanupBusy ? 'بيينضف…' : 'تنظيف رموز الاستخراج — حرف الـ N والرموز الغريبة + تفكيك الاختيارات المدموجة (ضغطة واحدة على كل الواجبات والامتحانات)'}
+        </button>
         {/* (و51) إصلاح شامل — أسئلة قديمة اتحفظت ورسماتها ناقصة عند الطلاب */}
         <button
           type="button"
@@ -6366,6 +6401,16 @@ function AIExtractionPanel({ onRefresh, adminId }: { onRefresh: () => void; admi
                 </div>
               )}
             </div>
+            {/* (ز42) شارة الكتاب المفتوح — تأكيد واضح: الاستخراج هينزل من الكتاب ده بالظبط */}
+            {bookFile && bookNumPages > 0 && (
+              <div className="flex items-start gap-2 p-2.5 rounded-lg border border-emerald-400/50 bg-emerald-500/10">
+                <span className="text-lg leading-none mt-0.5">📕</span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400 truncate">الكتاب المفتوح: {bookName || bookFile.name} ✓</p>
+                  <p className="text-[10px] text-emerald-700/80 dark:text-emerald-400/80 mt-0.5">ده المصدر اللي هيطلع منه الاستخراج — الصفحات هتتوخذ من الكتاب ده بالظبط ({bookNumPages} صفحة). عايز كتاب تاني؟ اختاره من «الكتب المحفوظة» فوق أو ارفع ملف جديد.</p>
+                </div>
+              </div>
+            )}
             {bookFile && <p className="text-xs text-muted-foreground text-center">{(bookFile.size / 1024 / 1024).toFixed(1)} MB</p>}
             {bookNumPages > 0 && <p className="text-xs text-center font-medium text-sky-600 dark:text-sky-400">عدد صفحات الكتاب: {bookNumPages}</p>}
             {/* (و119) ٣ — قايمة الصفحات بإيدي المستر — طلب المستر الحرفي:

@@ -13,7 +13,7 @@ import { repairModelJson, repairCorruptMath } from '@/lib/math-text'
 /* (و51) parser مقاوم لأي JSON مكسور — إصلاح جذري لـ «Could not parse AI response» */
 import { parseAIJsonRobust } from '@/lib/ai-json'
 /* (و45) تصنيف موحّد اختياري/مقالي — سؤال له اختيارات (حتى لو صور) = اختياري */
-import { isWritingQuestion } from '@/lib/question-figures'
+import { isWritingQuestion, splitEmbeddedOptions } from '@/lib/question-figures'
 /* (و53) القص السيرفري اتشال من وقت الاستخراج (قص المتصفح الأول بجودة أعلى
    والسيرفر بقى إنقاذ بس عبر /api/crop-figures) */
 import { db } from '@/lib/db'
@@ -413,6 +413,9 @@ function finalizeExtracted(extracted: any, type: string, grade: string, twoFiles
   if (!extracted.answerKey) { extracted.answerKey = '' }
 
   extracted.questions = extracted.questions.map(function(q) {
+    /* (ز43) العقل الذكي: تفكيك الاختيارات المدموجة جوه نص السؤال
+       «…\na. 2\nb. …\nc. …» → سؤال + اختيارات حقيقية A B C */
+    q = splitEmbeddedOptions(q)
     /* (و45) سؤال له اختيارات (نص أو صور/رسومات) = اختياري دايمًا — ممنوع يتحول مقالي */
     var qType = isWritingQuestion(q) ? 'writing' : 'mcq'
     /* (2026-و40-w) حقول ورقة العمل — pass-through (المصدر: البحث عن الجداول
@@ -425,6 +428,8 @@ function finalizeExtracted(extracted: any, type: string, grade: string, twoFiles
     if (q.table && Array.isArray(q.table.rows)) worksheet.table = q.table
     if (q.figure && q.figure.bbox) worksheet.figure = q.figure
     if (Array.isArray(q.optionFigures)) worksheet.optionFigures = q.optionFigures
+    /* (ز43) علامة تقطيع الرسمة العريضة لرسومات اختيارات — بتتصرف في مرحلة القص */
+    if (q._figureSplitPending) worksheet._figureSplitPending = q._figureSplitPending
     var withWs = function (obj: any) { return Object.assign({}, obj, worksheet) }
     if (qType === 'writing') {
       return withWs({
@@ -448,7 +453,8 @@ function finalizeExtracted(extracted: any, type: string, grade: string, twoFiles
           for (var ofi = 0; ofi < q.optionFigures.length; ofi++) opts.push('')
         }
         if (opts.length === 0) opts = ['N/A', 'N/A', 'N/A', 'N/A']
-        return opts.slice(0, 4).map(function(o: any) { return normalizeMath(String(o)) })
+        /* (ز43) سقف 8 اختيارات بدل 4 — كتب بتيجي بـ 5 و7 اختيارات */
+        return opts.slice(0, 8).map(function(o: any) { return normalizeMath(String(o)) })
       })(),
       correct: typeof q.correct === 'number' ? q.correct : 0,
       points: q.points || 1,
