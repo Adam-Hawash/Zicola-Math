@@ -40,7 +40,14 @@ var LATEX_KEEP_RE = /(\\(?:dfrac|tfrac|frac|cbrt|sqrt|times|div|text|left|right|
 export function cleanEscapeGarbage(input: string): string {
   if (!input) return input
   var s = String(input)
-  if (s.indexOf('\\') === -1 && s.indexOf('\u0001') === -1) return input
+  /* الحارس: شرطة أو مَعلم أو n ملتحومة (بلا شرطة — استخراجات قديمة) —
+     من غير ده النص الملتحوم بس («na. nb. nc.») بيرجع زي ما هو غلط */
+  var hasBackslash = s.indexOf('\\') !== -1
+  var hasMarker = s.indexOf('\u0001') !== -1
+  var hasFusedN = !hasBackslash && !hasMarker && (
+    /([0-9a-zA-Z])n([a-hA-H][).:\-–])/.test(s) || /(\s)n([a-hA-H][).:\-–])/.test(s)
+  )
+  if (!hasBackslash && !hasMarker && !hasFusedN) return input
   /* 0) \uXXXX الحرفية → الحرف الحقيقي */
   s = s.replace(/\\u([0-9a-fA-F]{4})/g, function (_m: string, hex: string) {
     return String.fromCharCode(parseInt(hex, 16))
@@ -64,6 +71,13 @@ export function cleanEscapeGarbage(input: string): string {
   var fusedN = s.match(/([0-9a-zA-Z])n([a-hA-H][).:\-–])/g)
   if (fusedN && fusedN.length >= 2) {
     s = s.replace(/([0-9a-zA-Z])n([a-hA-H][).:\-–])/g, '$1\n$2')
+  }
+  /* 3ج) الـ n الملتحومة بمسافة — «rectangles. na. nb. nc.» — نفس العلة
+     بس بمسافة قبل الـ n (استخراجات قديمة الشرطة اتشالت والسطر بقى مسافة)
+     — نفس الحارس: مرتين أو أكتر في نفس النص عشان ما نلمسش نص سليم */
+  var fusedN2 = s.match(/\s?n([a-hA-H][).:\-–])/g)
+  if (fusedN2 && fusedN2.length >= 2) {
+    s = s.replace(/\s?n([a-hA-H][).:\-–])/g, '\n$1')
   }
   /* 4) \\ (لاين بريك لاتكس) → سطر جديد — وأي شرطة قبل غير الحروف أو شرطة يتيمة → تتشال */
   s = s.replace(/\\\\/g, '\n')
