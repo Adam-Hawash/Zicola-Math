@@ -235,7 +235,7 @@ export async function verifyFinalAnswerEqual(params: {
   if (sVals.length === 0 || mVals.length === 0) return false
 
   var prompt = 'You are checking ONE thing only: are the student final value(s) and the correct final value(s) the SAME mathematical VALUE?\n\n'
-  prompt += 'Compare ONLY the final numeric/algebraic values — variable names, sides of the equation, notation, order, units and formatting NEVER matter.\n'
+  prompt += 'Compare ONLY the final numeric/algebraic values — variable names, sides of the equation, notation, order, units, LETTER CASE (K = k) and formatting NEVER matter.\n'
   prompt += 'All of these are the SAME value: 2^5 = 32, 1/2 = 0.5 = ½ = 50%, x^6y^4 = y^4x^6, "1/4 = x" === "x = 1/4", √50 = 5√2, 3:4 = 3/4, 3,5 = 3.5, ٤٢ = 42.\n\n'
   if (params.question) {
     prompt += 'Question (context only): ' + String(params.question).substring(0, 300) + '\n'
@@ -732,6 +732,7 @@ export async function gradeTextAnswer(params: {
   prompt += '- The model answer may list MULTIPLE acceptable final answers separated by "أو" / "او" / "or" (like "x = 2 أو x = 1/4") — the student answer is CORRECT if it matches ANY ONE of those alternatives\n'
   prompt += '- Different order: y^4x^6 = x^6y^4\n'
   prompt += '- REVERSED equation forms are the SAME answer: "1/4 = x" === "x = 1/4" — the variable name and its side/position NEVER matter\n'
+  prompt += '- LETTER CASE NEVER MATTERS (وN6): "K - 18" === "k - 18", "X = 5" === "x = 5" — capital and small letters are THE SAME value in math; a difference ONLY in letter case (K vs k) is NEVER a wrong answer\n'
   prompt += '- Different notation: a^7 = aaaaaaa (a multiplied 7 times), 2^10 = 1024, 1/2 = 0.5 = ½ = 50%, x^(1/2) = √x, √50 = 5√2, 3:4 = 3/4, 3,5 = 3.5\n'
   prompt += '- Arabic digits ٤٢ = 42; units and labels are IGNORED (12 سم = 12 cm = 12, x = 5 = 5); with or without × * · spaces or steps\n'
   prompt += '- The final value may be CONTAINED in the model solution (model shows steps, student wrote only the final result) → still CORRECT\n'
