@@ -18,6 +18,13 @@
 
 export var GEMINI_MODELS = ['gemini-3.6-flash', 'gemini-flash-latest']
 
+/* (2026-وN8) طلب المستر: «فيا ريت في نموذج أعلى من كده يفهم الماث» —
+   سلسلة التصحيح بتبدأ بالموديلات الـ Pro (أذكى في الرياضيات) وبعدين Flash
+   كشبكة أمان. أي موديل مش موجود عند المفتاح بيرجع 404 وبيتخطى تلقائيًا،
+   فالسلسلة دي آمنة مع أي مفتاح. بتتستخدم في نداءات التصحيح (smart-grader
+   + ai-image-grader) مش في الشات السريع. */
+export var GEMINI_GRADING_MODELS = ['gemini-3.6-pro', 'gemini-pro-latest']
+
 /* (و77) كاش الموديلات في قاعدة البيانات — self-healing بين الكولد ستارتس:
    آخر موديل نجح + الموديلات المكتشفة بيتخزنوا في جدول AiModelCache فأول
    نداء بعد كولد ستارت في Vercel ما يعيدش تجربة موديلات فاشلة (404)
@@ -474,6 +481,10 @@ export async function callGemini(opts: {
   timeoutMs?: number          // per-attempt timeout (default 30000)
   fastFailFirstMs?: number    // optional shorter timeout for the very first attempt
   thinking?: 'low' | 'off' | 'default'
+  /* (2026-وN8) سلسلة موديلات مخصصة — بتجري على الموديلات دي الأول بنفس ترتيبها
+     (لفايلوفر بتاع الاكتشاف شغال زي ما هو لو كلهم فشلوا). بتنفع عشان نحط
+     Pro أولاً في نداءات التصحيح من غير ما نغيّر سلوك الشات. */
+  models?: string[]
 }): Promise<GeminiResult> {
   var keys = getGeminiApiKeys()
   if (keys.length === 0) {
@@ -497,7 +508,9 @@ export async function callGemini(opts: {
 
   // background refresh (cached 10 min) — never awaited on the fast path
   var discoveryPromise = discoverModels()
-  var staticModels = getStaticChain()
+  /* (2026-وN8) سلسلة مخصصة؟ اشتغل بيها بالحرف — مفيش موديل شغال قديم يقفز
+     اللانية لو مش من ضمن اللي المُستدعي طلبهم */
+  var staticModels = (opts.models && opts.models.length > 0) ? opts.models.slice() : getStaticChain()
 
   var tryModels = async function (models: string[]): Promise<GeminiResult | null> {
     // Outer: passes (2nd pass clears short RPM blips) — then models — then keys
