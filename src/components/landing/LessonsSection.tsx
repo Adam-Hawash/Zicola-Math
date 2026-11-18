@@ -44,13 +44,34 @@ export default function LessonsSection() {
     if (selectedGrade) params.set('grade', selectedGrade)
     /* (تسريع المنصة — و112) أول عرض بياخد البيانات الجاهزة من شاشة التحميل */
     var preVideos = selectedGrade ? null : takeLanding('/api/videos?pageSize=50')
-    ;(preVideos || fetch('/api/videos?' + params.toString()).then(function(r) { return r.json() }))
-      .then(function(data) {
-        setVideos(data.videos || [])
-        lenRef.current = (data.videos || []).length
-      })
-      .catch(function() {})
-      .finally(function() { setLoading(false) })
+    /* (ر11) «ما فيش أي دروس» رغم إن دروس كتير: فشل لحظي (كولد ستارت/شبكة) كان
+       بيخزّن الـ prefetch فاشلًا (promise بيرجع null) فالقسم بياخده ومبيعملش
+       fallback للـ fetch المباشر والفشل يمسك في catch صامت بلا أي إعادة محاولة.
+       الدور: fallback على fetch مباشر لو الـ prefetch رجع null + إعادة محاولة أوتوماتيك */
+    function attempt(no: number) {
+      ;(preVideos || fetch('/api/videos?' + params.toString()).then(function(r) { return r.json() }))
+        .then(function(data) {
+          if (data && data.videos) {
+            setVideos(data.videos)
+            lenRef.current = data.videos.length
+            setLoading(false)
+            return
+          }
+          /* الـ prefetch فاشل (null) أو شكل غير متوقع — fallback على fetch مباشر */
+          if (preVideos) { preVideos = null; attempt(0); return }
+          if (no < 2) { setTimeout(function() { attempt(no + 1) }, 1500); return }
+          setVideos([])
+          lenRef.current = 0
+          setLoading(false)
+        })
+        .catch(function() {
+          if (no < 2) { setTimeout(function() { attempt(no + 1) }, 1500); return }
+          setVideos([])
+          lenRef.current = 0
+          setLoading(false)
+        })
+    }
+    attempt(0)
   }, [selectedGrade])
 
   // Auto-rotate every 4 seconds

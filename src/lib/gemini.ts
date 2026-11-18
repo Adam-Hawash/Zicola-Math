@@ -80,7 +80,7 @@ var GEMINI_BASE = (process.env.GEMINI_BASE_URL || 'https://generativelanguage.go
 
 /* (ر10 — نشر Cloudflare) الرسالة كانت بتوجه المستر لـ Vercel → Settings والده الحساب موقوف (402)
    فالمستر بيوقف مكانه — المسار الحقيقي دلوقتي: لوحة كلاود فلير → Workers & Pages → zicola-math */
-const QUOTA_HINT = 'الحصة اليومية لمفاتيح Gemini خلصت (429). الحل: ضيف مفاتيح تانية (من حسابات Google مختلفة — كل مفتاح بياخد حصة يومية مستقلة) في لوحة كلاود فلير → Workers & Pages → zicola-math → Settings → Variables and Secrets → عدّل GEMINI_API_KEYS (مفصولة بفواصل) واعمل Redeploy، أو فعّل الفاتورة من Google AI Studio.'
+const QUOTA_HINT = 'حد لمفاتيح Gemini خلص (429) — لو المنصة رجعت اشتغلت بعد استنادة قصيرة أو ريلود فده حد الدقيقة وبيروح لوحده، ولو فضلت واقفة لآخر اليوم فده الحد اليومي والحل: ضيف مفاتيح تانية (من حسابات Google مختلفة — كل مفتاح بياخد حصة مستقلة) في لوحة كلاود فلير → Workers & Pages → zicola-math → Settings → Variables and Secrets → عدّل GEMINI_API_KEYS (مفصولة بفواصل) واعمل Redeploy، أو فعّل الفاتورة من Google AI Studio.'
 
 /* (ر10) خطأ «User location is not supported» (400 FAILED_PRECONDITION) بيجي من Google لما الطلب
    يخرج من منطقة مش مدعومة — وده بيتغير حسب أقرب نقطة كلاود فلير للمستخدم فبيبان «أحيانًا شغال

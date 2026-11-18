@@ -18,7 +18,13 @@ export function prefetchLanding(url: string): Promise<any> {
   if (!cache[url]) {
     cache[url] = fetch(url)
       .then(function (r) { return r.json() })
-      .catch(function () { return null })
+      .catch(function () {
+        /* (ر11) الفشل اللحظي ما يسممش الكاش للأبد — كان بيتخزن promise فاشل
+           بيرجع null وكل قسم بياخده بعدها كان بيفضل فاضي طول الصفحة.
+           نمسح المدخل عشان أي قسم بياخده بعد كده يعمل fetch مباشر */
+        delete cache[url]
+        return null
+      })
   }
   return cache[url]
 }

@@ -77,10 +77,21 @@ export default function GallerySection() {
       setImages(preloaded)
       setLoading(false)
     } else {
-      fetch('/api/gallery')
-        .then(function(r) { return r.json() })
-        .then(function(d) { setImages(d.images || []); setLoading(false) })
-        .catch(function() { setLoading(false) })
+      /* (ر11) فشل لحظي كان بيسيب المعرض فاضي «سيتم اضافتها قريبا» بلا إعادة محاولة — إعادة أوتوماتيك */
+      var tryGallery = function(no: number) {
+        fetch('/api/gallery', { cache: 'no-store' })
+          .then(function(r) { return r.json() })
+          .then(function(d) {
+            if (!d || !d.images) throw new Error('bad payload')
+            setImages(d.images)
+            setLoading(false)
+          })
+          .catch(function() {
+            if (no < 2) { setTimeout(function() { tryGallery(no + 1) }, 1500); return }
+            setLoading(false)
+          })
+      }
+      tryGallery(0)
     }
   }, [galleryImages])
 

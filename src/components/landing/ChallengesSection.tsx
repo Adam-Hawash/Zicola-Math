@@ -57,11 +57,20 @@ export function ChallengesSection() {
     try {
       /* (تسريع المنصة — و112) أول عرض بياخد البيانات الجاهزة من شاشة التحميل */
       var preChallenge = takeLanding('/api/challenges/active')
-      const d = preChallenge ? await preChallenge : await (await fetch('/api/challenges/active', { cache: 'no-store' })).json()
+      var d = preChallenge ? await preChallenge : null
+      /* (ر11) الـ prefetch الفاشل بيرجع null — fallback على fetch مباشر بدل الاطلاع على null */
+      if (!d) {
+        d = await (await fetch('/api/challenges/active', { cache: 'no-store' })).json()
+      }
       setChallenge(d.challenge || null)
       setSolutions(d.solutions || [])
     } catch {
-      /* silent */
+      /* (ر11) فشل لحظي؟ إعادة محاولة واحدة قبل الاستسلام بدل الفاضي الصامت */
+      try {
+        const d2 = await (await fetch('/api/challenges/active', { cache: 'no-store' })).json()
+        setChallenge(d2.challenge || null)
+        setSolutions(d2.solutions || [])
+      } catch { /* silent */ }
     } finally {
       setLoaded(true)
     }
