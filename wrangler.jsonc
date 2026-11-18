@@ -19,7 +19,7 @@
                bun run build:cf
            وهو نفس الأمر اللي هنا بالظبط (سكريبت build:cf في package.json). */
         "build": {
-                "command": "npx opennextjs-cloudflare build && node scripts/patch-cf-instrumentation.mjs"
+                "command": "npx opennextjs-cloudflare build && node scripts/patch-cf-instrumentation.mjs && node scripts/patch-cf-worker-entry.mjs"
         },
         "services": [
                 {

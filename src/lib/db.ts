@@ -28,6 +28,107 @@ export async function withRetry(fn, retries, delayMs) {
   throw new Error('withRetry: unexpected fallthrough')
 }
 
+/* ============================================================
+ * (ر13) قفل التسلسل العالمي لعمليات قاعدة البيانات — إصلاح جذري
+ * ============================================================
+ * العطل المُثبت حيًا بالتشخيص المرحلي (wrangler dev بنفس runtime
+ * الإنتاج workerd): أي نداءين متزامنين بيوصلوا قاعدة البيانات في
+ * نفس اللحظة على نفس الـ isolate — سلسلة أحدهم بتتقطع وworkerd
+ * يلغي النداء فورًا برسوم «hung and would never generate a
+ * response» = في الإنتاج «error code: 1101» بجسم مش JSON.
+ * الأدلة:
+ *  - تزامن على راوت دافي بالداتابيز: 7/8 اتلغوا فورًا (0.04s).
+ *  - تزامن عابر لراوتات الداتابيز: كلهم اتلغوا.
+ *  - تزامن على راوت بدون داتابيز: سليم 100%.
+ *  - نداءات الداتابيز المسلسلة: سليمة 100% (9/9 في الرِج).
+ * درس ر13 المصيري: ممنوع تنسيق الطلبات عبر **promises عابرة للحدود**
+ * — workerd بيقول حرفيًا «This promise was created by a request that
+ * has since ended, so it can never settle» — أي طابور promises بين
+ * طلبات هو نفسه نوع العطل. عشان كده القفل هنا **مزامن بالكامل**:
+ * علم Boolean مشترك + polling بمؤقتات الطلب نفسه (النداء المنتظر
+ * فاعل وعنده أحداث فما بيتلغاش)، والصرف في finally أثناء حياة صاحب
+ * النداء، وسرقة القفل بعد 30 ثانية لو صاحبه اتلغى (ضمان ضد حصار دائم).
+ * $transaction (batch مصفوفة) بتعدّي بدون قفل لأنها ذرية على السيرفر
+ * في نداء واحد — ومفيش interactive transactions في المشروع.
+ * التكلفة: عمليات الداتابيز بتتنفذ واحد ورا التاني لكل isolate —
+ * مقبولة لحجم منصة مدرسة، والصح أولوية على السرعة هنا.
+ * ============================================================ */
+var __dbTurnstile = { busy: false, since: 0 }
+
+async function dbTurnstileAcquire() {
+  for (;;) {
+    if (!__dbTurnstile.busy || Date.now() - __dbTurnstile.since > 30000) {
+      __dbTurnstile.busy = true
+      __dbTurnstile.since = Date.now()
+      return
+    }
+    await new Promise(function (r) { setTimeout(r, 3) })
+  }
+}
+
+function dbTurnstileRelease() {
+  __dbTurnstile.busy = false
+}
+
+/* غلاف تسلسلي لمندوب الموديل (db.video, db.siteConfig, ...) */
+function serializeModelDelegate(delegate) {
+  return new Proxy(delegate, {
+    get: function (target, prop, receiver) {
+      if (typeof prop === 'symbol') return Reflect.get(target, prop, receiver)
+      var v = Reflect.get(target, prop, receiver)
+      if (typeof v !== 'function') return v
+      return function () {
+        var args = Array.prototype.slice.call(arguments)
+        /* (ر13-فكس) الربط دايمًا بالهدف الخام — تمرير الـ Proxy كـ this
+           كان بيخلي دوال Prisma الداخلية تعدي على الغلاف تاني وتطلب
+           القفل وهي حاجزه = قفل ذاتي وجمود كامل (مُثبت حيًا) */
+        return (async function () {
+          await dbTurnstileAcquire()
+          try {
+            return await v.apply(target, args)
+          } finally {
+            dbTurnstileRelease()
+          }
+        })()
+      }
+    },
+  })
+}
+
+/* غلاف تسلسلي للـ PrismaClient نفسه: الموديلات + raw queries مسلسلة،
+   و$transaction/$connect/$disconnect/$on/$extends تعدّي زي ما هي */
+function serializeDbClient(client) {
+  var modelCache = {}
+  return new Proxy(client, {
+    get: function (target, prop, receiver) {
+      if (typeof prop === 'symbol') return Reflect.get(target, prop, receiver)
+      var v = Reflect.get(target, prop, receiver)
+      if (typeof v === 'function') {
+        if (prop === '$transaction' || prop === '$connect' || prop === '$disconnect' || prop === '$on' || prop === '$extends') {
+          return v
+        }
+        return function () {
+          var args = Array.prototype.slice.call(arguments)
+          /* (ر13-فكس) نفس القاعدة: الربط بالهدف الخام دايمًا */
+          return (async function () {
+            await dbTurnstileAcquire()
+            try {
+              return await v.apply(target, args)
+            } finally {
+              dbTurnstileRelease()
+            }
+          })()
+        }
+      }
+      if (v && typeof v === 'object') {
+        if (!modelCache[prop]) modelCache[prop] = serializeModelDelegate(v)
+        return modelCache[prop]
+      }
+      return v
+    },
+  })
+}
+
 function createPrismaClient() {
   var dbUrl = process.env.TURSO_DATABASE_URL || process.env.DATABASE_URL || 'file:./db/custom.db'
 
@@ -44,12 +145,12 @@ function createPrismaClient() {
     var libsqlOpts = { url: dbUrl }
     if (authToken) { libsqlOpts.authToken = authToken }
     var adapter = new PrismaLibSQL(libsqlOpts)
-    return new PrismaClient({ adapter: adapter, log: [] })
+    return serializeDbClient(new PrismaClient({ adapter: adapter, log: [] }))
   }
 
-  return new PrismaClient({
+  return serializeDbClient(new PrismaClient({
     log: process.env.NODE_ENV !== 'production' ? ['query'] : [],
-  })
+  }))
 }
 
 export var db = _prisma || createPrismaClient()
