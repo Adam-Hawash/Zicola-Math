@@ -74,6 +74,22 @@ export async function GET(
       })
     }
 
+    /* ===== (ر12) كاش الحافة لكلاود فلير — الحقيقة الجذرية لعطل «الصور مرة بتظهر ومرة لأ»:
+       الملفات بتتخدم من base64 في القاعدة وفك التشفير كان بياكل حصة CPU المجانية
+       (10ms) فكلاود فلير بيقتل العملية (error 1101 → 500 عشوائي حسب حرارة الـ isolate
+       — الملف الكبير بيفشل ~40% من النداءات المثبتة حيًا على الإنتاج). دلوقتي: أي ملف
+       عام بعد أول نجاح بيتكاش على حافة كلاود فلير نفسها، فكل الطلبات الجاية من نفس
+       نقطة الشبكة بترجع من الكاش مباشرة بدون قاعدة بيانات ولا فك تشفير خالص. ===== */
+    var edgeCache: any = null
+    try { edgeCache = ((globalThis as any).caches && (globalThis as any).caches.default) || null } catch (e) {}
+    var isRangeReq = !!request.headers.get('range')
+    if (edgeCache && !isRangeReq) {
+      try {
+        var edgeHit = await edgeCache.match(request)
+        if (edgeHit) return edgeHit
+      } catch (e) {}
+    }
+
     /* ===== (تسريع الفيديو) القراءة بالبايت من غير تحميل الملف كله =====
        القديم: كل طلب — أول كل seek — بيجيب الـ base64 كامل من القاعدة ويفك
        تشفيره كله، فالفيديو الكبير بيقف ومبيجرش.
@@ -160,11 +176,11 @@ export async function GET(
           b64Start + 1, b64End - b64Start, id
         ) as any[]
         var part64 = partRows && partRows[0] ? String(partRows[0].part || '') : ''
-        var decoded = atob(part64)
+        /* (ر12) Buffer بدل atob + لوب يدوي — فك تشفير محلي سريع ما يحرقش حصة CPU */
+        var decodedBuf = Buffer.from(part64, 'base64')
         var innerOffset = rStart % 3
         var len = rEnd - rStart + 1
-        var bytes = new Uint8Array(len)
-        for (var bi = 0; bi < len; bi++) bytes[bi] = decoded.charCodeAt(innerOffset + bi)
+        var bytes = new Uint8Array(decodedBuf.subarray(innerOffset, innerOffset + len))
         return new NextResponse(bytes, {
           status: 206,
           headers: {
@@ -187,13 +203,14 @@ export async function GET(
     if (!full64) {
       return NextResponse.json({ error: 'File not found' }, { status: 404 })
     }
-    var binaryStr = atob(full64)
-    var bytes = new Uint8Array(binaryStr.length)
-    for (var i = 0; i < binaryStr.length; i++) {
-      bytes[i] = binaryStr.charCodeAt(i)
-    }
+    /* (ر12) الجذر الحقيقي لعطل «الصور مرة بتظهر ومرة لأ» + خطأ 1101:
+       atob + لوب JS يدوي على كل بايت كان بياكل حصة CPU المجانية (10ms) —
+       صورة كبيرة (2MB+) = ملايين اللفات → كلاود فلير بيقتل العملية فجأة
+       (500 عشوائي بيروح بالريلود — مثبت حيًا: نفس الصورة 5 نداءات = 200,500,200,200,500).
+       Buffer.from فك تشفير محلي أسرع عشرات المرات ما يوصلش للحد أبدًا. */
+    var bytes = new Uint8Array(Buffer.from(full64, 'base64'))
 
-    return new NextResponse(bytes, {
+    var finalFile = new NextResponse(bytes, {
       status: 200,
       headers: {
         'Content-Type': contentType,
@@ -205,6 +222,17 @@ export async function GET(
         'Accept-Ranges': 'bytes',
       },
     })
+    /* (ر12) تخزين الرد في كاش الحافة (الصور العامة فقط — الفيديو no-store فمبيتخزنش):
+       put بيتعمل في الخلفية waitUntil فالرد للطالب مبيتأخرش أبدًا —
+       أول تحميل ناجح لكل نقطة شبكة بيكفي، وباقي الزوار بيجيبوا من الحافة */
+    if (edgeCache && !String(contentType).startsWith('video/')) {
+      try {
+        var opennextApi = await import('@opennextjs/cloudflare')
+        var cfCtx = opennextApi.getCloudflareContext()
+        cfCtx.ctx.waitUntil(edgeCache.put(request, finalFile.clone()))
+      } catch (e) { /* بيئة غير كلاود فلير — الكاش مش متاح ودي مش مشكلة */ }
+    }
+    return finalFile
   } catch (error: any) {
     console.error('File serve error:', error)
     return NextResponse.json({ error: 'File not found' }, { status: 404 })

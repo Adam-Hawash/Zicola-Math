@@ -135,12 +135,19 @@ async function zaiChat(systemPrompt: string, history: any[], userContent: any, t
     var msgs: any[] = [{ role: 'assistant', content: systemPrompt }]
     for (var i = 0; i < history.length; i++) msgs.push({ role: history[i].role, content: history[i].content })
     msgs.push({ role: 'user', content: userContent })
-    tid = setTimeout(function () { throw new Error('timeout') }, timeoutMs)
-    var completion = await zai.chat.completions.create({
-      messages: msgs,
-      thinking: { type: 'disabled' },
-    })
-    clearTimeout(tid)
+    /* (ر12) المهلة كانت setTimeout بيحط throw جوه التايمر — الاستثناء ده عمره ما
+       بيوصل للـ promise بيتطلع uncaught في الكونسول ومفيش أي لغي فعلًا —
+       دلوقتي Promise.race بيلغي النداء فعلاً لو ZAI طال أكتر من المهلة */
+    var completion: any = await Promise.race([
+      zai.chat.completions.create({
+        messages: msgs,
+        thinking: { type: 'disabled' },
+      }),
+      new Promise(function (_res, rej) {
+        tid = setTimeout(function () { rej(new Error('timeout after ' + timeoutMs + 'ms')) }, timeoutMs)
+      }),
+    ])
+    if (tid) clearTimeout(tid)
     var text = (completion && completion.choices && completion.choices[0] && completion.choices[0].message && completion.choices[0].message.content) || ''
     text = String(text || '').trim()
     if (!text) return { ok: false, text: '', error: 'empty reply' }
@@ -336,8 +343,15 @@ export async function POST(request: Request) {
               })
             }
           } else {
+            /* (ر12) الرسالة القديمة كانت بتقول «الحصة اليومية خلصت» على أي 429 —
+               حتى لو العطل حد الدقيقة اللي بيروح لوحده بعد استنادة — فالمستر
+               كان يفتكر المساعد بايظ نهائي. gemini.ts دلوقتي بتحط تاغ
+               [quota:minute]/[quota:day] فبنقول للطالب الحقيقة بالظبط. */
+            var le = String(lastErr || '')
             var busyMsg = 'المساعد مشغول دلوقتي جداً، جرب تاني بعد شوية 🙏'
-            if (lastErr.indexOf('429') >= 0) busyMsg = 'الحصة اليومية للمساعد الذكي خلصت، جرب بكرة أو بعدين بشوية 🙏'
+            if (le.indexOf('[quota:minute]') >= 0) busyMsg = 'حد الاستخدام اللحظي للمساعد خلص مؤقتًا — استنى دقيقة أو اتنين وجرب تاني، بيرجع يشتغل لوحده 🙏'
+            else if (le.indexOf('[quota:day]') >= 0) busyMsg = 'حد المساعد اليومي خلص لليوم — جرب بكرة إن شاء الله 🙏'
+            else if (/location is not supported|المناطق المدعومة/i.test(le)) busyMsg = 'شبكة كلاود فلير رفضت الطلب من منطقة مش مدعومة في اللحظة دي — جرب تاني بعد دقيقة، بيتصلح لوحده 🙏'
             send({ error: busyMsg })
           }
           try { closed = true; controller.close() } catch (e) {}

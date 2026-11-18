@@ -121,6 +121,9 @@ export interface GeminiResult {
   model?: string
   error?: string
   status?: number
+  /* (ر12) الحصة اللي اتكسرت: true = حد يومي، false = حد دقيقة — عشان رسالة
+     المساعد تبقى صادقة بدل ما تقول «الحصة اليومية خلصت» على كل 429 */
+  quotaDay?: boolean
 }
 
 /* ============================================================
@@ -205,7 +208,9 @@ async function attemptInteractions(model: string, apiKey: string, parts: any[], 
     var errBody = ''
     if (!res.ok) {
       try { errBody = await res.text() } catch (e) {}
-      return { ok: false, error: 'interactions/' + model + ': ' + res.status + ' ' + (errBody || '').substring(0, 250), status: res.status }
+      /* (ر12) تمييز الحصة اليومية من اللحظية من جسم رد Google (PerDay/PerMinute) */
+      var quotaDayInter = res.status === 429 && /per\s?day/i.test(errBody)
+      return { ok: false, error: 'interactions/' + model + ': ' + res.status + ' ' + (errBody || '').substring(0, 250), status: res.status, quotaDay: quotaDayInter }
     }
     var data = await res.json()
     var text = extractInteractionText(data)
@@ -467,7 +472,9 @@ async function attempt(model: string, apiKey: string, parts: any[], generationCo
       if (inter.ok) return inter
     }
 
-    return { ok: false, error: model + ': ' + res.status + ' ' + (errBody || '').substring(0, 300), status: res.status }
+    /* (ر12) تمييز الحصة اليومية من اللحظية من جسم رد Google — عشان رسالة الطالب تقول الحقيقة */
+    var quotaDay = res.status === 429 && /per\s?day/i.test(errBody)
+    return { ok: false, error: model + ': ' + res.status + ' ' + (errBody || '').substring(0, 300), status: res.status, quotaDay: quotaDay }
   } catch (e) {
     var msg = (e && e.name === 'AbortError') ? 'timeout after ' + timeoutMs + 'ms' : (e.message || 'network error')
     return { ok: false, error: model + ': ' + msg }
@@ -504,6 +511,7 @@ export async function callGemini(opts: {
   var lastError = ''
   var sawQuota = false
   var sawLocation = false
+  var sawQuotaDay = false
   var attemptIndex = 0
   /* (ز17) ساعة الميزانية: لو الموديلات بتلف ومحدش بيرد بنوقف بدل ما الطالب يستنى كتير */
   var budgetStart = Date.now()
@@ -544,6 +552,7 @@ export async function callGemini(opts: {
           lastError = result.error || ''
           if (result.status === 429) {
             sawQuota = true
+            if (result.quotaDay) sawQuotaDay = true
             // small pause before switching key/model so we don't burn RPM
             await new Promise(function (r) { setTimeout(r, 400) })
           } else if (result.status === 400 && /location is not supported/i.test(result.error || '')) {
@@ -578,7 +587,8 @@ export async function callGemini(opts: {
   } catch (e) {}
 
   if (sawQuota) {
-    lastError = QUOTA_HINT + ' [' + lastError + ']'
+    /* (ر12) تاغ الحصة — [quota:minute] = بيروح لوحده بعد دقيقة، [quota:day] = لآخر اليوم */
+    lastError = QUOTA_HINT + (sawQuotaDay ? ' [quota:day]' : ' [quota:minute]') + ' [' + lastError + ']'
   } else if (sawLocation && /location is not supported/i.test(lastError)) {
     lastError = LOCATION_HINT + ' [' + lastError + ']'
   }
@@ -619,7 +629,9 @@ async function streamAttempt(model: string, apiKey: string, parts: any[], genera
       if (!res.ok || !res.body) {
         var errBody = ''
         try { errBody = await res.text() } catch (e) {}
-        return { ok: false, error: model + ': ' + res.status + ' ' + (errBody || '').substring(0, 300), status: res.status }
+        /* (ر12) تمييز الحصة اليومية من اللحظية من جسم رد Google */
+        var quotaDayStream = res.status === 429 && /per\s?day/i.test(errBody)
+        return { ok: false, error: model + ': ' + res.status + ' ' + (errBody || '').substring(0, 300), status: res.status, quotaDay: quotaDayStream }
       }
       var reader = res.body.getReader()
       var decoder = new TextDecoder()
@@ -716,6 +728,7 @@ export async function streamGemini(opts: {
   var lastError = ''
   var sawQuota = false
   var sawLocation = false
+  var sawQuotaDay = false
   /* (ز17) ساعة الميزانية للستريم — نفس منطق callGemini */
   var budgetStart = Date.now()
   function budgetExceeded(): boolean {
@@ -744,6 +757,7 @@ export async function streamGemini(opts: {
         lastError = result.error || ''
         if (result.status === 429) {
           sawQuota = true
+          if (result.quotaDay) sawQuotaDay = true
           await new Promise(function (r) { setTimeout(r, 400) })
         } else if (result.status === 400 && /location is not supported/i.test(result.error || '')) {
           sawLocation = true
@@ -770,7 +784,8 @@ export async function streamGemini(opts: {
     }
   } catch (e) {}
 
-  if (sawQuota) lastError = QUOTA_HINT + ' [' + lastError + ']'
+  /* (ر12) تاغ الحصة — [quota:minute] = بيروح لوحده بعد دقيقة، [quota:day] = لآخر اليوم */
+  if (sawQuota) lastError = QUOTA_HINT + (sawQuotaDay ? ' [quota:day]' : ' [quota:minute]') + ' [' + lastError + ']'
   else if (sawLocation && /location is not supported/i.test(lastError)) lastError = LOCATION_HINT + ' [' + lastError + ']'
   return { ok: false, error: lastError, status: sawQuota ? 429 : undefined }
 }
