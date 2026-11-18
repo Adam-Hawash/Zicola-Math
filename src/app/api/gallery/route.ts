@@ -12,7 +12,52 @@ function ytIdFrom(url: string): string {
 export async function GET() {
   try {
     var images = await db.galleryImage.findMany({ orderBy: { sortOrder: 'asc' } })
-    return NextResponse.json({ images })
+
+    /* (ر9) self-healing للمعرض — إصلاح «الصور مش موجودة / سيتم اضافتها قريبا»:
+       فيه سجلات معرض قديمة الـ filePath بتاعها بيشاور على ملف Media مش موجود
+       في القاعدة (اتحذف في مرحلة نقل قديمة) — الطالب كان يشوفها صورة مكسورة
+       والصفحة تقول «سيتم اضافتها قريبا». بفحص وجود الملفات دفعة واحدة بـ IN
+       وبرجع بس العناصر الحقيقية الشغالة + missingCount للتشخيص.
+       الفحص كله في try داخلي — لو ضرب نرجع اللستة الكاملة زي ما هي (fail-open). */
+    var visible: any[] = images
+    var missingCount = 0
+    try {
+      var fileIds: string[] = []
+      for (var gi = 0; gi < images.length; gi++) {
+        var fp = String((images[gi] as any).filePath || '')
+        if (fp.indexOf('/api/files/') === 0) {
+          var fid = fp.slice('/api/files/'.length)
+          if (fid) fileIds.push(fid)
+        }
+      }
+      var existing = new Set<string>()
+      if (fileIds.length) {
+        var ph = fileIds.map(function () { return '?' }).join(',')
+        var rows: any[] = (await db.$queryRawUnsafe(
+          'SELECT id FROM Media WHERE id IN (' + ph + ')',
+          ...fileIds
+        )) as any[]
+        for (var ri = 0; ri < rows.length; ri++) existing.add(String((rows[ri] as any).id))
+      }
+      visible = images.filter(function (g: any) {
+        var fp2 = String(g.filePath || '')
+        /* روابط خارجية (يوتيوب/لينك يدوي) تفضل زي ما هي — الفحص بس لملفات القاعدة */
+        if (fp2.indexOf('/api/files/') !== 0) return true
+        return existing.has(fp2.slice('/api/files/'.length))
+      })
+      missingCount = images.length - visible.length
+    } catch (filterErr: any) {
+      console.error('Gallery self-heal filter error:', filterErr)
+      visible = images
+      missingCount = 0
+    }
+
+    /* (ر9) no-store عشان الكاش (متصفح/حواف) ما يورينيش لستة قديمة بمفاتيح
+       ملفات محذوفة — كان ده سبب «مرة الصور موجودة ومرة لأ» */
+    return NextResponse.json(
+      { images: visible, missingCount: missingCount },
+      { headers: { 'Cache-Control': 'no-store' } }
+    )
   } catch (error) {
     console.error('Gallery fetch error:', error)
     return NextResponse.json({ error: 'Failed to fetch gallery', detail: error.message, code: error.code }, { status: 500 })
