@@ -655,6 +655,37 @@ export var CORE_TABLES = ['Admin', 'Student', 'StudentActivity', 'Video', 'Homew
 var SCHEMA_HASH_KEY = 'schema_heal_hash_v2_z13_arena'
 
 /* ============================================================
+ * (ر16) **الإصلاح الجذري لحلقة الترميم اللانهائية تحت حد 50 subrequest**
+ * ============================================================
+ * الدليل المُثبت حيًا على الإنتاج (ر16):
+ *  - /api/setup-db (force) رجّع «Too many subrequests by single Worker
+ *    invocation» — الدورة الكاملة = 36 جدول + 71 عمود + 18 إصلاح +
+ *    18 فهرس + ترحيلات ≈ **150 استعلام** وحد كلاود فلير المجاني
+ *    **50 subrequest لكل استدعاء** — يعني الترميم بيموت في نصه.
+ *  - كتابة البصمة (hash) **آخر خطوة** في الدورة → بيموت قبلها →
+ *    **البصمة عمرها ما بتتخزن** → كل isolate بارد يعيد الدورة الكاملة
+ *    من الأول → يموت تاني عند 50 → للأبد. ده تفسير كل أعراض المستر:
+ *    بطء ~7 ثواني لأول تحميل بعد سكون (50 استعلام × RTT) + 500 عشوائي
+ *    في المدفوعات/الفيديوهات/كل حاجة (أي استعلام بعد حد الـ 50 بيصلح
+ *    فورًا) + «ساعات تشتغل ساعات لأ» (isolate دافي = ميمو = سريع).
+ *
+ * الحل (ر16):
+ *  1) فحص البصمة **أولًا** (استعلام واحد) — لو مطابقة → كل الميموهات
+ *     تتظبط ويرجع فورًا بدل ~14 استعلام على كل isolate بارد.
+ *  2) الترميم بقى **بمراحل متتابعة مع مؤشر (cursor) دائم في SiteConfig**:
+ *     كل استدعاء بينفذ ≤ ~22 وحدة (تحت حد الـ 50 بأمان) بيسجل مكانه،
+ *     والنداء الجاي (من أي isolate) بيكمل من نفس المكان — **يتقارب
+ *     خلال ~7 استدعاءات** بدل ما يموت في نصه للأبد.
+ *  3) كتابة البصمة + مسح المؤشر في **نهاية آخر مرحلة** — بعدها المسار
+ *     السريع بيغطي كل الإقلاعات.
+ * ============================================================ */
+var REPAIR_CURSOR_KEY = 'schema_repair_cursor_v1'
+/* ميزانية الوحدات لكل استدعاء: كل استعلام ≈ 1 وحدة، الترحيلات بتكلف أكتر.
+   مع 4 استعلامات overhead (بصمة + cursor قراءة/كتابة) الإجمالي ≤ ~27 —
+   تحت حد الـ 50 بأمان حتى لو الترحيلات كتبت قيم */
+var REPAIR_UNIT_BUDGET = 22
+
+/* ============================================================
  * 2026-و23 — **إصلاح بطء المنصة** (طلب المستر: «المنصة بطيئة، تسجيل
  * الدخول وطلابي بياخدوا وقت عقبال ما يحملوا»):
  * الجذر: كل إقلاع سيرفر (cold start على Vercel) كان بيشغّل الدورة
@@ -714,34 +745,10 @@ export async function ensureSchema(client: any, opts?: { force?: boolean }) {
   }
 
   /* ============================================================
-   * (Z-1) ترحيل تنظيف الجريدز — بيشتغل مع كل تشغيل لضمان إن التكرارات
-   * (أول ثانوي/اولي ثانوي/أولى ثانوي) وصف «أولى بكالوريا» يتشالوا من
-   * grades_data حتى لو بصمة السكيما متطابقة (idempotent — بيكتب فقط
-   * لو فيه تغيير فعلي وينقل المحتوى المربوط قبل حذف أي صف).
+   * (ر16) المسار السريع الجديد — فحص البصمة **أولًا** قبل أي حاجة:
+   * استعلامان (بصمة + تنظيف grades_data) بدل ~14 كانوا بيتحرقوا على
+   * كل isolate بارد (ترحيلات + فحص). لو مطابقة → ميموهات تتظبط وترجع فورًا.
    * ============================================================ */
-  try {
-    var gm = await migrateGradesData(client)
-    if (gm && gm.changed) {
-      results.push({ gradesMigration: gm })
-      console.log('[ensure-schema] grades_data cleanup:', JSON.stringify(gm))
-    }
-  } catch (eGm) { /* الترحيل خدمة تنظيف — فشله ما يمنعش السكيما */ }
-
-  /* ============================================================
-   * (S-3) ترحيل الصفوف المخزنة فعليًا في جداول المحتوى — نفس مكان
-   * migrateGradesData (أول نداء في العملية قبل المسار السريع للبصمة،
-   * وبعد كده الـ memo بيرجع فورًا) وبنفس نمط العلم والتسجيل.
-   * ============================================================ */
-  try {
-    var gr = await migrateGradeRows(client)
-    if (gr && gr.changed) {
-      results.push({ gradeRowsMigration: gr })
-      console.log('[ensure-schema] grade rows migration:', JSON.stringify(gr))
-    }
-  } catch (eGr) { /* ترحيل صفوف — فشله ما يمنعش السكيما */ }
-
-  /* المسار السريع: البصمة متخزنة ومطابقة → مفيش أي ترميم محتاج
-     (استعلام واحد بدل ~70 — ده اللي هيخلي الدخول ولوحة الطلاب فورًا) */
   if (!force) {
     try {
       var flagRes = await client.execute({
@@ -751,62 +758,163 @@ export async function ensureSchema(client: any, opts?: { force?: boolean }) {
       var stored = flagRes && flagRes.rows && flagRes.rows.length > 0 ? String(flagRes.rows[0].value || '') : ''
       if (stored && stored === currentSchemaHash()) {
         _schemaVerifiedInProcess = true
+        _gradeRowsMigrationDone = true /* توحيد صفوف الجريدز اتنفذ في دورة ترميم سابقة — الـ 9 DISTINCT ممنوعة هنا */
+        try {
+          var gmFast = await migrateGradesData(client) /* استعلام واحد — تنظيف تكرارات grades_data مضمون */
+          if (gmFast && gmFast.changed) {
+            results.push({ gradesMigration: gmFast })
+            console.log('[ensure-schema] grades_data cleanup:', JSON.stringify(gmFast))
+          }
+        } catch (eGmFast) { /* تنظيف خدامي — فشله ما يمنعش السكيما */ }
         return { missing: [], repaired: false, skipped: true, results: [] }
       }
     } catch (e) {
-      // لو الجدول نفسه مش موجود (قاعدة جديدة) → الدورة الكاملة تحت
+      // لو الجدول نفسه مش موجود (قاعدة جديدة) → وضع الترميم تحت
     }
   }
 
-  // Which core tables already exist?
-  var existing: string[] = []
+  /* ============================================================
+   * (ر16) وضع الترميم **بمراحل محدودة مع مؤشر دائم** — يتقارب تحت حد
+   * كلاود فلير (50 subrequest لكل استدعاء). الدورة الكاملة ~150 استعلام
+   * كانت بتموت في نصها وكتابة البصمة آخر خطوة فعمرك ما بتتخزن = حلقة
+   * ترميم لا نهائية على كل isolate بارد = بطء ~7 ثواني + 500 عشوائي.
+   * كل استدعاء بينفذ ≤ ~22 وحدة ويسجل مكانه في SiteConfig — النداء الجاي
+   * (من أي isolate) بيكمل من نفس المكان لحد اكتمال الدورة وكتابة البصمة.
+   * ============================================================ */
+  var curHash = currentSchemaHash()
+
+  /* قراءة المؤشر الدائم — لو من دورة لنفس البصمة بيكمل من مكانه */
+  var cursorI = 0
   try {
-    var res = await client.execute("SELECT name FROM sqlite_master WHERE type='table'")
-    for (var i = 0; i < res.rows.length; i++) existing.push(String(res.rows[i].name))
-  } catch (e) {}
+    var curRes = await client.execute({
+      sql: 'SELECT value FROM SiteConfig WHERE key = ? LIMIT 1',
+      args: [REPAIR_CURSOR_KEY],
+    })
+    var curRaw = curRes && curRes.rows && curRes.rows.length > 0 ? String(curRes.rows[0].value || '') : ''
+    if (curRaw) {
+      var parsedCur = JSON.parse(curRaw)
+      if (parsedCur && parsedCur.ph === curHash && typeof parsedCur.i === 'number' && parsedCur.i >= 0) {
+        cursorI = parsedCur.i
+      }
+    }
+  } catch (eCur) { /* مؤشر مش موجود → دورة جديدة من الأول */ }
 
-  var missing = CORE_TABLES.filter(function (t) { return existing.indexOf(t) === -1 })
-
-  // Only run DDL when something is actually missing (or when forced by explicit setup)
-  var tablesToRun = (missing.length > 0 || force) ? SCHEMA_TABLES : []
-  // (2026-و30) الجداول متوازية — مستقلة عن بعض (IF NOT EXISTS)
-  await Promise.all(tablesToRun.map(function (sql) {
-    var name = sql.match(/CREATE TABLE IF NOT EXISTS (\w+)/)?.[1]
-    return execTolerant(client, sql, { table: name }, results)
-  }))
-
-  // Columns (tolerant of duplicates) — (2026-و30) على دفعات متوازية بدل تسلسلي
-  var CHUNK = 8
-  for (var k = 0; k < SCHEMA_COLUMNS.length; k += CHUNK) {
-    await Promise.all(SCHEMA_COLUMNS.slice(k, k + CHUNK).map(function (c) {
-      var sql = 'ALTER TABLE ' + c[0] + ' ADD COLUMN ' + c[1] + ' ' + c[2] + ' ' + c[3]
-      return execTolerant(client, sql, { table: c[0], column: c[1] }, results)
-    }))
+  /* البصمة مطابقة ومفيش مؤشر نص مكتمل → مفيش أي ترميم محتاج حتى مع
+     force — الترميم للبنى المتغيرة/القواعد الجديدة بس (منع دورات تعيد
+     كل حاجة على قاعدة مُشفّية خلاص) */
+  if (!cursorI) {
+    try {
+      var hashRes = await client.execute({
+        sql: 'SELECT value FROM SiteConfig WHERE key = ? LIMIT 1',
+        args: [SCHEMA_HASH_KEY],
+      })
+      var hashStored = hashRes && hashRes.rows && hashRes.rows.length > 0 ? String(hashRes.rows[0].value || '') : ''
+      if (hashStored && hashStored === curHash) {
+        _schemaVerifiedInProcess = true
+        _gradeRowsMigrationDone = true
+        return { missing: [], repaired: false, skipped: true, results: [] }
+      }
+    } catch (eH2) { /* قاعدة جديدة → الترميم تحت */ }
   }
 
-  // NULL fixes — (2026-و30) متوازية (كلها idempotent)
-  await Promise.all(SCHEMA_FIXES.map(function (sql) {
-    return client.execute(sql).catch(function () {})
-  }))
+  /* بناء خطة العمل — ترتيب ثابت حتمي (نفس الكود على كل isolate) فالمؤشر
+     بيفهم على أي isolate شغال. كل وحدة استعلام واحد تقريبًا ومتسامحة. */
+  var plan: Array<{ cost: number; run: () => any }> = []
 
-  // Indexes (idempotent — CREATE INDEX IF NOT EXISTS) — متوازية
-  await Promise.all(SCHEMA_INDEXES.map(function (sql) {
-    return execTolerant(client, sql, { index: sql }, results)
-  }))
+  /* المرحلة صفر — ترحيلات البيانات (تنظيف grades_data + توحيد صفوف الجريدز) */
+  plan.push({
+    cost: 2,
+    run: function () {
+      return migrateGradesData(client).then(function (gm) {
+        if (gm && gm.changed) {
+          results.push({ gradesMigration: gm })
+          console.log('[ensure-schema] grades_data cleanup:', JSON.stringify(gm))
+        }
+      })
+    },
+  })
+  plan.push({
+    cost: 10,
+    run: function () {
+      return migrateGradeRows(client).then(function (gr) {
+        if (gr && gr.changed) {
+          results.push({ gradeRowsMigration: gr })
+          console.log('[ensure-schema] grade rows migration:', JSON.stringify(gr))
+        }
+      })
+    },
+  })
+  /* الجداول — كل واحد استعلام واحد (IF NOT EXISTS متسامح) */
+  for (var ti = 0; ti < SCHEMA_TABLES.length; ti++) {
+    ;(function (sql: string) {
+      var name = sql.match(/CREATE TABLE IF NOT EXISTS (\w+)/)?.[1]
+      plan.push({ cost: 1, run: function () { return execTolerant(client, sql, { table: name }, results) } })
+    })(SCHEMA_TABLES[ti])
+  }
+  /* الأعمدة — كل عمود استعلام واحد (ALTER متسامح على duplicate) */
+  for (var ci = 0; ci < SCHEMA_COLUMNS.length; ci++) {
+    ;(function (c: any[]) {
+      var sql = 'ALTER TABLE ' + c[0] + ' ADD COLUMN ' + c[1] + ' ' + c[2] + ' ' + c[3]
+      plan.push({ cost: 1, run: function () { return execTolerant(client, sql, { table: c[0], column: c[1] }, results) } })
+    })(SCHEMA_COLUMNS[ci])
+  }
+  /* إصلاحات NULL — متسامحة */
+  for (var fi = 0; fi < SCHEMA_FIXES.length; fi++) {
+    ;(function (sql: string) {
+      plan.push({ cost: 1, run: function () { return client.execute(sql).catch(function () {}) } })
+    })(SCHEMA_FIXES[fi])
+  }
+  /* الفهارس — متسامحة */
+  for (var xi = 0; xi < SCHEMA_INDEXES.length; xi++) {
+    ;(function (sql: string) {
+      plan.push({ cost: 1, run: function () { return execTolerant(client, sql, { index: sql }, results) } })
+    })(SCHEMA_INDEXES[xi])
+  }
 
-  _schemaVerifiedInProcess = true
+  if (cursorI >= plan.length) cursorI = 0 /* خطة قديمة من كود مختلف → من الأول */
 
-  // تخزين بصمة البنية — الإقلاعات الجاية بتتخطى الترميم كله
-  try {
-    var hash = currentSchemaHash()
+  /* تنفيذ مرحلة الاستدعاء ده ضمن الميزانية — تسلسلي ومحسوب تحت حد الـ 50 */
+  var budget = REPAIR_UNIT_BUDGET
+  var idx = cursorI
+  while (idx < plan.length && budget > 0) {
+    var unit = plan[idx]
+    try { await unit.run() } catch (eUnit) { /* وحدة متسامحة — الترميم بيكمل */ }
+    budget -= unit.cost || 1
+    idx++
+  }
+
+  var completed = idx >= plan.length
+  if (completed) {
+    _schemaVerifiedInProcess = true
+    _gradesMigrationDone = true
+    _gradeRowsMigrationDone = true
+    /* تخزين البصمة — الإقلاعات الجاية بتطير من أول استعلام */
     try {
-      await client.execute({ sql: 'UPDATE SiteConfig SET value = ?, updatedAt = CURRENT_TIMESTAMP WHERE key = ?', args: [hash, SCHEMA_HASH_KEY] })
+      await client.execute({ sql: 'UPDATE SiteConfig SET value = ?, updatedAt = CURRENT_TIMESTAMP WHERE key = ?', args: [curHash, SCHEMA_HASH_KEY] })
     } catch (uErr) {
       try {
-        await client.execute({ sql: 'INSERT INTO SiteConfig (id, key, value) VALUES (?, ?, ?)', args: ['sch' + hash + Date.now().toString(36), SCHEMA_HASH_KEY, hash] })
+        await client.execute({ sql: 'INSERT INTO SiteConfig (id, key, value) VALUES (?, ?, ?)', args: ['sch' + curHash + Date.now().toString(36), SCHEMA_HASH_KEY, curHash] })
       } catch (iErr) {}
     }
-  } catch (hErr) {}
+    /* مسح المؤشر — الدورة اكتملت */
+    try { await client.execute({ sql: 'DELETE FROM SiteConfig WHERE key = ?', args: [REPAIR_CURSOR_KEY] }) } catch (dErr) {}
+  } else {
+    /* حفظ الموضع — النداء الجاي من أي isolate بيكمل من هنا */
+    var curVal = JSON.stringify({ i: idx, ph: curHash })
+    try {
+      await client.execute({ sql: 'UPDATE SiteConfig SET value = ?, updatedAt = CURRENT_TIMESTAMP WHERE key = ?', args: [curVal, REPAIR_CURSOR_KEY] })
+    } catch (uErr2) {
+      try {
+        await client.execute({ sql: 'INSERT INTO SiteConfig (id, key, value) VALUES (?, ?, ?)', args: ['rc' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), REPAIR_CURSOR_KEY, curVal] })
+      } catch (iErr2) {}
+    }
+  }
 
-  return { missing, repaired: missing.length > 0, results }
+  return {
+    missing: [],
+    repaired: true,
+    partial: !completed,
+    repairProgress: { done: idx, total: plan.length, completed: completed },
+    results: results,
+  }
 }

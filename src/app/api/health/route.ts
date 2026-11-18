@@ -6,6 +6,9 @@
 // swapped DATABASE_URL in Vercel to a fresh Turso database), the health check
 // creates the full schema automatically — no more "every API 500s after I
 // changed the database" outages. Just open /api/health once and it heals.
+// (ر16) شفافية كاملة: الأخطاء الفعلية للعدادات بتترجع نصًا (كانت 'n/a'
+// صامتة وغطت سبب العطل لأسابيع) + حالة الترميم المرحلي (ر16) بتظهر عشان
+// نتابع تقارب الدورة تحت حد كلاود فلير 50 subrequest.
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { makeLibsqlClient, ensureSchema, CORE_TABLES } from '@/lib/ensure-schema'
@@ -22,27 +25,46 @@ export async function GET() {
   var database = 'ok'
   var dbError = ''
   var counts = {}
+  var countErrors = {}
   var autoFixed = false
   var repairedTables: string[] = []
+  var schemaState: any = null
   try {
     await db.$queryRawUnsafe('SELECT 1')
 
-    // ---- AUTO-REPAIR: create missing core tables on a fresh/empty database ----
+    // ---- AUTO-REPAIR: (ر16) ترميم مرحلي محدود — كل نداء بيكمل مرحلة ----
     try {
       var client = makeLibsqlClient()
       if (client) {
         var outcome = await ensureSchema(client)
-        if (outcome.repaired) {
+        if (outcome && outcome.repaired) {
           autoFixed = true
-          repairedTables = outcome.missing
+          repairedTables = outcome.missing || []
+        }
+        schemaState = {
+          skipped: !!(outcome && outcome.skipped),
+          partial: !!(outcome && outcome.partial),
+          repairProgress: (outcome && outcome.repairProgress) || null,
         }
         try { await client.close() } catch (e) {}
       }
-    } catch (e) {}
+    } catch (e) {
+      schemaState = { error: String(e && e.message ? e.message : e).substring(0, 200) }
+    }
 
-    try { counts.students = await db.student.count() } catch (e) { counts.students = 'n/a' }
-    try { counts.videos = await db.video.count() } catch (e) { counts.videos = 'n/a' }
-    try { counts.admins = await db.admin.count() } catch (e) { counts.admins = 'n/a' }
+    // ---- (ر16) العدادات مع رسالة الخطأ الفعلية — 'n/a' الصامتة اتلغت ----
+    var cnt = async function (key: string, model: string) {
+      try {
+        counts[key] = null
+        counts[key] = await db[model].count()
+      } catch (e) {
+        counts[key] = 'n/a'
+        countErrors[key] = String(e && e.message ? e.message : e).substring(0, 250)
+      }
+    }
+    await cnt('students', 'student')
+    await cnt('videos', 'video')
+    await cnt('admins', 'admin')
   } catch (e) {
     database = 'fail'
     dbError = String(e && e.message ? e.message : e).substring(0, 300)
@@ -54,9 +76,11 @@ export async function GET() {
     database,
     autoFixed,
     repairedTables,
+    schemaState,
     coreTables: CORE_TABLES.length,
     dbError,
     counts,
+    countErrors,
     time: new Date().toISOString(),
   })
 }
