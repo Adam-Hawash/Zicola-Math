@@ -24,6 +24,7 @@ var TRANSIENT_RE = new RegExp([
   '502 Bad Gateway', '503 Service Unavailable', '504 Gateway',
   'temporarily unavailable', 'internal server error',
   'libsql.*\\b(500|502|503|504)\\b',
+  'untagged enum', 'did not match any variant',
 ].join('|'), 'i')
 
 function isTransientError(error: any): boolean {
@@ -187,8 +188,16 @@ function resilientProxy(prisma) {
   return new Proxy(prisma, {
     get: function (target, prop) {
       if (typeof prop !== 'string') return Reflect.get(target, prop)
-      if (prop.charCodeAt(0) === 36 /* $... */) return Reflect.get(target, prop)
-      if (prop in SKIP_PROPS) return Reflect.get(target, prop)
+      /* (ر19) دوال $ (queryRawUnsafe/executeRawUnsafe/transaction) لازم تتربط
+         بالهدف الخام — استدعاء db.$queryRawUnsafe(...) مع this=Proxy كان
+         بيكسر مسار Prisma الداخلي ويرجّع «data did not match any variant
+         of untagged enum JsonBody» ثابت على كل raw query (اتثبت حيًا على
+         الإنتاج: /api/health بقيت unhealthy بعد نشر ر18 وكل الاستعلامات
+         العادية شغالة) — الربط بيرجّع السلوك الأصلي بالضبط */
+      if (prop.charCodeAt(0) === 36 /* $... */ || prop in SKIP_PROPS) {
+        var v = Reflect.get(target, prop)
+        return typeof v === 'function' ? v.bind(target) : v
+      }
       if (prop in modelCache) return modelCache[prop]
       var orig = Reflect.get(target, prop)
       if (orig === null || orig === undefined) return orig
