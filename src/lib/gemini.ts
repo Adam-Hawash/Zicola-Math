@@ -78,7 +78,14 @@ async function ensureModelCache(): Promise<void> {
 // official endpoint — production/Vercel behavior is unchanged.
 var GEMINI_BASE = (process.env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com').replace(/\/$/, '')
 
-const QUOTA_HINT = 'الحصة اليومية لمفتاح Gemini خلصت (429). الحل: ضيف مفتاح/مفاتيح تانية في Vercel → Settings → Environment Variables باسم GEMINI_API_KEYS (مفصولة بفواصل) أو فعّل الفاتورة من Google AI Studio.'
+/* (ر10 — نشر Cloudflare) الرسالة كانت بتوجه المستر لـ Vercel → Settings والده الحساب موقوف (402)
+   فالمستر بيوقف مكانه — المسار الحقيقي دلوقتي: لوحة كلاود فلير → Workers & Pages → zicola-math */
+const QUOTA_HINT = 'الحصة اليومية لمفاتيح Gemini خلصت (429). الحل: ضيف مفاتيح تانية (من حسابات Google مختلفة — كل مفتاح بياخد حصة يومية مستقلة) في لوحة كلاود فلير → Workers & Pages → zicola-math → Settings → Variables and Secrets → عدّل GEMINI_API_KEYS (مفصولة بفواصل) واعمل Redeploy، أو فعّل الفاتورة من Google AI Studio.'
+
+/* (ر10) خطأ «User location is not supported» (400 FAILED_PRECONDITION) بيجي من Google لما الطلب
+   يخرج من منطقة مش مدعومة — وده بيتغير حسب أقرب نقطة كلاود فلير للمستخدم فبيبان «أحيانًا شغال
+   وأحيانًا لأ» — كان بيتواري خلف رسالة الحصة، دلوقتي بيتكشف وبيترجم لرسالة واضحة */
+const LOCATION_HINT = 'Google رفض الطلب لأن موقع سيرفر الشبكة مش من المناطق المدعومة (User location is not supported) — ده بيحصل من مناطق معينة بس وبيختلف من طلب لطلب حسب أقرب نقطة كلاود فلير. جرّب تاني بعد شوية — والحل الجذري: توجيه طلبات Gemini على بروكسي في منطقة مدعومة عبر متغير GEMINI_BASE_URL في نفس مكان المتغيرات بكلاود فلير.'
 
 // Collect all configured keys, in order
 export function getGeminiApiKeys(): string[] {
@@ -488,7 +495,7 @@ export async function callGemini(opts: {
 }): Promise<GeminiResult> {
   var keys = getGeminiApiKeys()
   if (keys.length === 0) {
-    return { ok: false, error: 'GEMINI_API_KEY not found — أضف المفتاح في Vercel Environment Variables أو ملف .env.local' }
+    return { ok: false, error: 'GEMINI_API_KEY not found — ضيف المفتاح في لوحة كلاود فلير → Workers & Pages → zicola-math → Settings → Variables and Secrets باسم GEMINI_API_KEYS واعمل Redeploy (أو في ملف .env.local للتطوير المحلي)' }
   }
 
   var generationConfig = opts.generationConfig || { temperature: 0.1, maxOutputTokens: 8192 }
@@ -496,6 +503,7 @@ export async function callGemini(opts: {
   var thinkingMode = opts.thinking || 'default'
   var lastError = ''
   var sawQuota = false
+  var sawLocation = false
   var attemptIndex = 0
   /* (ز17) ساعة الميزانية: لو الموديلات بتلف ومحدش بيرد بنوقف بدل ما الطالب يستنى كتير */
   var budgetStart = Date.now()
@@ -538,6 +546,8 @@ export async function callGemini(opts: {
             sawQuota = true
             // small pause before switching key/model so we don't burn RPM
             await new Promise(function (r) { setTimeout(r, 400) })
+          } else if (result.status === 400 && /location is not supported/i.test(result.error || '')) {
+            sawLocation = true
           } else if (result.status === 404) {
             // model retired — skip its remaining keys
             break
@@ -569,6 +579,8 @@ export async function callGemini(opts: {
 
   if (sawQuota) {
     lastError = QUOTA_HINT + ' [' + lastError + ']'
+  } else if (sawLocation && /location is not supported/i.test(lastError)) {
+    lastError = LOCATION_HINT + ' [' + lastError + ']'
   }
   return { ok: false, error: lastError, status: sawQuota ? 429 : undefined }
 }
@@ -696,13 +708,14 @@ export async function streamGemini(opts: {
 }): Promise<GeminiResult> {
   var keys = getGeminiApiKeys()
   if (keys.length === 0) {
-    return { ok: false, error: 'GEMINI_API_KEY not found — أضف المفتاح في Vercel Environment Variables أو ملف .env.local' }
+    return { ok: false, error: 'GEMINI_API_KEY not found — ضيف المفتاح في لوحة كلاود فلير → Workers & Pages → zicola-math → Settings → Variables and Secrets باسم GEMINI_API_KEYS واعمل Redeploy (أو في ملف .env.local للتطوير المحلي)' }
   }
   var generationConfig = opts.generationConfig || { temperature: 0.3, maxOutputTokens: 2048 }
   var timeoutMs = opts.timeoutMs || 30000
   var thinkingMode = opts.thinking || 'low'
   var lastError = ''
   var sawQuota = false
+  var sawLocation = false
   /* (ز17) ساعة الميزانية للستريم — نفس منطق callGemini */
   var budgetStart = Date.now()
   function budgetExceeded(): boolean {
@@ -732,6 +745,8 @@ export async function streamGemini(opts: {
         if (result.status === 429) {
           sawQuota = true
           await new Promise(function (r) { setTimeout(r, 400) })
+        } else if (result.status === 400 && /location is not supported/i.test(result.error || '')) {
+          sawLocation = true
         } else if (result.status === 404) {
           break
         } else if (result.status === 401 || result.status === 403) {
@@ -756,6 +771,7 @@ export async function streamGemini(opts: {
   } catch (e) {}
 
   if (sawQuota) lastError = QUOTA_HINT + ' [' + lastError + ']'
+  else if (sawLocation && /location is not supported/i.test(lastError)) lastError = LOCATION_HINT + ' [' + lastError + ']'
   return { ok: false, error: lastError, status: sawQuota ? 429 : undefined }
 }
 

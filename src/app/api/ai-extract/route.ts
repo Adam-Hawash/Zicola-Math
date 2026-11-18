@@ -117,7 +117,7 @@ export async function POST(request) {
     var apiKey = process.env.GEMINI_API_KEY || ''
     if (!hasGeminiKey()) {
       console.error('[AI Extract] GEMINI_API_KEY not found in environment')
-      return NextResponse.json({ error: 'GEMINI_API_KEY not found — أضف المفتاح في Vercel Environment Variables أو ملف .env.local' }, { status: 500 })
+      return NextResponse.json({ error: 'GEMINI_API_KEY not found — ضيف المفتاح في لوحة كلاود فلير → Workers & Pages → zicola-math → Settings → Variables and Secrets باسم GEMINI_API_KEYS واعمل Redeploy (أو في ملف .env.local للتطوير المحلي)' }, { status: 500 })
     }
 
     // ============= Load question file (or URL) =============

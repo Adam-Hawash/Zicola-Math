@@ -131,7 +131,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: false, error: 'الملف كبير أوي (الحد 12MB)' }, { status: 413 })
       }
       if (!hasGeminiKey()) {
-        return NextResponse.json({ ok: false, error: 'مفتاح Gemini مش متظبط — ضيف GEMINI_API_KEYS في Vercel' }, { status: 500 })
+        return NextResponse.json({ ok: false, error: 'مفتاح Gemini مش متظبط — ضيف GEMINI_API_KEYS في لوحة كلاود فلير → Workers & Pages → zicola-math → Settings → Variables and Secrets واعمل Redeploy' }, { status: 500 })
       }
       var bytes = new Uint8Array(await file.arrayBuffer())
       var base64Data = Buffer.from(bytes).toString('base64')
