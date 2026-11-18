@@ -888,26 +888,27 @@ export async function ensureSchema(client: any, opts?: { force?: boolean }) {
     _schemaVerifiedInProcess = true
     _gradesMigrationDone = true
     _gradeRowsMigrationDone = true
-    /* تخزين البصمة — الإقلاعات الجاية بتطير من أول استعلام */
+    /* (ر17) تخزين البصمة بـ UPSERT ذري — العيب الموروث: UPDATE على مفتاح
+       غير موجود بينجح بـ **صفر صفوف** من غير exception فالـ INSERT البديل
+       عمره ما بينفذ → البصمة عمرها ما بتتخزن → الحلقة اللانهائية الجذرية.
+       ON CONFLICT(key) يشتغل على قيد UNIQUE بتاع الجدول نفسه */
     try {
-      await client.execute({ sql: 'UPDATE SiteConfig SET value = ?, updatedAt = CURRENT_TIMESTAMP WHERE key = ?', args: [curHash, SCHEMA_HASH_KEY] })
-    } catch (uErr) {
-      try {
-        await client.execute({ sql: 'INSERT INTO SiteConfig (id, key, value) VALUES (?, ?, ?)', args: ['sch' + curHash + Date.now().toString(36), SCHEMA_HASH_KEY, curHash] })
-      } catch (iErr) {}
-    }
+      await client.execute({
+        sql: 'INSERT INTO SiteConfig (id, key, value, updatedAt) VALUES (?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updatedAt = CURRENT_TIMESTAMP',
+        args: ['schema_heal_hash', SCHEMA_HASH_KEY, curHash],
+      })
+    } catch (uErr) {}
     /* مسح المؤشر — الدورة اكتملت */
     try { await client.execute({ sql: 'DELETE FROM SiteConfig WHERE key = ?', args: [REPAIR_CURSOR_KEY] }) } catch (dErr) {}
   } else {
-    /* حفظ الموضع — النداء الجاي من أي isolate بيكمل من هنا */
+    /* (ر17) حفظ الموضع بـ UPSERT ذري — نفس عيب صفر صفوف اتصلح */
     var curVal = JSON.stringify({ i: idx, ph: curHash })
     try {
-      await client.execute({ sql: 'UPDATE SiteConfig SET value = ?, updatedAt = CURRENT_TIMESTAMP WHERE key = ?', args: [curVal, REPAIR_CURSOR_KEY] })
-    } catch (uErr2) {
-      try {
-        await client.execute({ sql: 'INSERT INTO SiteConfig (id, key, value) VALUES (?, ?, ?)', args: ['rc' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), REPAIR_CURSOR_KEY, curVal] })
-      } catch (iErr2) {}
-    }
+      await client.execute({
+        sql: 'INSERT INTO SiteConfig (id, key, value, updatedAt) VALUES (?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updatedAt = CURRENT_TIMESTAMP',
+        args: ['schema_repair_cursor', REPAIR_CURSOR_KEY, curVal],
+      })
+    } catch (uErr2) {}
   }
 
   return {
