@@ -11,9 +11,13 @@
                 "directory": ".open-next/assets",
                 "binding": "ASSETS"
         },
-        /* (ر8) بناء OpenNext قبل أي deploy + باتش الـ instrumentation الديناميكي —
-           أمر النشر في كلاود فلير (npx wrangler deploy) بيجري الأمر ده الأول
-           عشان يضمن إن .open-next طازة ومصلّحة قبل الرفع */
+        /* (ر8) بناء OpenNext قبل أي deploy + باتش الـ instrumentation الديناميكي.
+           مهم: أمر deploy في اللوحة (npx wrangler deploy) ما بيصنعش .open-next
+           بنفسه — بيكشف OpenNext وبينادي opennextjs-cloudflare deploy اللي بيقرا
+           الكومبايلد كونفج بس ويرفض لو مش موجود («Could not find compiled Open
+           Next config»). فأمر البناء في لوحة كلاود فلير لازم يكون:
+               bun run build:cf
+           وهو نفس الأمر اللي هنا بالظبط (سكريبت build:cf في package.json). */
         "build": {
                 "command": "npx opennextjs-cloudflare build && node scripts/patch-cf-instrumentation.mjs"
         },
