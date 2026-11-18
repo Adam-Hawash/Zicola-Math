@@ -94,6 +94,20 @@ export async function ensurePlayTicketTable(force = false): Promise<void> {
 var _videoTableReady = false
 export async function ensureVideoTable(force = false): Promise<void> {
   if (_videoTableReady && !force) return
+  /* (ر15) المسار السريع: استعلام واحد بيتحقق من كل الأعمدة المطلوبة مرة
+     واحدة — بدل CREATE + 9 محاولات ALTER (10 استعلامات × RTT على كل
+     isolate بارد = ~2-3 ثواني زيادة على كل أول نداء فيديو). لو الفحص
+     نجح → الجدول كامل → تم. لو فشل (عمود/جدول ناقص) → مسار الترميم
+     الكامل زي ما هو ثم إعادة الفحص */
+  try {
+    await db.$queryRawUnsafe(
+      'SELECT id, title, url, filePath, fileType, thumbnail, price, groupKey, orderIndex, durationSec, sortIndex, grade FROM Video LIMIT 1'
+    )
+    _videoTableReady = true
+    return
+  } catch (eProbe) {
+    /* الجدول أو عمود ناقص — نكمل مسار الترميم الكامل تحت */
+  }
   try {
     await db.$executeRawUnsafe(
       'CREATE TABLE IF NOT EXISTS Video (id TEXT PRIMARY KEY, title TEXT NOT NULL, url TEXT DEFAULT "", filePath TEXT DEFAULT "", fileType TEXT DEFAULT "", thumbnail TEXT DEFAULT "", grade TEXT NOT NULL, price REAL DEFAULT 0, createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)'
