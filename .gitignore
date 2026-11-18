@@ -10,3 +10,11 @@ dev-3300.log
 seed-test.cjs
 dev.log
 *.log
+
+# OpenNext
+.open-next
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example

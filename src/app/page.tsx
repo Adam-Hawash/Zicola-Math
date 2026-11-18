@@ -3,15 +3,20 @@
 import { useAppStore } from '@/stores/app-store'
 import { Navbar } from '@/components/landing/Navbar'
 import { Footer } from '@/components/landing/Footer'
-import { StudentPendingView } from '@/components/landing/StudentPendingView'
-import { StudentPaymentView } from '@/components/landing/StudentPaymentView'
-import { LoginView, RegisterView } from '@/components/landing/AuthPages'
 import dynamic from 'next/dynamic'
 import { useEffect, useState, useRef } from 'react'
 import { PlatformLoader } from '@/components/PlatformLoader'
 import { Reveal } from '@/components/landing/Reveal'
 /* (تسريع المنصة — و112) شاشة التحميل تحمّل بيانات الأقسام */
 import { prefetchLanding } from '@/lib/landing-prefetch'
+/* (ر8 — نشر Cloudflare Workers) شاشات ما بعد التفاعل بقت dynamic بـ ssr:false —
+   بتظهر بس بعد ضغطة مستخدم (مش أول رندر) فمفيش قيمة لرندرها على السيرفر،
+   وكودها كان بيتلفّ في باندل السيرفر/الـ Worker وبيضخّمه فوق حد
+   الخطة المجانية في كلاود فلير (3MB مضغوط) */
+const StudentPendingView = dynamic(() => import('@/components/landing/StudentPendingView').then(m => ({ default: (m as any).default || m.StudentPendingView })), { ssr: false })
+const StudentPaymentView = dynamic(() => import('@/components/landing/StudentPaymentView').then(m => ({ default: (m as any).default || m.StudentPaymentView })), { ssr: false })
+const LoginView = dynamic(() => import('@/components/landing/AuthPages').then(m => ({ default: m.LoginView })), { ssr: false })
+const RegisterView = dynamic(() => import('@/components/landing/AuthPages').then(m => ({ default: m.RegisterView })), { ssr: false })
 
 const HeroSection = dynamic(() => import('@/components/landing/HeroSection'), {
   loading: () => <div className="min-h-[70vh] bg-background" />,
@@ -56,18 +61,31 @@ const VideoProtection = dynamic(() => import('@/components/landing/VideoProtecti
   ssr: false,
 })
 const StudentPortal = dynamic(() => import('@/components/student/StudentPortal').then(m => ({ default: (m as any).default || m.StudentPortal })), {
+  /* (ر8) ssr:false — البورتات شاشات ما بعد الدخول (مفيش SEO) — من غيرها
+     كود البورتات كله بيتلفّ في باندل السيرفر/الـ Worker بتاع كلاود فلير
+     وبيضخّمه فوق حد الخطة المجانية (3MB مضغوط) */
+  ssr: false,
   loading: () => <div className="flex items-center justify-center py-20"><div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" /></div>,
 })
 const ParentPortal = dynamic(() => import('@/components/parent/ParentPortal').then(m => ({ default: (m as any).ParentPortal })), {
+  /* (ر8) ssr:false — نفس سبب StudentPortal فوق */
+  ssr: false,
   loading: () => <div className="flex items-center justify-center py-20"><div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" /></div>,
 })
 const ParentLoginView = dynamic(() => import('@/components/parent/ParentAuthPages').then(m => ({ default: m.ParentLoginView })), {
+  /* (ر8) ssr:false — نفس سبب StudentPortal فوق */
+  ssr: false,
   loading: () => <div className="flex items-center justify-center py-20"><div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" /></div>,
 })
 const ParentRegisterView = dynamic(() => import('@/components/parent/ParentAuthPages').then(m => ({ default: m.ParentRegisterView })), {
+  /* (ر8) ssr:false — نفس سبب StudentPortal فوق */
+  ssr: false,
   loading: () => <div className="flex items-center justify-center py-20"><div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" /></div>,
 })
 const AdminDashboard = dynamic(() => import('@/components/admin/AdminDashboard').then(m => ({ default: (m as any).default || m.AdminDashboard })), {
+  /* (ر8) ssr:false — لوحة الأدمن أضخم كومبوننت في المنصة — من غيرها
+     كودها كله بيتلفّ في باندل السيرفر وبيضخّم الـ Worker فوق حد الخطة المجانية */
+  ssr: false,
   loading: () => <div className="flex items-center justify-center py-20"><div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" /></div>,
 })
 

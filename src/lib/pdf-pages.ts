@@ -17,9 +17,30 @@ export interface OpenedPdf {
 
 const PDF_WORKER_SRC = '/pdf.worker.min.mjs'
 
+/* (ر8 — نشر Cloudflare Workers) pdf.js بيتحمّل كملف ثابت من public وقت
+   التشغيل (نفس نسخة pdfjs-dist بالظبط) بدل ما يتلفّ في أي باندل:
+   - /* turbopackIgnore: true *‎/ بيخلي Turbopack (باندل المتصفح + الـ SSR)
+     يتخطى الاستيراد خالص — Turbopack كان بيرفض أي استيراد ديناميكي
+     مش قابل للحل في باندل العميل بـ «Can't resolve <dynamic>».
+   - esbuild (باندل الـ Worker في OpenNext) برضه ما بيتبعش المتغير —
+     فpdf.js مش جوه الـ Worker بتاع كلاود فلير خالص (كان بيضخّمه
+     فوق حد الخطة المجانية 3MB مضغوط).
+   - على المتصفح: استيراد ESM من نفس الأصل — نسخة مطابقة للي كان
+     الباندلر بيلفّها، والـ worker ملف ثابت جاهز من قبل.
+   - على السيرفر: لو حد ندّى عليها (مستحيل — كل دوال الملف متصفحية)
+     الاستيراد بيفشل ويتمسك في try/catch النداء. */
+const PDFJS_URL = ['/', 'pdfjs.min.mjs'].join('')
+
+/* استيراد runtime غير مرئي لأي باندلر: Turbopack ما بيشوفش صيغة import
+   أصلًا فما بيحاول يحلّ الرابط (كان بيكسر البناء بـ Can't resolve)،
+   وesbuild بتاع OpenNext ما بيتبعهش فpdf.js مش جوه الـ Worker.
+   على المتصفح الاستيراد بيحصل طبيعي من نفس الأصل. */
+var runtimeImport: (u: string) => Promise<any> = Function('u', 'return import(u)') as unknown as (u: string) => Promise<any>
+
 /** فتح ملف PDF على المتصفح — بيرجّع عدد الصفحات + مستند pdf.js */
 export async function openPdf(file: File): Promise<OpenedPdf> {
-  var pdfjs: any = await import('pdfjs-dist')
+  var pdfjs: any = await runtimeImport(PDFJS_URL)
+  if (!pdfjs) throw new Error('pdf.js مش متاح')
   try { pdfjs.GlobalWorkerOptions.workerSrc = PDF_WORKER_SRC } catch (e) {}
   var data = await file.arrayBuffer()
   var doc = await pdfjs.getDocument({ data: data, isEvalSupported: false }).promise

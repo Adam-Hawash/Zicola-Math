@@ -1,0 +1,33 @@
+{
+        "$schema": "node_modules/wrangler/config-schema.json",
+        "main": ".open-next/worker.js",
+        "name": "zicola-math",
+        "compatibility_date": "2026-11-18",
+        "compatibility_flags": [
+                "nodejs_compat",
+                "global_fetch_strictly_public"
+        ],
+        "assets": {
+                "directory": ".open-next/assets",
+                "binding": "ASSETS"
+        },
+        /* (ر8) بناء OpenNext قبل أي deploy + باتش الـ instrumentation الديناميكي —
+           أمر النشر في كلاود فلير (npx wrangler deploy) بيجري الأمر ده الأول
+           عشان يضمن إن .open-next طازة ومصلّحة قبل الرفع */
+        "build": {
+                "command": "npx opennextjs-cloudflare build && node scripts/patch-cf-instrumentation.mjs"
+        },
+        "services": [
+                {
+                        // Self-reference service binding, the service name must match the worker name
+                        // see https://opennext.js.org/cloudflare/caching
+                        "binding": "WORKER_SELF_REFERENCE",
+                        "service": "zicola-math"
+                }
+        ],
+        "images": {
+                // Enable image optimization
+                // see https://opennext.js.org/cloudflare/howtos/image
+                "binding": "IMAGES"
+        }
+}

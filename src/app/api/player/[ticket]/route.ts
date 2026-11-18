@@ -84,10 +84,26 @@
 // ============================================================
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
-import QRCode from 'qrcode'
 import { db } from '@/lib/db'
 import { getYouTubeId, mediaIdFromPath, signVideoToken, ensurePlayTicketTable } from '@/lib/video-guard'
 import { sanitizePlayerConfig } from '@/lib/player-config'
+
+/* (ر8 — نشر Cloudflare Workers) qrcode runtime import بدل باندل —
+   نفس أسلوب canvas/pdf.js: اسم الباكج بمتغير + استيراد عبر Function
+   ما بيتبعهش esbuild فمش جوه الـ Worker (كان بياخد ~150KB gzip من
+   حد الخطة المجانية 3MB). على Node/Vercel بيتحمل من node_modules
+   عادي (serverExternalPackages + outputFileTracingIncludes)،
+   وعلى Workers بيقع في try/catch النداء — العلامة المائية النصية
+   (الاسم/الرقم) بتفضل شغالة من غير الكود. */
+var QR_MOD = ['qrcode'].join('')
+var qrcodeMod: any = null
+async function getQRCode(): Promise<any> {
+  if (qrcodeMod) return qrcodeMod
+  var runtimeImport: (u: string) => Promise<any> = Function('u', 'return import(u)') as unknown as (u: string) => Promise<any>
+  var m = await runtimeImport(QR_MOD)
+  qrcodeMod = (m && m.default) ? m.default : m
+  return qrcodeMod
+}
 
 /* ===== (و35) أي لينك فيديو بيتشغل — مش شرط يوتيوب أو امتداد مباشر =====
    طلب المستر: «لو رفعت أي لينك فيديو مش شرط من يوتيوب من أي موقع تاني
@@ -360,11 +376,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     var wmQr = ''
     if (wmEnabled === '1' && (wmName || wmPhone)) {
       try {
-        const qrSvg = await QRCode.toString('Zicola In Math | ' + wmName + ' | ' + wmPhone, {
-          type: 'svg', margin: 0, width: 64, errorCorrectionLevel: 'M',
-          color: { dark: '#000000', light: '#ffffff' },
-        })
-        wmQr = 'data:image/svg+xml;base64,' + Buffer.from(qrSvg, 'utf8').toString('base64')
+        const QRCode = await getQRCode()
+        if (!QRCode) { wmQr = '' } else {
+          const qrSvg = await QRCode.toString('Zicola In Math | ' + wmName + ' | ' + wmPhone, {
+            type: 'svg', margin: 0, width: 64, errorCorrectionLevel: 'M',
+            color: { dark: '#000000', light: '#ffffff' },
+          })
+          wmQr = 'data:image/svg+xml;base64,' + Buffer.from(qrSvg, 'utf8').toString('base64')
+        }
       } catch (e) { wmQr = '' }
     }
 

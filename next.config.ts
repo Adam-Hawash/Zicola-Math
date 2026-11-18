@@ -13,6 +13,9 @@ const nextConfig: NextConfig = {
     /* (و49) القص السيرفري للرسومات — pdf.js legacy + napi canvas لازم يفضلوا خارجية */
     'pdfjs-dist',
     '@napi-rs/canvas',
+    /* (ر8) qrcode بقى runtime import مشفية عن الباندلر — خارجية عشان
+       Vercel/Node يجيبوها من node_modules وقت التشغيل */
+    'qrcode',
   ],
   /* (و50) كل أصول القص السيرفري لازم توصل مع الدالة على Vercel:
      خطوط pdf.js + باكجات napi canvas الأصلية (.node binaries) — من غيرها
@@ -30,6 +33,10 @@ const nextConfig: NextConfig = {
       './node_modules/@napi-rs/canvas/**',
       './node_modules/@napi-rs/canvas-linux-x64-gnu/**',
       './node_modules/@napi-rs/canvas-linux-x64-musl/**',
+    ],
+    /* (ر8) qrcode بقى runtime import — لازم يتتبع للمسار ده على Vercel */
+    '/api/player/[ticket]': [
+      './node_modules/qrcode/**',
     ],
     /* (و50) خط إنقاذ الرسمات من السيرفر — نفس أصول القص */
     '/api/crop-figures': [
@@ -62,3 +69,5 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+
+import('@opennextjs/cloudflare').then(m => m.initOpenNextCloudflareForDev());

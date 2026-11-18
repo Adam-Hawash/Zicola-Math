@@ -55,7 +55,9 @@ import { MathKeyboard } from '@/components/student/MathKeyboard'
 /* (2026-و40) استخراج من صفحات كتاب PDF — تصوير الصفحات على المتصفح بـ pdf.js */
 import { openPdf, renderPageToJpeg } from '@/lib/pdf-pages'
 /* (2026-و40-w) ورقة العمل: قص رسومات الأسئلة + عرض الجداول/الرسومات في المراجعة */
-import { ensureFigureUrls, isWritingQuestion } from '@/lib/question-figures'
+import { isWritingQuestion } from '@/lib/question-figures'
+/* (ر8) طبقة القص على المتصفح اتنقلت لملفها المستقل — سيرفر السيرفر ما يحملش pdf.js في الباندل */
+import { ensureFigureUrls } from '@/lib/figure-browser-crop'
 import BidiText from '@/components/BidiText'
 import { WorksheetTableReadonly, WorksheetTableEditor, WorksheetFigure, parseTableValuesFromText } from '@/components/worksheet/WorksheetParts'
 /* (2026-و40) الكتب والملازم — تاب مكتبة الكتب للطالب */

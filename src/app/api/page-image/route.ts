@@ -13,6 +13,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { isAdmin } from '@/lib/video-guard'
 
+/* (ر8 — نشر Cloudflare Workers) اسم الباكج بمتغير مركّب بدل نص حرفي —
+   esbuild مش بيقدر يحلّه وقت البناء فمش بيلف ملفات Skia الـ .node الـ native
+   (اللي كانت بتكسر نشر Cloudflare بـ «No loader is configured for \".node\" files»)،
+   والاستيراد بيتأجل لوقت التشغيل — على Node/Vercel شغال عادي وعلى Workers
+   بيقع في try/catch الجسم ويرجّع رسالة واضحة بدل ما يكسر السيرفر. */
+var NAPI_CANVAS = ['@napi-rs', 'canvas'].join('/')
+/* (ر8) نفس الأسلوب لـ pdf.js السيرفري — runtime import بدل الباندل (تفاصيل فوق في server-figures) */
+var PDFJS_MAIN = ['pdfjs-dist', 'legacy/build/pdf.mjs'].join('/')
+var PDFJS_WORKER = ['pdfjs-dist', 'legacy/build/pdf.worker.mjs'].join('/')
+
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
@@ -54,7 +64,7 @@ export async function GET(request: NextRequest) {
     }
 
     /* PDF → رندر سيرفري بنفس طبقة /api/crop-figures (napi canvas قبل استيراد pdf.js) */
-    var { createCanvas, DOMMatrix, Path2D, ImageData } = await import('@napi-rs/canvas')
+    var { createCanvas, DOMMatrix, Path2D, ImageData } = await import(NAPI_CANVAS)
     if (!(globalThis as any).DOMMatrix) (globalThis as any).DOMMatrix = DOMMatrix
     if (!(globalThis as any).Path2D) (globalThis as any).Path2D = Path2D
     if (!(globalThis as any).ImageData) (globalThis as any).ImageData = ImageData
@@ -63,10 +73,10 @@ export async function GET(request: NextRequest) {
        الاستيراد الصريح بيخلي الباندلر يشمله + بنسجله في globalThis زي ما
        pdf.js بيفحصه الأول في setupFakeWorkerGlobal */
     try {
-      var wmod: any = await import('pdfjs-dist/legacy/build/pdf.worker.mjs')
+      var wmod: any = await import(PDFJS_WORKER)
       if (wmod && !(globalThis as any).pdfjsWorker) (globalThis as any).pdfjsWorker = wmod
     } catch (eW) {}
-    var pdfjs: any = await import('pdfjs-dist/legacy/build/pdf.mjs')
+    var pdfjs: any = await import(PDFJS_MAIN)
 
     var pathMod = await import('path')
     var fsMod = await import('fs')

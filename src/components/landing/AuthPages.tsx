@@ -254,7 +254,10 @@ export function LoginView() {
         /* (تسريع المنصة — و112) طلب المستر: المنصه تفتح والبيانات كلها جاهزه —
            بنبدأ تحميل كل بيانات الفسحة + كودها نفسه بالتوازي مع الانتقال */
         startPortalBundle(student.grade, student.id)
-        try { import('@/components/student/StudentPortal') } catch (eWarm) {}
+        /* (ر8) تسخين chunk البورت اتشال — كان استيراد literal بيسحب كود
+           البورت كله لباندل السيرفر وبيضخّم الـ Worker بتاع كلاود فلير فوق
+           حد الخطة المجانية. البيانات بتتسخن من startPortalBundle فوق،
+           وchunk الكود بيتحمّل أول فتح للفسحة عادي. */
         setCurrentStudent(student); setView('student-portal')
         toast.success('مرحباً ' + student.name + '!')
         fetch('/api/students/track-login', {
