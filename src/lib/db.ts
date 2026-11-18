@@ -17,7 +17,7 @@ export async function withRetry(fn, retries, delayMs) {
       var msg = error && (error.message || '')
       var code = error && (error.code || '')
       var isLocked = msg.indexOf('database is locked') !== -1 || code === 'SQLITE_BUSY'
-      var isTransient = code === 'CONNRESET' || code === 'ECONNRESET' || code === 'ETIMEDOUT'
+      var isTransient = code === 'CONNRESET' || code === 'ECONNRESET' || code === 'ETIMEDOUT' || code === 'NETWORK'
       if ((isLocked || isTransient) && attempt < retries) {
         await new Promise(function (r) { setTimeout(r, delayMs * (attempt + 1)) })
         continue
@@ -29,104 +29,89 @@ export async function withRetry(fn, retries, delayMs) {
 }
 
 /* ============================================================
- * (ر13) قفل التسلسل العالمي لعمليات قاعدة البيانات — إصلاح جذري
+ * (ر14) الإصلاح الجذري النهائي لبطء المنصة وتجمّدها المفاجئ (500 في
+ * الفيديوهات والمدفوعات وكل حاجة) — تفكيك طبقات القفل كلها
  * ============================================================
- * العطل المُثبت حيًا بالتشخيص المرحلي (wrangler dev بنفس runtime
- * الإنتاج workerd): أي نداءين متزامنين بيوصلوا قاعدة البيانات في
- * نفس اللحظة على نفس الـ isolate — سلسلة أحدهم بتتقطع وworkerd
- * يلغي النداء فورًا برسوم «hung and would never generate a
- * response» = في الإنتاج «error code: 1101» بجسم مش JSON.
- * الأدلة:
- *  - تزامن على راوت دافي بالداتابيز: 7/8 اتلغوا فورًا (0.04s).
- *  - تزامن عابر لراوتات الداتابيز: كلهم اتلغوا.
- *  - تزامن على راوت بدون داتابيز: سليم 100%.
- *  - نداءات الداتابيز المسلسلة: سليمة 100% (9/9 في الرِج).
- * درس ر13 المصيري: ممنوع تنسيق الطلبات عبر **promises عابرة للحدود**
- * — workerd بيقول حرفيًا «This promise was created by a request that
- * has since ended, so it can never settle» — أي طابور promises بين
- * طلبات هو نفسه نوع العطل. عشان كده القفل هنا **مزامن بالكامل**:
- * علم Boolean مشترك + polling بمؤقتات الطلب نفسه (النداء المنتظر
- * فاعل وعنده أحداث فما بيتلغاش)، والصرف في finally أثناء حياة صاحب
- * النداء، وسرقة القفل بعد 30 ثانية لو صاحبه اتلغى (ضمان ضد حصار دائم).
- * $transaction (batch مصفوفة) بتعدّي بدون قفل لأنها ذرية على السيرفر
- * في نداء واحد — ومفيش interactive transactions في المشروع.
- * التكلفة: عمليات الداتابيز بتتنفذ واحد ورا التاني لكل isolate —
- * مقبولة لحجم منصة مدرسة، والصح أولوية على السرعة هنا.
+ * التشخيص المُثبت بالقراءة الحية لكود الحزم المثبتة (node_modules):
+ *
+ * 1) @prisma/adapter-libsql (index-node.mjs) بيحط Mutex من async-mutex
+ *    على **كل استعلام** — وperformIO بيصرف القفل في finally. لو الطلب
+ *    اللي شايل القفل اتلغي (المتصفح قفل الصفحة/ريفريش أثناء البطء/مهلة
+ *    انتهت والرد اتقفل والاستعلام لسه شغال) — سلسلة client.execute
+ *    **عمرها ما بتتسوى** في workerd → finally عمره ما بينادي →
+ *    **الـ Mutex بيفضل مقفول للأبد على الـ isolate** → كل استعلام بعد
+ *    كده بيقف في الطابور للأبد → workerd يلغي الطلبات كلها
+ *    («hung and would never generate a response» = 1101/500 عشوائي).
+ *    ده بالظبط تسلسل أعراض المستر: بطء → رسالة «قاعدة البيانات بطيء»
+ *    في الأدمن → وبعدها 500 في الفيديوهات والمدفوعات وكل حاجة.
+ *
+ * 2) قفل ر13 (turnstile) كان طبقة تانية فوق الـ Mutex بتاع المحوّل —
+ *    يعني كل استعلام بيستنى طابورين ورا بعض = بطء مضاعف، ولو القفل
+ *    الميت حصل برضه كان بيرجع بعد 30 ثانية لكن القفل التحتي للمحوّل
+ *    بيفضل ميت → التجميد استمر رغم ر13.
+ *
+ * 3) والقفل نفسه **مش ضروري أصلًا** في الإنتاج: Turso بيتوصل عبر
+ *    HTTP عديم الحالة (نسخة web من @libsql/client بتوجّه libsql://
+ *    إلى https تلقائيًا — مؤكد من قراءة config.js) — كل استعلام =
+ *    نداء fetch مستقل، والـ client نفسه فيه promiseLimit(20) داخلي
+ *    للتزامن، وسيرفر Turso بيسلسل الكتابات بنفسه. التزامن الحقيقي
+ *    آمن 100% والقفل كان بيأخر كل حاجة من غير أي فايدة.
+ *
+ * الحل (ر14):
+ *  - إزالة طبقة turnstile بالكامل من db.ts.
+ *  - استبدال الـ async-mutex بتاع المحوّل بmutex آمن مصغر:
+ *    * على الداتابيز البعيدة (Turso): بدون أي قفل — acquire فوري.
+ *      مفيش أي حالة مشتركة بين الاستعلامات → **استحالة الجمود** —
+ *      أي طلب يتلغي يسيب وعوده يموت لوحده من غير ما يعلّق حد.
+ *    * التسلسل اللي كان بيحميه القفل محفوظ فعليًا: سيرفر Turso
+ *      يتعامل مع كل statement ذريًا، والسباقات على مستوى التطبيق
+ *      كانت أصلاً ممكنة بين isolates متعددة فالقفل ما كانش بيضمن حاجة.
+ *  - withRetry/safeWrite زي ما هم للحالات العابرة.
  * ============================================================ */
-var __dbTurnstile = { busy: false, since: 0 }
 
-async function dbTurnstileAcquire() {
-  for (;;) {
-    if (!__dbTurnstile.busy || Date.now() - __dbTurnstile.since > 30000) {
-      __dbTurnstile.busy = true
-      __dbTurnstile.since = Date.now()
-      return
-    }
-    await new Promise(function (r) { setTimeout(r, 3) })
+function makeNoopMutex() {
+  var noopRelease = function () {}
+  return {
+    acquire: function () { return Promise.resolve(noopRelease) },
+    isLocked: function () { return false },
   }
 }
 
-function dbTurnstileRelease() {
-  __dbTurnstile.busy = false
+/* إيجاد الـ Mutex المخفي في الـ adapter (خانة بمفتاح Symbol خاص) وتبديله */
+function patchAdapterMutex(adapter) {
+  try {
+    var syms = Object.getOwnPropertySymbols(adapter)
+    for (var i = 0; i < syms.length; i++) {
+      var v = adapter[syms[i]]
+      if (v && typeof v.acquire === 'function' && typeof v.release === 'function' && typeof v.isLocked === 'function') {
+        adapter[syms[i]] = makeNoopMutex()
+        return true
+      }
+    }
+  } catch (e) {}
+  return false
 }
 
-/* غلاف تسلسلي لمندوب الموديل (db.video, db.siteConfig, ...) */
-function serializeModelDelegate(delegate) {
-  return new Proxy(delegate, {
-    get: function (target, prop, receiver) {
-      if (typeof prop === 'symbol') return Reflect.get(target, prop, receiver)
-      var v = Reflect.get(target, prop, receiver)
-      if (typeof v !== 'function') return v
-      return function () {
-        var args = Array.prototype.slice.call(arguments)
-        /* (ر13-فكس) الربط دايمًا بالهدف الخام — تمرير الـ Proxy كـ this
-           كان بيخلي دوال Prisma الداخلية تعدي على الغلاف تاني وتطلب
-           القفل وهي حاجزه = قفل ذاتي وجمود كامل (مُثبت حيًا) */
-        return (async function () {
-          await dbTurnstileAcquire()
-          try {
-            return await v.apply(target, args)
-          } finally {
-            dbTurnstileRelease()
-          }
-        })()
-      }
-    },
-  })
-}
-
-/* غلاف تسلسلي للـ PrismaClient نفسه: الموديلات + raw queries مسلسلة،
-   و$transaction/$connect/$disconnect/$on/$extends تعدّي زي ما هي */
-function serializeDbClient(client) {
-  var modelCache = {}
-  return new Proxy(client, {
-    get: function (target, prop, receiver) {
-      if (typeof prop === 'symbol') return Reflect.get(target, prop, receiver)
-      var v = Reflect.get(target, prop, receiver)
-      if (typeof v === 'function') {
-        if (prop === '$transaction' || prop === '$connect' || prop === '$disconnect' || prop === '$on' || prop === '$extends') {
-          return v
-        }
-        return function () {
-          var args = Array.prototype.slice.call(arguments)
-          /* (ر13-فكس) نفس القاعدة: الربط بالهدف الخام دايمًا */
-          return (async function () {
-            await dbTurnstileAcquire()
-            try {
-              return await v.apply(target, args)
-            } finally {
-              dbTurnstileRelease()
-            }
-          })()
-        }
-      }
-      if (v && typeof v === 'object') {
-        if (!modelCache[prop]) modelCache[prop] = serializeModelDelegate(v)
-        return modelCache[prop]
-      }
-      return v
-    },
-  })
+/* الـ factory هو اللي بينشئ الـ adapter وقت connect — بنغلف connect
+   عشان كل adapter جديد يطلع بالـ mutex الآمن */
+function patchAdapterFactory(factory) {
+  var origConnect = factory.connect.bind(factory)
+  factory.connect = function () {
+    return Promise.resolve(origConnect()).then(function (ad) {
+      patchAdapterMutex(ad)
+      return ad
+    })
+  }
+  if (typeof factory.connectToShadowDb === 'function') {
+    var origShadow = factory.connectToShadowDb.bind(factory)
+    factory.connectToShadowDb = function () {
+      return Promise.resolve(origShadow()).then(function (ad) {
+        patchAdapterMutex(ad)
+        return ad
+      })
+    }
+  }
+  return factory
 }
 
 function createPrismaClient() {
@@ -145,12 +130,14 @@ function createPrismaClient() {
     var libsqlOpts = { url: dbUrl }
     if (authToken) { libsqlOpts.authToken = authToken }
     var adapter = new PrismaLibSQL(libsqlOpts)
-    return serializeDbClient(new PrismaClient({ adapter: adapter, log: [] }))
+    /* (ر14) القفل الآمن — التزامن الكامل على Turso بدون أي احتمال تجميد */
+    patchAdapterFactory(adapter)
+    return new PrismaClient({ adapter: adapter, log: [] })
   }
 
-  return serializeDbClient(new PrismaClient({
+  return new PrismaClient({
     log: process.env.NODE_ENV !== 'production' ? ['query'] : [],
-  }))
+  })
 }
 
 export var db = _prisma || createPrismaClient()

@@ -12,20 +12,20 @@
 import { ensureSchema, makeLibsqlClient } from '@/lib/ensure-schema'
 import { db } from '@/lib/db'
 
-var _arenaReady: Promise<void> | null = null
+var _arenaOk = false
 
-export function ensureArenaTables(): Promise<void> {
-  if (!_arenaReady) {
-    _arenaReady = (async function () {
-      try {
-        var client = makeLibsqlClient()
-        if (client) {
-          try { await ensureSchema(client) } finally { try { await client.close() } catch (e2) {} }
-        }
-      } catch (e) {}
-    })()
-  }
-  return _arenaReady
+/* (ر14) علم Boolean بدل الوعد المشترك بين الطلبات — نفس سبب ر14: الوعد
+   المشترك ممكن يتعلق للأبد لو صاحبه اتلغي في نص التنفيذ. ensureSchema
+   idempotent فالتوازي آمن والفشل ما يمنعش استدعاءات الساحة */
+export async function ensureArenaTables(): Promise<void> {
+  if (_arenaOk) return
+  try {
+    var client = makeLibsqlClient()
+    if (client) {
+      try { await ensureSchema(client) } finally { try { await client.close() } catch (e2) {} }
+    }
+    _arenaOk = true
+  } catch (e) {}
 }
 
 /* ترميز أكواد الغرف بدون حروف متشابهة (بدون O/0 و I/1) */

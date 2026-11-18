@@ -86,18 +86,16 @@ export default async function RootLayout({
 }>) {
   var initialConfig: Record<string, string> = {};
   try {
-    /* (تسريع المنصة) الكونفيج من الكاش (30s) بدل قراءة قاعدة Turso في كل طلب
-       — نفس سلوك الشفاء الذاتي: لو القاعدة بطيئة/ناقصة، الكلينت هيجيب عبر /api/config */
-    var dbPromise = import("@/lib/site-config").then(function(cfgModule) {
-      return cfgModule.getSiteConfigRaw();
-    });
-    var configs = await Promise.race([
-      dbPromise,
-      new Promise(function(resolve) { setTimeout(function() { resolve([]) }, 3000) })
-    ]);
-    for (var i = 0; i < (configs as any[]).length; i++) {
-      initialConfig[(configs as any[])[i].key] = (configs as any[])[i].value;
-    }
+    /* (ر14) إزالة مهلة الـ 3 ثواني (Promise.race) — كانت **قاتل صامت لقاعدة
+       البيانات**: لما المهلة تكسب والرد يرجع والاستعلام لسه شغال، سياق الطلب
+       يقفل وسلسلة القراءة تفضل معلقة للأبد في workerd والقفل الداخلي لمحوّل
+       Prisma يفضل مسكوب = تجميد كل عمليات الداتابيز على الـ isolate بعد
+       أول تحميل بطيء. دلوقتي القراءة بتخلص طبيعي (الكاش 30 ثانية بيخلي
+       الطلبات الجاية فورية — والبطء نفسه اتحل من الجذر في db.ts ر14) */
+    var cfgModule = await import("@/lib/site-config");
+    var configs = await cfgModule.getSiteConfigRaw();
+    /* (ر14) getSiteConfigRaw بترجع خريطة جاهزة — نسخ مباشر من غير أي casts */
+    initialConfig = { ...configs };
   } catch (e) {
     /* DB not available yet — client will fetch via /api/config */
   }

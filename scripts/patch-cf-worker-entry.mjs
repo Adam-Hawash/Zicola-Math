@@ -48,8 +48,11 @@ const CLOSE_ANCHOR = `        });
     },
 };`
 
-const OPEN_REPLACEMENT = `/* (ر13 — بوابة أول تحميل المزامنة ضد سباق التحميل الكسور) */
-const __ffGate = { firstLoadBusy: false, since: 0, pathWarm: new Set() };
+const OPEN_REPLACEMENT = `/* (ر13 — بوابة أول تحميل المزامنة ضد سباق التحميل الكسور)
+   (ر14) القفل بقى **لكل مسار** بدل قفل عالمي واحد — كانت بتسلسل كل المسارات
+   الباردة ورا بعض = بطء التحميل الأول. دلوقتي المسارات المختلفة بتشتغل بالتوازي
+   والمسار الواحد بس بيتسلسل على أول تحميل (نفس الحماية لسباق الاستيراد) */
+const __ffGate = { locks: new Map(), pathWarm: new Set() };
 async function __originalFetch(request, env, ctx) {
         return runWithCloudflareRequestContext(request, env, ctx, async () => {`
 
@@ -58,11 +61,13 @@ const CLOSE_REPLACEMENT = `        });
 async function __ffFetch(request, env, ctx) {
         var __ffPath = new URL(request.url).pathname;
         if (__ffGate.pathWarm.has(__ffPath)) return __originalFetch(request, env, ctx);
-        /* أخذ القفل بالـ polling المزامن — النداء المنتظر فاعل (timers) فما بيتلغاش */
+        /* (ر14) قفل لكل مسار — أخذ القفل بالـ polling المزامن، النداء المنتظر فاعل (timers) فما بيتلغاش */
+        var __ffLock = __ffGate.locks.get(__ffPath);
+        if (!__ffLock) { __ffLock = { busy: false, since: 0 }; __ffGate.locks.set(__ffPath, __ffLock); }
         for (;;) {
-            if (!__ffGate.firstLoadBusy || Date.now() - __ffGate.since > 30000) {
-                __ffGate.firstLoadBusy = true;
-                __ffGate.since = Date.now();
+            if (!__ffLock.busy || Date.now() - __ffLock.since > 30000) {
+                __ffLock.busy = true;
+                __ffLock.since = Date.now();
                 break;
             }
             await new Promise(function (r) { setTimeout(r, 3) });
@@ -73,7 +78,7 @@ async function __ffFetch(request, env, ctx) {
             __ffGate.pathWarm.add(__ffPath);
             return __ffR;
         } finally {
-            __ffGate.firstLoadBusy = false;
+            __ffLock.busy = false;
         }
 }
 export default {
@@ -126,4 +131,4 @@ for (const step of STAGE_INSTRUMENT) {
 }
 
 writeFileSync(WORKER, content)
-console.log('[patch-worker] ✓ بوابة أول تحميل المزامنة + تسجيل المراحل اتطبقوا على worker.js')
+console.log('[patch-worker] ✓ بوابة أول تحميل لكل مسار (ر14) + تسجيل المراحل اتطبقوا على worker.js')

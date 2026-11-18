@@ -17,7 +17,6 @@ import { db } from '@/lib/db'
 
 var TTL_MS = 30 * 1000
 var cache: { map: Record<string, string> | null; at: number } = { map: null, at: 0 }
-var inflight: Promise<Record<string, string>> | null = null
 
 async function loadFromDb(): Promise<Record<string, string>> {
   var configs = await db.siteConfig.findMany()
@@ -32,18 +31,15 @@ async function loadFromDb(): Promise<Record<string, string>> {
 export async function getSiteConfigRaw(): Promise<Record<string, string>> {
   var now = Date.now()
   if (cache.map && now - cache.at < TTL_MS) return cache.map
-  if (inflight) return inflight
-  inflight = loadFromDb()
-    .then(function (map) {
-      cache = { map: map, at: Date.now() }
-      inflight = null
-      return map
-    })
-    .catch(function (err) {
-      inflight = null
-      throw err
-    })
-  return inflight
+  /* (ر14) إزالة الـ inflight المشترك بين الطلبات — كان **وعد عابر للحدود**:
+     طلب تاني بيستنى وعد قراءة اتبنى في سياق طلب تالت — لو التالت خلص
+     (ريفريش/إغلاق/مهلة) النداء بيفضل معلّق للأبد في workerd والطلب المستني
+     يتلغي («hung and would never generate a response» = 500/1101).
+     دلوقتي كل نداء بعمل قراءته المستقلة (التزامن حقيقي بعد ر14 في db.ts
+     فالاستعلامات المتوازية آمنة وسريعة) والكاش المشترك بيانات سادة — آمن. */
+  var map = await loadFromDb()
+  cache = { map: map, at: Date.now() }
+  return map
 }
 
 /** إبطال الكاش — تتنادى بعد أي كتابة على SiteConfig من أي راوت */

@@ -11,21 +11,19 @@
    ============================================================ */
 import { db } from '@/lib/db'
 
-var parentStudentDdlDone: Promise<void> | null = null
+var parentStudentDdlOk = false
 
-export function ensureParentStudentTable(): Promise<void> {
-  if (!parentStudentDdlDone) {
-    parentStudentDdlDone = (async function () {
-      await db.$executeRawUnsafe(
-        'CREATE TABLE IF NOT EXISTS ParentStudent (id TEXT PRIMARY KEY, parentId TEXT NOT NULL, studentId TEXT NOT NULL, createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(parentId, studentId))'
-      )
-      try { await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS idx_ps_parent ON ParentStudent(parentId)') } catch (e) {}
-      try { await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS idx_ps_student ON ParentStudent(studentId)') } catch (e) {}
-    })().catch(function () {
-      parentStudentDdlDone = null
-    })
-  }
-  return parentStudentDdlDone
+/* (ر14) علم Boolean بدل الوعد المشترك — الوعد المشترك بين الطلبات كان ممكن
+   يتعلق للأبد لو الطلب اللي بيشغّل الـ DDL خلص في نصه (سياقه يقفل وسلسلة
+   الاستعلام تستنى للأبد). الـ DDL هنا idempotent (IF NOT EXISTS) فالتوازي آمن */
+export async function ensureParentStudentTable(): Promise<void> {
+  if (parentStudentDdlOk) return
+  await db.$executeRawUnsafe(
+    'CREATE TABLE IF NOT EXISTS ParentStudent (id TEXT PRIMARY KEY, parentId TEXT NOT NULL, studentId TEXT NOT NULL, createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(parentId, studentId))'
+  )
+  try { await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS idx_ps_parent ON ParentStudent(parentId)') } catch (e) {}
+  try { await db.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS idx_ps_student ON ParentStudent(studentId)') } catch (e) {}
+  parentStudentDdlOk = true
 }
 
 export function normPhone(v: any): string {

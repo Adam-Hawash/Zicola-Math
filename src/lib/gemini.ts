@@ -33,7 +33,6 @@ export var GEMINI_GRADING_MODELS = ['gemini-3.6-pro', 'gemini-pro-latest']
 import { db } from '@/lib/db'
 
 var _dbCacheReady = false
-var _dbCacheLoading: Promise<void> | null = null
 var _cachedWorkingModel = ''
 var _cachedModelsJson = ''
 
@@ -56,22 +55,22 @@ async function cacheSet(key: string, value: string): Promise<void> {
 
 /* بتتنادى مرة واحدة لكل عملية (lazy) — بتقرأ الكاش من الداتابيز في متغيرات الموديول */
 async function ensureModelCache(): Promise<void> {
+  /* (ر14) علم Boolean بدل الوعد المشترك بين الطلبات — الوعد المشترك ممكن يتعلق
+     للأبد لو الطلب اللي بيشغّل التحميل اتلغي في نصه (سياقه يقفل والسلسلة تستنى
+     للأبد في workerd). النداء هنا idempotent (CREATE IF NOT EXISTS + قرايات) —
+     التوازي آمن والكتابات بسيطة */
   if (_dbCacheReady) return
-  if (_dbCacheLoading) { try { await _dbCacheLoading } catch (e) {} return }
-  _dbCacheLoading = (async function () {
-    try {
-      await db.$executeRawUnsafe('CREATE TABLE IF NOT EXISTS AiModelCache (key TEXT PRIMARY KEY, value TEXT)')
-      var wm = await cacheGet('working_model')
-      if (wm) _cachedWorkingModel = wm
-      var mj = await cacheGet('models_json')
-      if (mj) _cachedModelsJson = mj
-    } catch (e) {
-      // الداتابيز مش متاحة؟ نسبي — الكاش في الميموري وكده بيكفي
-    } finally {
-      _dbCacheReady = true
-    }
-  })()
-  try { await _dbCacheLoading } catch (e) {}
+  try {
+    await db.$executeRawUnsafe('CREATE TABLE IF NOT EXISTS AiModelCache (key TEXT PRIMARY KEY, value TEXT)')
+    var wm = await cacheGet('working_model')
+    if (wm) _cachedWorkingModel = wm
+    var mj = await cacheGet('models_json')
+    if (mj) _cachedModelsJson = mj
+  } catch (e) {
+    // الداتابيز مش متاحة؟ نسبي — الكاش في الميموري وكده بيكفي
+  } finally {
+    _dbCacheReady = true
+  }
 }
 
 // Optional API base override (proxy/self-host testing). Defaults to Google's
@@ -239,7 +238,6 @@ function isAuthKeyPathError(status: number, errBody: string): boolean {
  * ============================================================ */
 var discoveredModels: string[] = []
 var discoveredAt = 0
-var discovering: Promise<string[]> | null = null
 
 function rankScore(modelId: string): number {
   var m = modelId.toLowerCase()
@@ -280,49 +278,46 @@ async function discoverModels(): Promise<string[]> {
   if (keys.length === 0) return []
   var now = Date.now()
   if (discoveredModels.length > 0 && now - discoveredAt < 10 * 60 * 1000) return discoveredModels
-  if (discovering) return discovering
-
-  discovering = (async function () {
-    var found: string[] = []
-    for (var i = 0; i < keys.length && found.length === 0; i++) {
-      try {
-        var controller = new AbortController()
-        var to = setTimeout(function () { controller.abort() }, 8000)
-        /* (و104) المفتاح بيتبعت في الهيدر مش في الـ URL — الصيغة الجديدة
-           من AI Studio (بتبدأ بـ AQ.…) بتترفض 401 لو اتبعتت ?key= —
-           الهيدر x-goog-api-key شغال مع الصيغتين (AIza القديمة + AQ الجديدة) */
-        var res = await fetch(GEMINI_BASE + '/v1beta/models?pageSize=200', {
-          method: 'GET',
-          headers: { 'x-goog-api-key': keys[i] },
-          signal: controller.signal,
-        })
-        clearTimeout(to)
-        if (!res.ok) continue
-        var data = await res.json()
-        var models = (data && data.models) || []
-        for (var mi = 0; mi < models.length; mi++) {
-          var mm = models[mi]
-          var name = (mm.name || '').replace(/^models\//, '')
-          var methods = mm.supportedGenerationMethods || []
-          if (!name || name.indexOf('gemini') !== 0) continue
-          if (name.indexOf('embedding') >= 0 || name.indexOf('aqa') >= 0 || name.indexOf('imagen') >= 0 || name.indexOf('veo') >= 0 || name.indexOf('tts') >= 0 || name.indexOf('live') >= 0) continue
-          if (methods.indexOf('generateContent') < 0) continue
-          found.push(name)
-        }
-      } catch (e) {}
-    }
-    if (found.length > 0) {
-      discoveredModels = rankModels(found)
-      discoveredAt = Date.now()
-      try { console.log('[Gemini] Available models for this key:', discoveredModels.slice(0, 8).join(', ')) } catch (e) {}
-      // (و77) خزّن الموديلات المكتشفة في الداتابيز — fire-and-forget —
-      // عشان الكولد ستارت الجاي يبدأ من قائمة شغالة على طول
-      try { cacheSet('models_json', JSON.stringify(discoveredModels)) } catch (e) {}
-    }
-    return discoveredModels
-  })()
-
-  try { return await discovering } finally { discovering = null }
+  /* (ر14) بدون وعد مشترك بين الطلبات (نفس سبب ر14 — الوعد المشترك يتعلق
+     لو صاحبه اتلغي). الاكتشاف idempotent وبيكتب في الكاش المشترك (بيانات
+     سادة) — التوازي في أسوأ الحالات بيلغم كشفين بدل واحد وما فيش تعليق */
+  var found: string[] = []
+  for (var i = 0; i < keys.length && found.length === 0; i++) {
+    try {
+      var controller = new AbortController()
+      var to = setTimeout(function () { controller.abort() }, 8000)
+      /* (و104) المفتاح بيتبعت في الهيدر مش في الـ URL — الصيغة الجديدة
+         من AI Studio (بتبدأ بـ AQ.…) بتترفض 401 لو اتبعتت ?key= —
+         الهيدر x-goog-api-key شغال مع الصيغتين (AIza القديمة + AQ الجديدة) */
+      var res = await fetch(GEMINI_BASE + '/v1beta/models?pageSize=200', {
+        method: 'GET',
+        headers: { 'x-goog-api-key': keys[i] },
+        signal: controller.signal,
+      })
+      clearTimeout(to)
+      if (!res.ok) continue
+      var data = await res.json()
+      var models = (data && data.models) || []
+      for (var mi = 0; mi < models.length; mi++) {
+        var mm = models[mi]
+        var name = (mm.name || '').replace(/^models\//, '')
+        var methods = mm.supportedGenerationMethods || []
+        if (!name || name.indexOf('gemini') !== 0) continue
+        if (name.indexOf('embedding') >= 0 || name.indexOf('aqa') >= 0 || name.indexOf('imagen') >= 0 || name.indexOf('veo') >= 0 || name.indexOf('tts') >= 0 || name.indexOf('live') >= 0) continue
+        if (methods.indexOf('generateContent') < 0) continue
+        found.push(name)
+      }
+    } catch (e) {}
+  }
+  if (found.length > 0) {
+    discoveredModels = rankModels(found)
+    discoveredAt = Date.now()
+    try { console.log('[Gemini] Available models for this key:', discoveredModels.slice(0, 8).join(', ')) } catch (e) {}
+    // (و77) خزّن الموديلات المكتشفة في الداتابيز — fire-and-forget —
+    // عشان الكولد ستارت الجاي يبدأ من قائمة شغالة على طول
+    try { cacheSet('models_json', JSON.stringify(discoveredModels)) } catch (e) {}
+  }
+  return discoveredModels
 }
 
 // ============================================================
