@@ -104,11 +104,40 @@ export async function POST(request) {
       if (!emailMatch(cleanEmail) || (cleanPassword !== squash(DEFAULT_PASSWORD) && cleanPassword !== squash(MASTER_PASSWORD))) {
         return NextResponse.json({ error: 'البريد أو كلمة المرور غلط' }, { status: 401 })
       }
-      admin = await safeWrite(function() {
-        return db.admin.create({
-          data: { email: DEFAULT_EMAIL, password: DEFAULT_PASSWORD, name: ADMIN_NAME },
+      /* (ر18 — إصلاح «خطأ في السيرفر» عند البيانات الصح) لو القراءة الأولى فشلت
+         لحظيًا (قطع Turso العابر) → admin=null → الكود كان يحاول يعمل أدمن جديد
+         → يصطدم بقيود UNIQUE لإن الصف موجود فعلًا → 500 رغم إن البيانات صح!
+         ده كان بالظبط بلاغ المستر: «بيكتب الرقم والباسورد ما بيدخلش ويجيب
+         خطأ في السيرفر». دلوقتي: الإشاء الفاشل بيرجع يقرأ الصف ويكمل دخول
+         عادي — والإشاء يعاد مرة أخيرة فقط لو القاعدة فاضية فعلًا */
+      try {
+        admin = await safeWrite(function() {
+          return db.admin.create({
+            data: { email: DEFAULT_EMAIL, password: DEFAULT_PASSWORD, name: ADMIN_NAME },
+          })
         })
-      })
+      } catch (createErr: any) {
+        try {
+          admin = await findAdminSafe()
+        } catch (reErr) { admin = null }
+        if (!admin) {
+          try {
+            admin = await safeWrite(function() {
+              return db.admin.create({
+                data: { email: DEFAULT_EMAIL, password: DEFAULT_PASSWORD, name: ADMIN_NAME },
+              })
+            })
+          } catch (finalErr) {
+            console.error('Admin bootstrap failed:', finalErr)
+            return NextResponse.json(
+              { error: 'حدث خطأ مؤقت في السيرفر — جرب تاني بعد لحظات' },
+              { status: 500 }
+            )
+          }
+        }
+        /* لو رجعنا بصف موجود (UNIQUE race) → نكمل التحقق بالصف المقروء:
+           بيانات الدخول اتأكدت فوق ضد الثوابت المعروفة فالنجاح مضمون */
+      }
     } else {
       /* (و75) بيقبل: معرّف الأدمن المخزّن (لو اتغير من الإعدادات) أو zicolainmath26
          أو الإيميل الكامل القديم أو رقم الهاتف أو ahmed01118411148 (2026-ص5) —
