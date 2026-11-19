@@ -89,13 +89,12 @@ function bytesToB64(bytes: Uint8Array): string {
   return btoa(bin)
 }
 
-/** تنظيف الأجزاء اليتيمة من عمليات نُسيت (أكتر من 24 ساعة) */
+/** تنظيف الأجزاء اليتيمة من عمليات نُسيت (أكتر من 24 ساعة) — استعلام موديل مُثبت البقاء */
 async function sweepStaleChunks(): Promise<void> {
   try {
-    await db.$executeRawUnsafe(
-      "DELETE FROM Media WHERE category = ? AND createdAt < datetime('now','-24 hours')",
-      CHUNK_ROW_CATEGORY
-    )
+    await db.media.deleteMany({
+      where: { category: CHUNK_ROW_CATEGORY, createdAt: { lt: new Date(Date.now() - 24 * 3600 * 1000) } },
+    })
   } catch (e) { /* صامت — تنظيف إضافي بس */ }
 }
 
@@ -153,13 +152,25 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    /* ===== الرفع المجزأ: تخزين الجزء ===== */
+    /* ===== الرفع المجزأ: تخزين الجزء =====
+       (ر20-ب) استعلام موديل مُثبت البقاء — الإثبات الحي: الـ INSERT الخام
+       $executeRawUnsafe كان بيرجع نجاح من غير بقاء الفعلي على الإنتاج
+       (التجميع كان بيلاقي صفر أجزاء) بينما db.media.create بيثبت 100% */
     var chunkRowId = 'chunk-' + uploadId + '-' + String(chunkIndex)
-    // UPSERT — إعادة رفع نفس الجزء (retry) بتستبدل القديم
-    await db.$executeRawUnsafe(
-      'INSERT INTO Media (id, filename, filePath, fileType, fileSize, data, category, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET data = excluded.data, fileSize = excluded.fileSize, updatedAt = CURRENT_TIMESTAMP',
-      chunkRowId, uploadId + '|' + String(chunkIndex), '__chunk/' + uploadId, finalType, String(buf.length), b64, CHUNK_ROW_CATEGORY
-    )
+    var chunkData = {
+      filename: uploadId + '|' + String(chunkIndex),
+      filePath: '__chunk/' + uploadId,
+      fileType: finalType,
+      fileSize: String(buf.length),
+      data: b64,
+      category: CHUNK_ROW_CATEGORY,
+    }
+    try {
+      await db.media.upsert({ where: { id: chunkRowId }, update: { data: chunkData.data, fileSize: chunkData.fileSize }, create: Object.assign({ id: chunkRowId }, chunkData) })
+    } catch (eUp) {
+      // حماية إضافية — لو الـ upsert فشل لأي سبب نكمل بالإشاء العادي
+      await db.media.create({ data: Object.assign({ id: chunkRowId }, chunkData) })
+    }
 
     /* تنظيف عرضي للأجزاء اليتيمة */
     if (Math.random() < 0.08) void sweepStaleChunks()
@@ -170,10 +181,10 @@ export async function POST(req: NextRequest) {
     }
 
     /* ===== الجزء الأخير: تجميع الملف كامل ===== */
-    var rows: any[] = await db.$queryRawUnsafe(
-      'SELECT id, data, fileSize FROM Media WHERE category = ? AND filename LIKE ?',
-      CHUNK_ROW_CATEGORY, uploadId + '|%'
-    ) || []
+    var rows: any[] = await db.media.findMany({
+      where: { category: CHUNK_ROW_CATEGORY, filename: { startsWith: uploadId + '|' } },
+      select: { id: true, filename: true, data: true },
+    }) || []
     // الترتيب الرقمي الفعلي — الترتيب النصي في SQL بيرتب |10 قبل |2 وبيخرّب التجميع
     rows.sort(function (a: any, b: any) {
       return (parseInt(String(a.filename || '').split('|')[1], 10) || 0)
@@ -238,9 +249,9 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    // مسح الأجزاء المؤقتة — استعلام واحد
+    // مسح الأجزاء المؤقتة — استعلام موديل واحد
     try {
-      await db.$executeRawUnsafe('DELETE FROM Media WHERE category = ? AND filename LIKE ?', CHUNK_ROW_CATEGORY, uploadId + '|%')
+      await db.media.deleteMany({ where: { category: CHUNK_ROW_CATEGORY, filename: { startsWith: uploadId + '|' } } })
     } catch (eDel) { /* الأجزاء هتتنضف بالمكنسة بعد 24 ساعة */ }
 
     return NextResponse.json({
