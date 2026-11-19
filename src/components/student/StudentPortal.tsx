@@ -107,8 +107,7 @@ export function StudentPortal() {
   return <StudentPortalInner />
 }
 
-/* (ر20 — منقول من منصة مستر شريف) معلومة/حكمة اليوم — إشعار أول ما الطالب يفتح */
-import { DailyInfoToast } from '@/components/student/DailyInfoToast'
+/* (ر22) معلومة/حكمة اليوم انتقلت لمستوى الصفحة (page.tsx) — مش محتاجينها هنا */
 
 function StudentPortalInner() {
   const { currentStudent, logout } = useAppStore()
@@ -352,8 +351,7 @@ function StudentPortalInner() {
 
     return (
       <div className="flex-1 py-6 px-4 sm:px-6">
-        {/* (ر20) معلومة/حكمة اليوم — أول ما الطالب يفتح منصته */}
-        <DailyInfoToast studentId={studentId} />
+        {/* (ر22) معلومة/حكمة اليوم انتقلت لمستوى الصفحة (page.tsx) — تفضل ثابتة جوه البورتال كمان */}
         <div className="mx-auto max-w-4xl space-y-5">
           {/* Welcome Card + Quick Actions on top */}
           <Card className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-primary/20">
@@ -528,8 +526,7 @@ function StudentPortalInner() {
 
   return (
     <div className="flex-1 flex flex-col">
-      {/* (ر20) معلومة/حكمة اليوم — إشعار كبير من الشمال + X + إغلاق تلقائي 30 ثانية */}
-      <DailyInfoToast studentId={studentId} />
+      {/* (ر22) معلومة/حكمة اليوم انتقلت لمستوى الصفحة (page.tsx) — للكل ومن غير مؤقت */}
       {/* Top Bar */}
       <div className="border-b px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">

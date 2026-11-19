@@ -7,6 +7,8 @@ import dynamic from 'next/dynamic'
 import { useEffect, useState, useRef } from 'react'
 import { PlatformLoader } from '@/components/PlatformLoader'
 import { Reveal } from '@/components/landing/Reveal'
+/* (ر22) معلومة/حكمة اليوم — عامة للكل على الرئيسية وتفضل ثابتة بعد الدخول — X يقفلها بس */
+import { DailyInfoToast } from '@/components/student/DailyInfoToast'
 /* (تسريع المنصة — و112) شاشة التحميل تحمّل بيانات الأقسام */
 import { prefetchLanding } from '@/lib/landing-prefetch'
 /* (ر8 — نشر Cloudflare Workers) شاشات ما بعد التفاعل بقت dynamic بـ ssr:false —
@@ -247,6 +249,11 @@ export default function HomePage() {
     <div className="min-h-screen flex flex-col">
       <VideoProtection />
       <Navbar />
+
+      {/* (ر22) معلومة/حكمة اليوم بطلب المستر — عامة للكل على الصفحة الرئيسية
+          جنب الهيرو سيكشن حتى اللي مش مسجلين، وبتفضل ثابتة معاه حتى بعد تسجيل
+          الدخول — وبتتقفل بس لما يدوس على الـ X — من غير أي وقت خالص */}
+      {currentView !== 'admin-dashboard' && <DailyInfoToast />}
 
       {currentView === 'landing' && (
         <main className="flex-1">
