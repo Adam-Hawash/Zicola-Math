@@ -10,7 +10,9 @@
 //  3. لو التععادة فشلت برضه بنرمي خطأ واضح بدل ما نسيب ورقة مقطوعة تتخزن
 //     ويصححها الـ AI على إنها ناقصة
 
-const CHUNK_SIZE = 2 * 1024 * 1024 // 2MB per chunk
+// 2097150 = مضاعف 3 بالظبط (ر20) — أجزاء الـ base64 بتتدمج نصيًا من غير فك
+// ثنائي — أي حجم مضاعف 3 يضمن إن دمج أجزاء base64 يطلع base64 سليم
+const CHUNK_SIZE = 2097150 // bytes per chunk (multiple of 3)
 const UPLOAD_TIMEOUT = 300_000 // 5 minutes max per chunk
 
 function uploadWithTimeout(url: string, options: RequestInit): Promise<Response> {

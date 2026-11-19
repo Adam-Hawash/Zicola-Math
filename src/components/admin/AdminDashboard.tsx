@@ -26,8 +26,10 @@ import {
   Video as VideoIcon, LinkIcon, MonitorPlay, Send,
   MessageCircle, Copy,
   ChevronLeft, CheckCircle2, Smartphone, RotateCcw, ShieldCheck, Monitor, Tablet, Flag, GraduationCap, UsersRound, PieChart, BookOpen, ChevronDown, Wrench,
-  Layers, ChevronUp, EyeOff, Swords
+  Layers, ChevronUp, EyeOff, Swords, Lightbulb
 } from 'lucide-react'
+/* (ر20 — منقول من منصة مستر شريف) معلومة اليوم / حكمة اليوم — لوحة المستر */
+import { DailyInfoAdmin } from './DailyInfoAdmin'
 import { AdminComplaints } from './AdminComplaints'
 import { CMSPanel } from './CMSPanel'
 /* (و64) الترجمة الحقيقية عربي/إنجليزي — الزراير الموحدة في النافبار */
@@ -456,6 +458,8 @@ export function AdminDashboard() {
             {/* (2026-و38) تحليلات الأسئلة — أكتر سؤال الطلاب غلطت فيه + أساميهم — طلب المستر */}
             <TabsTrigger value="item-analytics" className="text-xs sm:text-sm gap-1 text-violet-600 dark:text-violet-400"><PieChart className="h-4 w-4" /><span className="hidden sm:inline">{T('تحليلات الأسئلة', 'Analytics')}</span></TabsTrigger>
             <TabsTrigger value="announcements" className="text-xs sm:text-sm gap-1"><Megaphone className="h-4 w-4" /><span className="hidden sm:inline">{T('الإعلانات', 'Announcements')}</span></TabsTrigger>
+            {/* (ر20) معلومة اليوم / حكمة اليوم — منقولة من منصة مستر شريف بطلب المستر */}
+            <TabsTrigger value="daily-info" className="text-xs sm:text-sm gap-1 text-amber-600 dark:text-amber-400"><Lightbulb className="h-4 w-4" /><span className="hidden sm:inline">{T('معلومة اليوم', 'Daily Info')}</span></TabsTrigger>
             {/* (و70) تاب المجتمعات اتشال بطلب المستر */}
             {/* (و70) تاب التحديات — فيديو المستر + حلول الطلاب بترتيب الوصول */}
             <TabsTrigger value="challenges" className="text-xs sm:text-sm gap-1 text-amber-600 dark:text-amber-400"><Trophy className="h-4 w-4" /><span className="hidden sm:inline">{T('التحديات', 'Challenges')}</span></TabsTrigger>
@@ -496,6 +500,8 @@ export function AdminDashboard() {
           </TabsContent>
           {/* (و70) تاب المجتمعات اتشال بطلب المستر */}
           {/* (و70) تاب التحديات */}
+          {/* (ر20) معلومة اليوم / حكمة اليوم — كتابة + ملف مرفق + تفعيل */}
+          <TabsContent value="daily-info"><DailyInfoAdmin adminId={(currentAdmin && currentAdmin.id) || ''} /></TabsContent>
           <TabsContent value="challenges"><ChallengesPanel /></TabsContent>
           <TabsContent value="activity"><ActivityPanel /></TabsContent>
           <TabsContent value="gallery"><GalleryManager /></TabsContent>
