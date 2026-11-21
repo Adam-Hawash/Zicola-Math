@@ -11,6 +11,8 @@ import { Reveal } from '@/components/landing/Reveal'
 import { DailyInfoToast } from '@/components/student/DailyInfoToast'
 /* (تسريع المنصة — و112) شاشة التحميل تحمّل بيانات الأقسام */
 import { prefetchLanding } from '@/lib/landing-prefetch'
+/* (ر27) ريتراي شفاف ضد «تفتح وتقفل» — الفشل اللحظي بيتصلح لوحده */
+import { fetchWithRetry } from '@/lib/fetch-with-retry'
 /* (ر8 — نشر Cloudflare Workers) شاشات ما بعد التفاعل بقت dynamic بـ ssr:false —
    بتظهر بس بعد ضغطة مستخدم (مش أول رندر) فمفيش قيمة لرندرها على السيرفر،
    وكودها كان بيتلفّ في باندل السيرفر/الـ Worker وبيضخّمه فوق حد
@@ -198,9 +200,9 @@ export default function HomePage() {
     }, MAX_LOADING_MS)
 
     Promise.all([
-      fetch('/api/config').then(function(r) { return r.json() }).catch(function() { return {} }),
-      fetch('/api/gallery').then(function(r) { return r.json() }).catch(function() { return {} }),
-      fetch('/api/stats').then(function(r) { return r.json() }).catch(function() { return {} }),
+      fetchWithRetry('/api/config').then(function(r) { return r.json() }).catch(function() { return {} }),
+      fetchWithRetry('/api/gallery').then(function(r) { return r.json() }).catch(function() { return {} }),
+      fetchWithRetry('/api/stats').then(function(r) { return r.json() }).catch(function() { return {} }),
     ]).then(function(results) {
       var cfg = results[0]
       var gal = results[1]

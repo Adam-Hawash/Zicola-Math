@@ -11,12 +11,15 @@
 // - take = استهلاك مرة واحدة: القسم ياخد الكاش وأول تحديث بعده يجيب طازة.
 // ============================================================
 
+/* (ر27) ريتراي شفاف — الفشل اللحظي ما يسممش الكاش ويقع الأقسام */
+import { fetchWithRetry } from '@/lib/fetch-with-retry'
+
 var cache: Record<string, Promise<any>> = {}
 
 /** إشعال تحميل مسبق من شاشة التحميل (أو أي حتة تانية) */
 export function prefetchLanding(url: string): Promise<any> {
   if (!cache[url]) {
-    cache[url] = fetch(url)
+    cache[url] = fetchWithRetry(url)
       .then(function (r) { return r.json() })
       .catch(function () {
         /* (ر11) الفشل اللحظي ما يسممش الكاش للأبد — كان بيتخزن promise فاشل

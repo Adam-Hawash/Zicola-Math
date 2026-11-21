@@ -38,6 +38,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronDown, FileText, Lightbulb, Brain, X } from 'lucide-react'
 import { useAppStore } from '@/stores/app-store'
+/* (ر27) ريتراي شفاف — نداء معلومة اليوم ما يقعش على فشل شبكة لحظي */
+import { fetchWithRetry } from '@/lib/fetch-with-retry'
 
 interface DailyInfo {
   id: string
@@ -94,7 +96,7 @@ export function DailyInfoToast() {
     ;(async function () {
       var closed = readClosed()
       try {
-        const res = await fetch('/api/daily-info', { cache: 'no-store' })
+        const res = await fetchWithRetry('/api/daily-info', { cache: 'no-store' })
         const data = await res.json().catch(function () { return null })
         if (alive && res.ok && data && data.info && data.info.id) {
           if (closed.indexOf(String(data.info.id)) < 0) {
