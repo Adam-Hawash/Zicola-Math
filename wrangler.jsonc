@@ -29,6 +29,14 @@
                         "service": "zicola-math"
                 }
         ],
+        /* (ر26) keep-warm كل دقيقتين —scheduled handler في worker.js (باتش
+           ر26) بيندّي على الرئيسية وكل APIs اللند عشان العزل يفضل دافي —
+           من غيرها المستر بيلاقي المنصة بتفضل تحمل كل ما يدخل (isolate
+           بارد = 1.2-2.3s TTFB بدل 0.07s دافي). كل النداءات محمية بـ
+           try/catch فالفشل صامت ومش بيظهر كأخطاء في اللوحة. */
+        "triggers": {
+                "crons": ["*/2 * * * *"]
+        },
         "images": {
                 // Enable image optimization
                 // see https://opennext.js.org/cloudflare/howtos/image

@@ -85,6 +85,41 @@ export default {
     async fetch(request, env, ctx) {
         return __ffFetch(request, env, ctx);
     },
+    /* (ر26) مُدقّق دوري keep-warm — شكوى المستر الحية: «كل ما أدخل على المنصة
+       بتاخد وقت كبير جداً عقبال ما تشتغل وتحمل» — الإثبات الحي على الإنتاج
+       بعد ر25: النداءات بتتناوب بين isolate دافي (TTFB 0.068s) وبارد
+       (TTFB 1.2-2.3s على / وكل APIs اللند) — يعني نص زيارات المستر بتقع
+       على isolate بارد بياخد من الأول: تفريغ الباندل + استيراد الـ handler
+       + إنشاء عميل Turso + أرزي الجداول. المنصة كلها force-dynamic (و103
+       عشان تغييرات الأدمن تظهر فورا) فمفيش كاش HTML يلجأ له.
+       الحل: cron كل دقيقتين بيندّي على المنصة نفسها عبر ربط
+       WORKER_SELF_REFERENCE على مسارات اللند كلها بالترتيب: SSR الرئيسية
+       (بيسخّن استيراد الـ handler + عميل الداتابيز) وبعدين كل APIs اللي
+       الصفحة الرئيسية بتناديلها فعلًا (config/gallery/stats/videos/challenges
+       + daily-info بتاعة الحبة) وآخر حاجة health (أتقلهم). فأي زيارة
+       حقيقية بتجي على isolate دافي بيرد في جزء من الثانية — والـ cron نفسه
+       ملوف بعبارات try/catch فبيفشل بصمت ومش هيضيف أخطاء في اللوحة. */
+    async scheduled(event, env, ctx) {
+        try {
+            var __ffSelf = env && env.WORKER_SELF_REFERENCE;
+            if (!__ffSelf) return;
+            var __ffPaths = [
+                '/',
+                '/api/daily-info',
+                '/api/config',
+                '/api/gallery',
+                '/api/stats',
+                '/api/videos?pageSize=50',
+                '/api/challenges/active',
+                '/api/health',
+            ];
+            for (var __ffI = 0; __ffI < __ffPaths.length; __ffI++) {
+                try {
+                    await __ffSelf.fetch(new Request('https://keepwarm.internal' + __ffPaths[__ffI]));
+                } catch (__ffE) {}
+            }
+        } catch (__ffE2) {}
+    },
 };`
 
 /* (ر13-تشخيص) تسجيل مراحل الطلب — بيكشف فين النداء المعلّق بيوقف

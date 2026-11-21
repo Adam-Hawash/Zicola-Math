@@ -17,6 +17,13 @@ import type { NextRequest } from 'next/server'
 
 var HSTS = 'max-age=31536000'
 
+/* (ر26) CSP upgrade-insecure-requests — أي مورد فرعي http:// جاي من
+   الداتا (روابط فيديو/صور اتنسخت بـ http) بيرقى https تلقائيًا في
+   المتصفح من غير ما يتمنع — نهاية نهائية لأي شعار «Not (fully)
+   secure» وحالات blocked mixed content في الكونسول حتى لو رابط
+   http اتحفظ في قاعدة البيانات نفسها. */
+var CSP_UPGRADE = 'upgrade-insecure-requests'
+
 export function proxy(request: NextRequest) {
   var proto = String(request.headers.get('x-forwarded-proto') || '')
   /* x-forwarded-proto ممكن يجي «http,http» ورا سلسلة بروكسيات — نتحقق
@@ -31,6 +38,9 @@ export function proxy(request: NextRequest) {
   var response = NextResponse.next()
   /* HSTS على كل رد https — بعد أول زيارة المتصفح بيرقي http لوحده بلا وميض «Not secure» */
   response.headers.set('Strict-Transport-Security', HSTS)
+  /* (ر26) ترقية أي موارد http إلى https — حماية من المحتوى المختلط
+     مهما كان مصدر الرابط (قاعدة البيانات/لوحة الأدمن) */
+  response.headers.set('Content-Security-Policy', CSP_UPGRADE)
   return response
 }
 
