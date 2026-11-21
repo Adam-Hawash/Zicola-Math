@@ -12,6 +12,7 @@
 // النصوص ثنائية اللغة عربي/إنجليزي زي باقي المنصة
 // ============================================================
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Smartphone, X, Download } from 'lucide-react'
 import { toast } from 'sonner'
@@ -208,6 +209,12 @@ export function InstallPwaButton({ variant = 'default', size, className = '', la
 export function FloatingInstallButton() {
   var pwa = usePwaInstall()
   var T = useT()
+  /* (ر25) طلب المستر حرفيًا: «لما الطالب يجي يدخل مواعيد السنتر زرار الـ
+     install app يتشال من قدامه» — الزرار كان بيغطي لينك «Private Classes»
+     اللي تحت على الشمال على الموبايل فالطالب ما بيلاقيش البرايفت كلاس.
+     الزرار يتشال في صفحة مواعيد السنتر وصفحة حصص البرايفت بتاعتها */
+  var pathname = usePathname()
+  if (pathname && pathname.indexOf('/schedule') === 0) return null
   /* (2026-ص5) على اللابتوب/الديسكتوب مفيش زرار عايم خالص — الموبايل بس */
   if (!pwa.isMobileDevice) return null
   return (
