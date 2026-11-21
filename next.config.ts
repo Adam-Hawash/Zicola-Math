@@ -55,6 +55,10 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: '**' },
       { protocol: 'http', hostname: '**' },
     ],
+    /* (ر32) تقليل استهلاك فيرسل: الصور المولدة (_next/image — المعرض والثامبنيلز)
+       بتتحشر في CDN 30 يوم بدل القصور الافتراضي — الطالب بترد الصورة من الحواف
+       بدل تشغيل دالة تحسين لكل صورة لكل طالب — بدون أي فرق بصري */
+    minimumCacheTTL: 2678400,
   },
   async headers() {
     // Production-only: immutable caching for static assets.
@@ -63,6 +67,13 @@ const nextConfig: NextConfig = {
     return [
       { source: '/uploads/:path*', headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }] },
       { source: '/_next/static/:path*', headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }] },
+      /* (ر32) تقليل استهلاك فيرسل — كاش CDN للردود العامة الآمنة: داتا عامة للزوار
+         والطلاب بدون أي هوية (أرقام الرئيسية + صور المعرض) — النداءات المتكررة بتترد
+         من حواف فيرسل في ميلي ثواني بدل تشغيل دالة لكل طالب — التعديلات بتظهر
+         خلال أقصى 60 ثانية — ومسارات الهوية (admin/students/videos/daily-info/player)
+         فاضلة dynamic زي ما هي عشان ما يتأثرش أي وظيفة */
+      { source: '/api/stats', headers: [{ key: 'Cache-Control', value: 'public, s-maxage=60, stale-while-revalidate=120' }] },
+      { source: '/api/gallery', headers: [{ key: 'Cache-Control', value: 'public, s-maxage=60, stale-while-revalidate=120' }] },
     ];
   },
   turbopack: {},
