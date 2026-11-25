@@ -1143,10 +1143,14 @@ window.addEventListener('orientationchange', function(){ setTimeout(layoutWrap, 
 document.addEventListener('fullscreenchange', function(){ setTimeout(layoutWrap, 60); setTimeout(layoutWrap, 500); });
 document.addEventListener('keydown', function(e){ if(e.key==='Escape' && isFakeFs){ isFakeFs=false; wrap.className=''; layoutWrap(); } });
 
-/* ===== التقدم → postMessage للأب (من غير أي لينك) ===== */
+/* ===== التقدم → postMessage للأب (من غير أي لينك) =====
+   (ر8) tm = طابع زمني ساعة الحائط على جهاز الطالب — الحارس في الأب
+   بيستخدمه لكشف «صدمة البلاغات المتأخرة»: لو بلاغ وصل متأخر عن طابعه
+   أكتر من 10 ثواني معناها الصفحة كانت مجمّدة (خدعة إيقاف الـ debugger
+   عشان يشوف الفيديو في الـ iframe بس) → إشارة أدوات مطوّر */
 var lastCur = 0;
 function reportProgress(cur, dur){
-  try{ if(window.parent && window.parent !== window) window.parent.postMessage({type:'mg_vp', videoId:CFG.videoId, cur:cur, dur:dur}, '*'); }catch(e){}
+  try{ if(window.parent && window.parent !== window) window.parent.postMessage({type:'mg_vp', videoId:CFG.videoId, cur:cur, dur:dur, tm:Date.now()}, '*'); }catch(e){}
 }
 function reportEnded(){ try{ if(window.parent && window.parent !== window) window.parent.postMessage({type:'mg_ended', videoId:CFG.videoId}, '*'); }catch(e){} }
 
