@@ -9,19 +9,11 @@ importers:
   .:
     dependencies:
       '@libsql/client':
-<<<<<<< Updated upstream
         specifier: ^0.8.1
         version: 0.8.1
       '@napi-rs/canvas':
         specifier: ^1.0.9
         version: 1.2.0
-=======
-        specifier: 0.8.1
-        version: 0.8.1
-      '@napi-rs/canvas':
-        specifier: ^1.0.9
-        version: 1.2.1
->>>>>>> Stashed changes
       '@prisma/adapter-libsql':
         specifier: ^6.19.3
         version: 6.19.3
@@ -152,24 +144,18 @@ importers:
         specifier: ^5.0.5
         version: 5.0.15(@types/react@19.2.18)(react@19.2.8)
     devDependencies:
-<<<<<<< Updated upstream
       '@opennextjs/cloudflare':
         specifier: ^1.20.17
         version: 1.20.18(next@16.3.1(@types/node@22.20.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(wrangler@4.168.0(@types/node@22.20.1))
-=======
->>>>>>> Stashed changes
       '@types/katex':
         specifier: ^0.16.8
         version: 0.16.8
       '@types/web-push':
         specifier: ^3.6.4
         version: 3.6.4
-<<<<<<< Updated upstream
       wrangler:
         specifier: ^4.164.0
         version: 4.168.0(@types/node@22.20.1)
-=======
->>>>>>> Stashed changes
 
 packages:
 
@@ -725,225 +711,177 @@ packages:
     resolution: {integrity: sha512-dqVSFynCox4C/J8kT16V7SIFAns0IjgLwkvYT7p8LQVmJ5OS5b6tI9IGflxTeuBS//zXeFIUbwt5dwxyZ17cnA==}
     cpu: [arm64]
     os: [linux]
-<<<<<<< Updated upstream
 
   '@img/sharp-libvips-linux-arm64@1.3.4':
     resolution: {integrity: sha512-Y3dgX/6lE2QhQb+Gxy0WZxfg9MEm/JBjamZpS2IklP7xIQoKN4hzAm7KcMVGtaVDt3neE9OKBC7vAfonA/Lr1A==}
     cpu: [arm64]
     os: [linux]
-=======
->>>>>>> Stashed changes
 
   '@img/sharp-libvips-linux-arm@1.3.2':
     resolution: {integrity: sha512-1eMLzy92I4J6rmi4mAT8yC3HxOtniyGELlzGbNMLLeqe052ahFQ0h6LFq+lh5DsDIdYViIDst08abvSbcEdLXQ==}
     cpu: [arm]
     os: [linux]
-<<<<<<< Updated upstream
 
   '@img/sharp-libvips-linux-arm@1.3.4':
     resolution: {integrity: sha512-LmRtTsOHuvM2+wlO2Db37dx5MiZhB0FvSunciw48YjdOkZz9KAiRbm8ujeMOA1INqmei5NapFxYEK1D1ZSidmw==}
     cpu: [arm]
     os: [linux]
-=======
->>>>>>> Stashed changes
 
   '@img/sharp-libvips-linux-ppc64@1.3.2':
     resolution: {integrity: sha512-3z0NHDxD6n5I9gc05U1eW1AyRm+Gznzq3naMrthPNqE6oYykcogW0l/jfpJdjYnuNl8R7yI9pNbE1XiUeyq0Aw==}
     cpu: [ppc64]
     os: [linux]
-<<<<<<< Updated upstream
 
   '@img/sharp-libvips-linux-ppc64@1.3.4':
     resolution: {integrity: sha512-Le6boB8Tai0Nis+gIxIpKx68UDVVIqdR8Tin5Yf1z2LJJQLDJvCDRqRu+jC2qCoD+eIomonmOwB4smBRxfVpYQ==}
     cpu: [ppc64]
     os: [linux]
-=======
->>>>>>> Stashed changes
 
   '@img/sharp-libvips-linux-riscv64@1.3.2':
     resolution: {integrity: sha512-bsb4rI+NldGOsXuej2r8OdSS8+zXDVaCWxyWrcv6kneTOlgAHtZABRzBBCwdsPiD90J4myNJuHpg6kA20ImW/w==}
     cpu: [riscv64]
     os: [linux]
-<<<<<<< Updated upstream
 
   '@img/sharp-libvips-linux-riscv64@1.3.4':
     resolution: {integrity: sha512-aHkkIEHPRdQEegJN20MLmGtxYD9R2wQr3Cwpddnu5+YKMt6Uzax7S9h5gpZTo8wyrGuZSlfQ63OevL5mTyOC7Q==}
     cpu: [riscv64]
     os: [linux]
-=======
->>>>>>> Stashed changes
 
   '@img/sharp-libvips-linux-s390x@1.3.2':
     resolution: {integrity: sha512-/ABshyj8gCpyIrNXnHn4LorDJ0HHm1VhXPBlxZ8zAtfVPAaSafXPGn+sUSIRiwaSBy0mmFjSjiXI5mkcwdChKQ==}
     cpu: [s390x]
     os: [linux]
-<<<<<<< Updated upstream
 
   '@img/sharp-libvips-linux-s390x@1.3.4':
     resolution: {integrity: sha512-ra/mB6MikESDUO7Yg+Mi95bFBb9GsObURuhnOv3OqknjGe9sZrG8tCe9q0xSIGrtLgvgw0gKnFWcK4blSgQOuQ==}
     cpu: [s390x]
     os: [linux]
-=======
->>>>>>> Stashed changes
 
   '@img/sharp-libvips-linux-x64@1.3.2':
     resolution: {integrity: sha512-ITPEtgffGJ0S6G9dRyw/366tJQqFRcHWPHhC+Stpg3Z8AEMrDrTr2lhdz4f/Y/HMbRh//7Z5mBzEpVdi62Oc3w==}
     cpu: [x64]
     os: [linux]
-<<<<<<< Updated upstream
 
   '@img/sharp-libvips-linux-x64@1.3.4':
     resolution: {integrity: sha512-GJ//SSXbnwSDes02umB3nDJLFcQzw8a18V8fyhqr6tV515tOEMdImjjxj1AoafMRz56F3PHgftnj1QEKSU1zkw==}
     cpu: [x64]
     os: [linux]
-=======
->>>>>>> Stashed changes
 
   '@img/sharp-libvips-linuxmusl-arm64@1.3.2':
     resolution: {integrity: sha512-zE9EdiUzUmg5mDT5a1rk5fYJ6GWPloTwWBYDS14naqHsL+EaMpDj1AWnpLgh3u0YCORv2Tt50wrcrpYqkP97Kw==}
     cpu: [arm64]
     os: [linux]
-<<<<<<< Updated upstream
 
   '@img/sharp-libvips-linuxmusl-arm64@1.3.4':
     resolution: {integrity: sha512-hvulFwtjUcagsis6BBxHwGFwWoNZjgYmULGVrZcyfNbjA8hKILbRxGg15/7w5HDyXHXUos/j6baAWqnCyQ2DWA==}
     cpu: [arm64]
     os: [linux]
-=======
->>>>>>> Stashed changes
 
   '@img/sharp-libvips-linuxmusl-x64@1.3.2':
     resolution: {integrity: sha512-m0lrLiUt+lBYnCFr8qV/65yMR4E/c7/wf78I5eKTdkEakFAlZ9QlzEM3QIhhAwVeUhLAHLcCq7a7Vszq/oFNZQ==}
     cpu: [x64]
     os: [linux]
-<<<<<<< Updated upstream
 
   '@img/sharp-libvips-linuxmusl-x64@1.3.4':
     resolution: {integrity: sha512-6zXKeE/p39I1AmA3cJG35eyBGNqNddLnUXjhwBnsGjFPWqf5VKkDBEqaEkPDoTEtkxwi2vv8Tcr2mDyP4So7Fg==}
     cpu: [x64]
     os: [linux]
-=======
->>>>>>> Stashed changes
 
   '@img/sharp-linux-arm64@0.35.3':
     resolution: {integrity: sha512-QgKDspHPnrU+GQ55XPhGwyhC8acLVOOSyAvo1oVfFmrIXLkDNmGWzAfDZ4xK8oSA1qBQrALcHX0G5UZni/SuFQ==}
     engines: {node: '>=20.9.0'}
     cpu: [arm64]
     os: [linux]
-<<<<<<< Updated upstream
 
   '@img/sharp-linux-arm64@0.35.5':
     resolution: {integrity: sha512-LYVx5JTsOM2CBzmxreh+nl64/3H6Xb09iSLknqH47z2T2DFFxDeFLP5y4dJwe6H7uGQlHPyEEtIqyo3DYsRwdQ==}
     engines: {node: '>=20.9.0'}
     cpu: [arm64]
     os: [linux]
-=======
->>>>>>> Stashed changes
 
   '@img/sharp-linux-arm@0.35.3':
     resolution: {integrity: sha512-affVWCTLooy8TSxbDx2qkzuDeaWLNVBA+P//FNBirHsXpP2fuBhk5AuboYUnrDnzoXes8GFjpTx0SBFOCRg+FA==}
     engines: {node: '>=20.9.0'}
     cpu: [arm]
     os: [linux]
-<<<<<<< Updated upstream
 
   '@img/sharp-linux-arm@0.35.5':
     resolution: {integrity: sha512-LEaXK2WdXVK5ykcw0buWyPMsmLLL2vpHLD6yrNSW+JGEL3BZPA4tpKN6iaMc4AxTTAoaX/sU1rOL51lcIz48ZQ==}
     engines: {node: '>=20.9.0'}
     cpu: [arm]
     os: [linux]
-=======
->>>>>>> Stashed changes
 
   '@img/sharp-linux-ppc64@0.35.3':
     resolution: {integrity: sha512-sMd8rDxmpLOwv/7N44klFjOD5DUO7FLdjiXDI0hoxYaf7Ar262dQIEkosE98bps+5HPLtp/EvNqeqQtOycP/IA==}
     engines: {node: '>=20.9.0'}
     cpu: [ppc64]
     os: [linux]
-<<<<<<< Updated upstream
 
   '@img/sharp-linux-ppc64@0.35.5':
     resolution: {integrity: sha512-QVxAAq8evVRI9ia2vqgwrmWucn5Dfv+JdWzj75pD8omHLPSP7f8p20O8jxzjCcuCEQEOtYOZUmX1hkiZ0kdevA==}
     engines: {node: '>=20.9.0'}
     cpu: [ppc64]
     os: [linux]
-=======
->>>>>>> Stashed changes
 
   '@img/sharp-linux-riscv64@0.35.3':
     resolution: {integrity: sha512-0Eob78yjlYPfL5vMNWAW55l3R9Y6BQS/gOfe0ZcP9mEz9ohhKSt4im1hayiknXgf8AWrFqMvJcKIdmLmEe7yeQ==}
     engines: {node: '>=20.9.0'}
     cpu: [riscv64]
     os: [linux]
-<<<<<<< Updated upstream
 
   '@img/sharp-linux-riscv64@0.35.5':
     resolution: {integrity: sha512-LtdreXguaavKODPIfzJ4kffx7UNt1omwtK0rch4EBbbSTXPnxWmYSayXdLJw0fJzQ97kHt1gL/yh4tvU+nCyRQ==}
     engines: {node: '>=20.9.0'}
     cpu: [riscv64]
     os: [linux]
-=======
->>>>>>> Stashed changes
 
   '@img/sharp-linux-s390x@0.35.3':
     resolution: {integrity: sha512-KgAxQ0DxpNOq1rG2t5cgTgShJFGSuU7XO45cqC+1NVOuZnP6tlgZRuSYOfNupGkHID0o3cJOsw4DVeJpMovcGw==}
     engines: {node: '>=20.9.0'}
     cpu: [s390x]
     os: [linux]
-<<<<<<< Updated upstream
 
   '@img/sharp-linux-s390x@0.35.5':
     resolution: {integrity: sha512-UZasTOFiYzotTsGOCu42BfUzP6Tu6Do/947iRm1RsLKvlllxwGcn4RN27LibGWceix4Y+Pmw3jsnTcCQIgWjqA==}
     engines: {node: '>=20.9.0'}
     cpu: [s390x]
     os: [linux]
-=======
->>>>>>> Stashed changes
 
   '@img/sharp-linux-x64@0.35.3':
     resolution: {integrity: sha512-8pqvxubL2PGdhlPy6GLqzDYMUjyRmKAwKHYKixpdJYBUK7PJ0C029XdsnpFIdgRZG68fZiGdHVWcKPvtiPB4cA==}
     engines: {node: '>=20.9.0'}
     cpu: [x64]
     os: [linux]
-<<<<<<< Updated upstream
 
   '@img/sharp-linux-x64@0.35.5':
     resolution: {integrity: sha512-SxFtLTeJInhAA9Q836kux2vZNeOBQEx658qvbboZScr0wIARym3IcGmW7KpVD5sbVg0Ojy+udFQdayYIZyoNog==}
     engines: {node: '>=20.9.0'}
     cpu: [x64]
     os: [linux]
-=======
->>>>>>> Stashed changes
 
   '@img/sharp-linuxmusl-arm64@0.35.3':
     resolution: {integrity: sha512-Vz0iQjzzcSX3HCbfwFfCSG/9SCIqyO0mH2sXyiHaAYfBk0cRsCWXRyQYX0ovCK/PAQBbTzQ0dsPQHh5MAFL59w==}
     engines: {node: '>=20.9.0'}
     cpu: [arm64]
     os: [linux]
-<<<<<<< Updated upstream
 
   '@img/sharp-linuxmusl-arm64@0.35.5':
     resolution: {integrity: sha512-9HbMclmI1zlNkFRs3z9/eBtDjfD0sGlrX1z6b1qwmiFY5ElDLh4BC0LPBdVp7z1DXFiKlIcznf+ZlsuZzLxQqg==}
     engines: {node: '>=20.9.0'}
     cpu: [arm64]
     os: [linux]
-=======
->>>>>>> Stashed changes
 
   '@img/sharp-linuxmusl-x64@0.35.3':
     resolution: {integrity: sha512-6O1NPKcDVj9QEdg7Hx549EX8U0rp6yXQERqru6yRN7fGBn32UvIRJUlWnk+8xDCiG76hXVBbX82NZ/ZKr0euIg==}
     engines: {node: '>=20.9.0'}
     cpu: [x64]
     os: [linux]
-<<<<<<< Updated upstream
 
   '@img/sharp-linuxmusl-x64@0.35.5':
     resolution: {integrity: sha512-4KOphqB035HrVdqLZfCgMzzERrQkkzOwRhl4OAkRO1YCldbaFjySXMaK534Mo0V+LndnlJk+sbUyLeU0ULyD1A==}
     engines: {node: '>=20.9.0'}
     cpu: [x64]
     os: [linux]
-=======
->>>>>>> Stashed changes
 
   '@img/sharp-wasm32@0.35.3':
     resolution: {integrity: sha512-cZ0XkcYGpHZkqW6iCkqTcmUC0CD9DhD5d/qeZlZkfRBn6GnHniZXLUo5+9xw8Iv76YE6LQFN9YNBlKREcCG76w==}
@@ -1078,13 +1016,8 @@ packages:
     cpu: [arm64]
     os: [android]
 
-<<<<<<< Updated upstream
   '@napi-rs/canvas-android-arm64@1.2.0':
     resolution: {integrity: sha512-Ya2Db4BrwM5WnQtdmA2iOw5O2yZ9vcd5fuX9GjlkQ3k87iWzDUxnijVz11IJrF8c+xBxUHzEgENXmA1yPdnZ2g==}
-=======
-  '@napi-rs/canvas-android-arm64@1.2.1':
-    resolution: {integrity: sha512-CtM+0Xieqc8jMyIm6sPLbnvDut4/BmSAP+HQnbbwPcw3ZG+bY1NhwndtpOzAPcNbIPyWuiShSF99/Ja7vYeXbw==}
->>>>>>> Stashed changes
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [android]
@@ -1095,13 +1028,8 @@ packages:
     cpu: [arm64]
     os: [darwin]
 
-<<<<<<< Updated upstream
   '@napi-rs/canvas-darwin-arm64@1.2.0':
     resolution: {integrity: sha512-7Rq4h2J4Y+JKqxaH9Zf0PGOY3asTeAbcG51MkQNaUTB7ushbhuEgY54CWRww5WK8v8VYB8epv4bLF0GI8IPlxQ==}
-=======
-  '@napi-rs/canvas-darwin-arm64@1.2.1':
-    resolution: {integrity: sha512-DazlaWwTa1xIdROpA8e95ttU4yNedl6brXbqBm+upoQ/1WIpmDu4zwanYp6ftGIbrjMld/OjJK15kFrDPWLoEQ==}
->>>>>>> Stashed changes
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [darwin]
@@ -1112,13 +1040,8 @@ packages:
     cpu: [x64]
     os: [darwin]
 
-<<<<<<< Updated upstream
   '@napi-rs/canvas-darwin-x64@1.2.0':
     resolution: {integrity: sha512-LHeqXtEFqO1DDnKRWSvy7C+kXQTciKvZzShVZd0aTnvVwWskpbj9hwWc8lwTpjm6GsgS7oEKCNARj8xLI1qcww==}
-=======
-  '@napi-rs/canvas-darwin-x64@1.2.1':
-    resolution: {integrity: sha512-XU9zFjeRusfeP49/Dk4CNqvMzxOiBtrl6Qoyndp2Wxk0LhJxgiUhhSMGLIripipZZKfKJOo1h/k8FswMVk0PuA==}
->>>>>>> Stashed changes
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [darwin]
@@ -1129,13 +1052,8 @@ packages:
     cpu: [arm]
     os: [linux]
 
-<<<<<<< Updated upstream
   '@napi-rs/canvas-linux-arm-gnueabihf@1.2.0':
     resolution: {integrity: sha512-er2hS9KLBWSFMyz6UCAAM5gYfFfCAkLXXdPnFJ8SL8clNa+hx5ooC5iREYKuaFxIfhsE86OHiiee3HjIuvtz5w==}
-=======
-  '@napi-rs/canvas-linux-arm-gnueabihf@1.2.1':
-    resolution: {integrity: sha512-24R1MI8ZcWSrqU5rD+hRelWsoExMc4Bo8vRbIIge4f5X97P4pvrPMIMV0e5szSyU9y5aF8gA+CCXwWWRwFthYg==}
->>>>>>> Stashed changes
     engines: {node: '>= 10'}
     cpu: [arm]
     os: [linux]
@@ -1146,13 +1064,8 @@ packages:
     cpu: [arm64]
     os: [linux]
 
-<<<<<<< Updated upstream
   '@napi-rs/canvas-linux-arm64-gnu@1.2.0':
     resolution: {integrity: sha512-wwfgI/DQOXjpQ+uLDV7R2Wh6O0lLvWRWz3mZND58csTH9fTn6+H2bfWBIu37Bcg8cjJLPE5BKjqK/a7WOYeqxA==}
-=======
-  '@napi-rs/canvas-linux-arm64-gnu@1.2.1':
-    resolution: {integrity: sha512-2pxxAlQ3wTYxqZnuqXhQbE4sTvLC1/dYkuPpudggCgvQXRb6KYm6K01UAL2kWqpkTqFmy6kHfIjLJ/86vQhOnQ==}
->>>>>>> Stashed changes
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
@@ -1163,13 +1076,8 @@ packages:
     cpu: [arm64]
     os: [linux]
 
-<<<<<<< Updated upstream
   '@napi-rs/canvas-linux-arm64-musl@1.2.0':
     resolution: {integrity: sha512-ftJFcPZIAer2xHMQ0BXfGTVqE2AB5tl3+dm913YunKnsG+lcS91pFKNaeM5yvp7kbTLPlMxkMpi+RKXOXEwljw==}
-=======
-  '@napi-rs/canvas-linux-arm64-musl@1.2.1':
-    resolution: {integrity: sha512-+Ksk8ilbmbA4oMu+BfOL/WZMeDY0Z40TblthqS8Ssr6K7MFXh9707O1H3uJcVx3H7plXWsDuycGai20FBRO0sg==}
->>>>>>> Stashed changes
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
@@ -1180,13 +1088,8 @@ packages:
     cpu: [riscv64]
     os: [linux]
 
-<<<<<<< Updated upstream
   '@napi-rs/canvas-linux-riscv64-gnu@1.2.0':
     resolution: {integrity: sha512-NFfXv9E3IuzHi3RK3KhBbjO4bCdS8PvZkUzVvkTWBCLnVw4ndNNHUCK46/lcOMcnuKg8qxQsK5X7Uwp/SPGA0g==}
-=======
-  '@napi-rs/canvas-linux-riscv64-gnu@1.2.1':
-    resolution: {integrity: sha512-B7Y0cljUn/kTmDiSJ7q94axEvQMJLoJZX8FDf8+JdvAkQiUR2tHnDomGIxtHsvXGmzf3UE736YdtvNLEfCDjdg==}
->>>>>>> Stashed changes
     engines: {node: '>= 10'}
     cpu: [riscv64]
     os: [linux]
@@ -1197,13 +1100,8 @@ packages:
     cpu: [x64]
     os: [linux]
 
-<<<<<<< Updated upstream
   '@napi-rs/canvas-linux-x64-gnu@1.2.0':
     resolution: {integrity: sha512-+RsdhlUA8hRoktgA5JG1XR7skZ6PCVjNfodnqDnBV1eTX7dgVBYHK7O7yKdQGac/45B5t8ufgyceQEq3Rfk6JA==}
-=======
-  '@napi-rs/canvas-linux-x64-gnu@1.2.1':
-    resolution: {integrity: sha512-1/7y8Yx589PcQE8Xuvc0ZLRwEsjA1FonfV+ZWUS4s+pwI6Aa5i+VHUhAv+pR1692A+mIjuaH5FpH89+CFK0Nng==}
->>>>>>> Stashed changes
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
@@ -1214,13 +1112,8 @@ packages:
     cpu: [x64]
     os: [linux]
 
-<<<<<<< Updated upstream
   '@napi-rs/canvas-linux-x64-musl@1.2.0':
     resolution: {integrity: sha512-G7O6pLdb+waaiRfCVKNRymqFNulfU4tfyRKvWmOWt7Vh/VltHLvU4+oWGMMKzWehMrxLnvmeLSNkWWpzMZAy+w==}
-=======
-  '@napi-rs/canvas-linux-x64-musl@1.2.1':
-    resolution: {integrity: sha512-fiO90vFdt9Kq3v+sPHSczzbpRi2CTMx6NQdfD31zfJFeouXVR8EeiGyHpXuV5wwE6ui7IQLmVTHq7Uz3V0xq/w==}
->>>>>>> Stashed changes
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
@@ -1231,13 +1124,8 @@ packages:
     cpu: [arm64]
     os: [win32]
 
-<<<<<<< Updated upstream
   '@napi-rs/canvas-win32-arm64-msvc@1.2.0':
     resolution: {integrity: sha512-8xB9DHYScFsEukONZKfc45bTYJUAfEqL6daUxo3YqWrUC9YMfU6N2Zx3HCJTq0LwhnjjRXScZbasaaxviaA4uQ==}
-=======
-  '@napi-rs/canvas-win32-arm64-msvc@1.2.1':
-    resolution: {integrity: sha512-COZrzxhGGpWwP+3xMtppDz3J7ycLKsIZfClKxAmJRZFR5sVmiujy+ShnMyzmQtzTzpFInxkzQ35maAxYjR88kA==}
->>>>>>> Stashed changes
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [win32]
@@ -1248,13 +1136,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-<<<<<<< Updated upstream
   '@napi-rs/canvas-win32-x64-msvc@1.2.0':
     resolution: {integrity: sha512-GJ0DLyiTvLw5xNtdUJ0ncRuuT4Yv9zNXnrrvfvKr1/M08mbvtFVLoKiwQAaWixEcTsCh0U94/nMxkJTLH7ZMfw==}
-=======
-  '@napi-rs/canvas-win32-x64-msvc@1.2.1':
-    resolution: {integrity: sha512-oPzPLrFlox/NAcqVVT8mHaXF0FsQ2XXX3nWy/l5yV/NksxBf9V/nnCes+O5fz+xzzwDNVjL5EOk7+siz5HmfCA==}
->>>>>>> Stashed changes
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [win32]
@@ -1263,13 +1146,8 @@ packages:
     resolution: {integrity: sha512-xglYA6q3XO5P3BNJYxVZ1IV7DLVjp1Py6nwag88YntrS+3vKHyYcMqXVS4ZztJmwz2uGvz1FWhI/4LgbR5uQDA==}
     engines: {node: '>= 10'}
 
-<<<<<<< Updated upstream
   '@napi-rs/canvas@1.2.0':
     resolution: {integrity: sha512-6LpJr0U9BH/Iz5/z2EherYStmsjyRwmCp8wwYg0QfEnib/ip19fyJd1Y1OFbn8DbyIQKCCpSqgY1trXkIbLdEg==}
-=======
-  '@napi-rs/canvas@1.2.1':
-    resolution: {integrity: sha512-dTFJYKi4eE9Yr9FlLi7hN/Q+15VVmpnA1HrKkTzGQuWiVw5MWBL2reLXAaXUMENmzKxtlqYCtCp1NIeQqx+uEA==}
->>>>>>> Stashed changes
     engines: {node: '>= 10'}
 
   '@neon-rs/load@0.0.4':
@@ -2244,7 +2122,6 @@ packages:
   '@tailwindcss/postcss@4.3.3':
     resolution: {integrity: sha512-JTSZZGQi1AyKirbLN3azmjVzef92tcX7h+iSqPdaeStyFpGpDlKvvpxeOE8njhbUanbRwr3z8DyzhICWnMtQeg==}
 
-<<<<<<< Updated upstream
   '@tsconfig/node18@18.2.8':
     resolution: {integrity: sha512-bxn9vGVfFpyb0cv2JMvTdcfC16kiJy+4p88Ffi9vb4FAmNvhMiMW4BjMlVGEUvrtgDe9DcxPDAoOAcFJBW96IA==}
 
@@ -2257,11 +2134,6 @@ packages:
   '@types/node@18.19.130':
     resolution: {integrity: sha512-GRaXQx6jGfL8sKfaIDD6OupbIHBr9jv7Jnaml9tB7l4v068PAOXqfcujMMo5PhbIs6ggR1XODELqahT2R8v0fg==}
 
-=======
-  '@types/katex@0.16.8':
-    resolution: {integrity: sha512-trgaNyfU+Xh2Tc+ABIb44a5AYUpicB3uwirOioeOkNPPbmgRNtcWyDeeFRzjPZENO9Vq8gvVqfhaaXWLlevVwg==}
-
->>>>>>> Stashed changes
   '@types/node@22.20.1':
     resolution: {integrity: sha512-EANqOCF9QFyra+4pfxUcX9STKJpCLjMbObVzljIJomAWSnuSIEAvyzEU53GaajbXJEgdh0iEcPL+DGvpUd4k1Q==}
 
@@ -2292,7 +2164,6 @@ packages:
     resolution: {integrity: sha512-heiJGj2qt5qTv6yiShH9f6KRAoZGj+lz61GQ+lBRL4lhvUmKI9A51KYlQTnsUd9ymdFlKHBlvmPeG+yGz2Qsbg==}
     engines: {node: '>=16.14'}
 
-<<<<<<< Updated upstream
   abort-controller@3.0.0:
     resolution: {integrity: sha512-h8lQ8tacZYnR3vNQTgibj+tODHI5/+l06Au2Pcriv/Gmet0eaj4TwWH41sO9wnHDiQsEj19q0drzdWdeAHtweg==}
     engines: {node: '>=6.5'}
@@ -2333,30 +2204,14 @@ packages:
   ansi-styles@6.2.3:
     resolution: {integrity: sha512-4Dj6M28JB+oAH8kFkTLUo+a2jwOFkuqb3yucU0CANcRRUbxS0cP0nZYCGjcc3BNXwRIsUVmDGgzawme7zvJHvg==}
     engines: {node: '>=12'}
-=======
-  agent-base@7.1.4:
-    resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
-    engines: {node: '>= 14'}
-
-  ansi-regex@5.0.1:
-    resolution: {integrity: sha512-quJQXlTSUGL2LH9SUXo8VwsY4soanhgo6LNSm84E1LBcE8s3O0wpdiRzyR9z/ZZJMlMWv37qOOb9pdJlMUEKFQ==}
-    engines: {node: '>=8'}
-
-  ansi-styles@4.3.0:
-    resolution: {integrity: sha512-zbB9rCJAT1rbjiVDb2hqKFHNYLxgtk8NURxZ3IZwD3F6NtxbXZQCnnSi1Lkx+IDohdPlFp222wVALIheZJQSEg==}
-    engines: {node: '>=8'}
->>>>>>> Stashed changes
 
   aria-hidden@1.2.6:
     resolution: {integrity: sha512-ik3ZgC9dY/lYVVM++OISsaYDeg1tb0VtP5uL3ouh1koGOaUMDPpbFIei4JkFimWUFPn90sbMNMXQAIVOlnYKJA==}
     engines: {node: '>=10'}
 
-<<<<<<< Updated upstream
   array-timsort@1.0.3:
     resolution: {integrity: sha512-/+3GRL7dDAGEfM6TseQk/U+mi18TU2Ms9I3UlLdUMhz2hbvGNTKdj9xniwXfUqgYhHxRx0+8UnKkvlNwVU+cWQ==}
 
-=======
->>>>>>> Stashed changes
   asn1.js@5.4.1:
     resolution: {integrity: sha512-+I//4cYPccV8LdmBLiX8CYvf9Sp3vQsrqu2QNXRcrbiWvcx/UdlFiqUJJzxRQxgsZmvhXhn4cSKeSmoFjVdupA==}
 
@@ -2384,7 +2239,6 @@ packages:
   bn.js@4.12.5:
     resolution: {integrity: sha512-3aRg6/JxfffFD+OlOjOFR3Vo79l39ooBTFucxx+MT3dhCtzn3EmiUPQo+6/OZuI2jbXi3YKgmiTFBgChQMwIRQ==}
 
-<<<<<<< Updated upstream
   body-parser@2.4.0:
     resolution: {integrity: sha512-Ifk1KcLrxaGt1occQagQNFNNOqRt1LFuehEnHHzB8Z6cRgIxRU1TBaiIsUiCdA+gy5PL7Y1IX31DNKkRmxtXjQ==}
     engines: {node: '>=18'}
@@ -2410,11 +2264,6 @@ packages:
     resolution: {integrity: sha512-/Nf7TyzTx6S3yRJObOAV7956r8cr2+Oj8AC5dt8wSP3BQAoeX58NoHyCU8P8zGkNXStjTSi6fzO6F0pBdcYbEg==}
     engines: {node: '>= 0.8'}
 
-=======
-  buffer-equal-constant-time@1.0.1:
-    resolution: {integrity: sha512-zRpUiDwd/xk6ADqPMATG8vc9VPrkck7T07OIx0gnjmJAnHnTVXNQG3vfvWNuiZIkwu9KrKdA1iJKfsfTVxE6NA==}
-
->>>>>>> Stashed changes
   c12@3.1.0:
     resolution: {integrity: sha512-uWoS8OU1MEIsOv8p/5a82c3H31LsWVR5qiyXVfBNOzfffjUWtPnhAb4BYI2uG2HfGmZmFjCtui5XNWaps+iFuw==}
     peerDependencies:
@@ -2423,7 +2272,6 @@ packages:
       magicast:
         optional: true
 
-<<<<<<< Updated upstream
   call-bind-apply-helpers@1.0.2:
     resolution: {integrity: sha512-Sp1ablJ0ivDkSzjcaJdxEunN5/XvksFJ2sMBFfq6x0ryhQV/2b/KwFe21cMpmHtPOSij8K99/wSfoEuTObmuMQ==}
     engines: {node: '>= 0.4'}
@@ -2432,8 +2280,6 @@ packages:
     resolution: {integrity: sha512-+ys997U96po4Kx/ABpBCqhA9EuxJaQWDQg7295H4hBphv3IZg0boBKuwYpt4YXp6MZ5AmZQnU/tyMTlRpaSejg==}
     engines: {node: '>= 0.4'}
 
-=======
->>>>>>> Stashed changes
   camelcase@5.3.1:
     resolution: {integrity: sha512-L28STB170nwWS63UjtlEOE3dldQApaJXZkOI1uMFfzf3rRuPegHaHesyee+YxQ+W6SvRDQV6UrdOdRiR153wJg==}
     engines: {node: '>=6'}
@@ -2472,7 +2318,6 @@ packages:
   cliui@6.0.0:
     resolution: {integrity: sha512-t6wbgtoCXvAzst7QgXxJYqPt0usEfbgQdftEPbLL/cvv6HPE5VgvqCuAIDR0NgU52ds6rFwqrgakNLrHEjCbrQ==}
 
-<<<<<<< Updated upstream
   cliui@9.0.1:
     resolution: {integrity: sha512-k7ndgKhwoQveBL+/1tqGJYNz097I7WOvwbmmU2AR5+magtbjPWQTS1C5vzGkBC8Ym8UWRzfKUzUUqFLypY4Q+w==}
     engines: {node: '>=20'}
@@ -2483,8 +2328,6 @@ packages:
   cloudflare@5.2.0:
     resolution: {integrity: sha512-dVzqDpPFYR9ApEC9e+JJshFJZXcw4HzM8W+3DHzO5oy9+8rLC53G7x6fEf9A7/gSuSCxuvndzui5qJKftfIM9A==}
 
-=======
->>>>>>> Stashed changes
   clsx@2.1.1:
     resolution: {integrity: sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==}
     engines: {node: '>=6'}
@@ -2496,18 +2339,14 @@ packages:
   color-name@1.1.4:
     resolution: {integrity: sha512-dOy+3AuW3a2wNbZHIuMZpTcgjGuLU/uBL/ubcZF9OXbDo8ff4O8yVp5Bf0efS8uEoYo5q4Fx7dY9OgQGXgAsQA==}
 
-<<<<<<< Updated upstream
   combined-stream@1.0.8:
     resolution: {integrity: sha512-FQN4MRfuJeHf7cBbBMJFXhKSDq+2kAArBlmRBvcvFE5BB1HZKXtSFASDhdlz9zOYwxh8lDdnvmMOe/+5cdoEdg==}
     engines: {node: '>= 0.8'}
 
-=======
->>>>>>> Stashed changes
   commander@15.1.0:
     resolution: {integrity: sha512-cgnQ88TRrWcC7pVq46RzJVRMktu3W2RcbnoidnfBsl1bmDCBwJS/udcIZpKoCrbAYYaCqsz1yZCVIgbIaU3ddQ==}
     engines: {node: '>=22.12.0'}
 
-<<<<<<< Updated upstream
   commander@2.20.3:
     resolution: {integrity: sha512-GpVkmM8vF2vQUkj2LvZmD35JxeJOLCwJ9cUkugyk2nuhbv3+mJvpLYYt+0+USMxE+oj+ey/lJEnhZw75x/OMcQ==}
 
@@ -2515,8 +2354,6 @@ packages:
     resolution: {integrity: sha512-R2rze/hDX30uul4NZoIZ76ImSJLFxn/1/ZxtKC1L77y2X1k+yYu1joKbAtMA2Fg3hZrTOiw0I5mwVMo0cf250w==}
     engines: {node: '>= 6'}
 
-=======
->>>>>>> Stashed changes
   confbox@0.2.4:
     resolution: {integrity: sha512-ysOGlgTFbN2/Y6Cg3Iye8YKulHw+R2fNXHrgSmXISQdMnomY6eNDprVdW9R5xBguEqI954+S6709UyiO7B+6OQ==}
 
@@ -2597,12 +2434,9 @@ packages:
   detect-node-es@1.1.0:
     resolution: {integrity: sha512-ypdmJU/TbBby2Dxibuv7ZLW3Bs1QEmM7nHjEANfohJLvE0XVujisn1qPJcZxg+qDucsr+bP6fLD1rPS3AhJ7EQ==}
 
-<<<<<<< Updated upstream
   devtools-protocol@0.0.1182435:
     resolution: {integrity: sha512-EmlkWb62wSbQNE1gRZZsi4KZYRaF5Skpp183LhRU7+sadKR06O1dHCjZmFSEG6Kv7P6S/UYLxcY3NlYwqKM99w==}
 
-=======
->>>>>>> Stashed changes
   dijkstrajs@1.0.3:
     resolution: {integrity: sha512-qiSlmBq9+BCdCA/L46dw8Uy93mloxsPSbwnm5yrKn2vMPiy8KyAskTF6zuV/j5BMsmOGZDPs7KjU+mjb670kfA==}
 
@@ -2627,7 +2461,6 @@ packages:
     resolution: {integrity: sha512-uBq4egWHTcTt33a72vpSG0z3HnPuIl6NqYcTrKEg2azoEyl2hpW0zqlxysq2pK9HlDIHyHyakeYaYnSAwd8bow==}
     engines: {node: '>=12'}
 
-<<<<<<< Updated upstream
   dunder-proto@1.0.1:
     resolution: {integrity: sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==}
     engines: {node: '>= 0.4'}
@@ -2647,14 +2480,6 @@ packages:
   emoji-regex@10.6.0:
     resolution: {integrity: sha512-toUI84YS5YmxW219erniWD0CIVOo46xGKColeNQRgOzDorgBi1v4D71/OFzgD9GO2UGKIv1C3Sp8DAn0+j5w7A==}
 
-=======
-  ecdsa-sig-formatter@1.0.11:
-    resolution: {integrity: sha512-nagl3RYrbNv6kQkeJIpt6NJZy8twLB/2vtz6yN9Z4vRKHN4/QZJIEbqohALSgwKdnksuY3k5Addp5lg8sVoVcQ==}
-
-  effect@3.21.0:
-    resolution: {integrity: sha512-PPN80qRokCd1f015IANNhrwOnLO7GrrMQfk4/lnZRE/8j7UPWrNNjPV0uBrZutI/nHzernbW+J0hdqQysHiSnQ==}
-
->>>>>>> Stashed changes
   emoji-regex@8.0.0:
     resolution: {integrity: sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==}
 
@@ -2678,7 +2503,6 @@ packages:
     resolution: {integrity: sha512-V0hjH4dGPh9Ao5p0MoRY6BVqtwCjhz6vI5LT8AJ55H+4g9/4vbHx1I54fS0XuclLhDHArPQCiMjDxjaL8fPxhw==}
     engines: {node: '>=0.12'}
 
-<<<<<<< Updated upstream
   error-stack-parser-es@1.0.5:
     resolution: {integrity: sha512-5qucVt2XcuGMcEGgWI7i+yZpmpByQ8J1lHhcL7PwqCwu9FPP3VUXzT4ltHe5i2z9dePwEHcDVOAfSnHsOlCXRA==}
 
@@ -2727,8 +2551,6 @@ packages:
     resolution: {integrity: sha512-qCqy1xSoaugxOD4IVHb1ZWdkvCF2W3aE2okKouWj8VwJ+ztskSiXoBnCSJqfKT+cVPJhuJqe9YLbY425+Zh00g==}
     engines: {node: '>= 18'}
 
-=======
->>>>>>> Stashed changes
   exsolve@1.1.1:
     resolution: {integrity: sha512-9U/jZUgjnSGyntRr6y5Muu1MJcwFl6kPu7k8qLF0IMNfLqvw0NZ4nnVDq0RVoZ0RvCyumib4Ez3KYrVfilrw+g==}
 
@@ -2750,7 +2572,6 @@ packages:
     resolution: {integrity: sha512-7yAQpD2UMJzLi1Dqv7qFYnPbaPx7ZfFK6PiIxQ4PfkGPyNyl2Ugx+a/umUonmKqjhM4DnfbMvdX6otXq83soQQ==}
     engines: {node: ^12.20 || >= 14.13}
 
-<<<<<<< Updated upstream
   fill-range@7.1.1:
     resolution: {integrity: sha512-YsGpe3WHLK8ZYi4tWDg2Jy3ebRz2rXowDxnld4bkQB00cc/1Zw9AWnC0i9ztDJitivtQvaI9KaLyKrc+hBW0yg==}
     engines: {node: '>=8'}
@@ -2759,13 +2580,10 @@ packages:
     resolution: {integrity: sha512-S8KoZgRZN+a5rNwqTxlZZePjT/4cnm0ROV70LedRHZ0p8u9fRID0hJUZQpkKLzro8LfmC8sx23bY6tVNxv8pQA==}
     engines: {node: '>= 18.0.0'}
 
-=======
->>>>>>> Stashed changes
   find-up@4.1.0:
     resolution: {integrity: sha512-PpOwAdQ/YlXQ2vj8a3h8IipDuYRi3wceVQQGYWxNINccq40Anw7BlsEXCMbt1Zt+OLA6Fq9suIpIWD0OsnISlw==}
     engines: {node: '>=8'}
 
-<<<<<<< Updated upstream
   form-data-encoder@1.7.2:
     resolution: {integrity: sha512-qfqtYan3rxrnCk1VYaA4H+Ms9xdpPqvLZa6xmMgFvhO32x7/3J/ExcTd6qpxM0vH2GdMI+poehyBZvqfMTto8A==}
 
@@ -2777,8 +2595,6 @@ packages:
     resolution: {integrity: sha512-0iirZp3uVDjVGt9p49aTaqjk84TrglENEDuqfdlZQ1roC9CWlPk6Avf8EEnZNcAqPonwkG35x4n3ww/1THYAeQ==}
     engines: {node: '>= 12.20'}
 
-=======
->>>>>>> Stashed changes
   formdata-polyfill@4.0.10:
     resolution: {integrity: sha512-buewHzMvYL29jdeQTVILecSaZKnt/RJWjoZCF5OW60Z67/GmSLBkOFM7qh1PI3zFNtJbaZL5eQu1vLfazOwj4g==}
     engines: {node: '>=12.20.0'}
@@ -2801,7 +2617,6 @@ packages:
       react-dom:
         optional: true
 
-<<<<<<< Updated upstream
   fresh@2.0.0:
     resolution: {integrity: sha512-Rx/WycZ60HOaqLKAi6cHRKKI7zxWbJ31MhntmtwMoaTeF7XFH9hhBp8vITaMidfljRQ6eYWCKkaTK+ykVJHP2A==}
     engines: {node: '>= 0.8'}
@@ -2814,13 +2629,10 @@ packages:
   function-bind@1.1.2:
     resolution: {integrity: sha512-7XHNxH7qX9xG5mIwxkhumTox/MIRNcOgDrxWsMt2pAr23WHp6MrRlN7FBSFpCpr+oVO0F744iUgR82nJMfG2SA==}
 
-=======
->>>>>>> Stashed changes
   get-caller-file@2.0.5:
     resolution: {integrity: sha512-DyFP3BM/3YHTQOCUL/w0OZHR0lpKeGrxotcHWcqNEdnltqFwXVfhEBQ94eIo34AfQpo0rGki4cyIiftY06h2Fg==}
     engines: {node: 6.* || 8.* || >= 10.*}
 
-<<<<<<< Updated upstream
   get-east-asian-width@1.7.0:
     resolution: {integrity: sha512-XjH1AECxf0giL2V1aU8vKyRR2ppRUb5c0EvT7zuJTokQ74bNo52zOtghqdWIqrhUD79fo3x0WfKZdOqxF6LG1Q==}
     engines: {node: '>=18'}
@@ -2829,8 +2641,6 @@ packages:
     resolution: {integrity: sha512-9fSjSaos/fRIVIp+xSJlE6lfwhES7LNtKaCBIamHsjr2na1BiABJPo0mOjjz8GJDURarmCPGqaiVg5mfjb98CQ==}
     engines: {node: '>= 0.4'}
 
-=======
->>>>>>> Stashed changes
   get-nonce@1.0.1:
     resolution: {integrity: sha512-FJhYRoDaiatfEkUK8HKlicmu/3SGFD51q3itKDGoSTysQJBnfOcxU5GxnhE1E6soB76MbT0MBtnKJuXyAx+96Q==}
     engines: {node: '>=6'}
@@ -2858,7 +2668,6 @@ packages:
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
 
-<<<<<<< Updated upstream
   gzip-size@7.0.0:
     resolution: {integrity: sha512-O1Ld7Dr+nqPnmGpdhzLmMTQ4vAsD+rHwMm1NLUmoUFFymBOMKxCCrtDxqdBRYXdeEPEi3SyoR4TizJLQrnKBNA==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
@@ -2875,8 +2684,6 @@ packages:
     resolution: {integrity: sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A==}
     engines: {node: '>= 0.4'}
 
-=======
->>>>>>> Stashed changes
   hls.js@1.5.13:
     resolution: {integrity: sha512-xRgKo84nsC7clEvSfIdgn/Tc0NOT+d7vdiL/wvkLO+0k0juc26NRBPPG1SfB8pd5bHXIjMW/F5VM8VYYkOYYdw==}
 
@@ -2887,13 +2694,10 @@ packages:
   htmlparser2@8.0.2:
     resolution: {integrity: sha512-GYdjWKDkbRLkZ5geuHs5NY1puJ+PXwP7+fHPRz06Eirsb9ugf6d8kkXav6ADhcODhFFPMIXyxkxSuMf3D6NCFA==}
 
-<<<<<<< Updated upstream
   http-errors@2.0.1:
     resolution: {integrity: sha512-4FbRdAX+bSdmo4AUFuS0WNiPz8NgFt+r8ThgNWmlrjQjt1Q7ZR9+zTlce2859x4KSXrwIsaeTqDoKQmtP8pLmQ==}
     engines: {node: '>= 0.8'}
 
-=======
->>>>>>> Stashed changes
   http_ece@1.2.0:
     resolution: {integrity: sha512-JrF8SSLVmcvc5NducxgyOrKXe3EsyHMgBFgSaIUGmArKe+rwr0uphRkRXvwiom3I+fpIfoItveHrfudL8/rxuA==}
     engines: {node: '>=16'}
@@ -2902,7 +2706,6 @@ packages:
     resolution: {integrity: sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw==}
     engines: {node: '>= 14'}
 
-<<<<<<< Updated upstream
   humanize-ms@1.2.1:
     resolution: {integrity: sha512-Fl70vYtsAFb/C06PTS9dZBo7ihau+Tu/DNCk/OyHhea07S+aeMWpFFkUaXRa8fI+ScZbEI8dfSxwY7gxZ9SAVQ==}
 
@@ -2921,33 +2724,22 @@ packages:
     resolution: {integrity: sha512-0KI/607xoxSToH7GjN1FfSbLoU0+btTicjsQSWQlh/hZykN8KpmMf7uYwPW3R+akZ6R/w18ZlXSHBYXiYUPO3g==}
     engines: {node: '>= 0.10'}
 
-=======
-  inherits@2.0.4:
-    resolution: {integrity: sha512-k/vGaX4/Yla3WzyMCvTQOXYeIHvqOKtnqBduzTHpzpQZzAskKMhZ2K+EnBiSM9zGSoIFeMpXKxa4dYeZIQqewQ==}
-
->>>>>>> Stashed changes
   is-buffer@2.0.5:
     resolution: {integrity: sha512-i2R6zNFDwgEHJyQUtJEk0XFi1i0dPFn/oqjK3/vPCcDeJvW5NQ83V8QbicfF1SupOaB0h8ntgBC2YiE7dfyctQ==}
     engines: {node: '>=4'}
 
-<<<<<<< Updated upstream
   is-extglob@2.1.1:
     resolution: {integrity: sha512-SbKbANkN603Vi4jEZv49LeVJMn4yGwsbzZworEoyEiutsN3nJYdbO36zfhGJ6QEDpOZIFkDtnq5JRxmvl3jsoQ==}
     engines: {node: '>=0.10.0'}
 
-=======
->>>>>>> Stashed changes
   is-fullwidth-code-point@3.0.0:
     resolution: {integrity: sha512-zymm5+u+sCsSWyD9qNaejV3DFvhCKclKdizYaJUuHA83RLjb7nSuGnddCHGv0hk+KY7BMAlsWeK4Ueg6EV6XQg==}
     engines: {node: '>=8'}
 
-<<<<<<< Updated upstream
   is-glob@4.0.3:
     resolution: {integrity: sha512-xelSayHH36ZgE7ZWhli7pW34hNbNl8Ojv5KVmkJD4hBdD3th8Tfk9vYasLM+mXWOZhFkgZfxhLSnrwRr4elSSg==}
     engines: {node: '>=0.10.0'}
 
-=======
->>>>>>> Stashed changes
   is-node-process@1.2.0:
     resolution: {integrity: sha512-Vg4o6/fqPxIjtxgUH5QLJhwZ7gW5diGCVlXpuUfELC62CuxM1iHcRe51f2W1FDy04Ai4KJkagKjx3XaqyfRKXw==}
 
@@ -2975,13 +2767,10 @@ packages:
     resolution: {integrity: sha512-yvyz/2VMKqoho/35Hat5w37wIEdWJ5ElVMidTAlWrxr5uW4aBGsEpveTmKh18/zw08v/7lGswCPon4OhqmqrTA==}
     deprecated: Accidentally published with breaking changes. Use 0.19.0 instead.
     hasBin: true
-<<<<<<< Updated upstream
 
   kleur@4.1.5:
     resolution: {integrity: sha512-o+NO+8WrRiQEE4/7nwRJhN1HWpVmJm511pBHUxPLtp0BUISzlBplORYSmTclCnJvQq2tKu/sgl3xVpkc7ZWuQQ==}
     engines: {node: '>=6'}
-=======
->>>>>>> Stashed changes
 
   leac@0.6.0:
     resolution: {integrity: sha512-y+SqErxb8h7nE/fiEX07jsbuhrpO9lL8eca7/Y1nuWV2moNlXhyd59iDGcRf6moVyDMbmTNzL40SUyrFU/yDpg==}
@@ -3065,13 +2854,10 @@ packages:
     resolution: {integrity: sha512-t7hw9pI+WvuwNJXwk5zVHpyhIqzg2qTlklJOf0mVxGSbe3Fp2VieZcduNYjaLDoy6p9uGpQEGWG87WpMKlNq8g==}
     engines: {node: '>=8'}
 
-<<<<<<< Updated upstream
   lru-cache@11.5.3:
     resolution: {integrity: sha512-U4N8FgzmWxc8k1VH8Kr6lQg18U7Fjvby6wXHVRX/ZZ7IwWbRMgrRbP0Wrb5q5NVinryp4SQampHKdvtecItxUg==}
     engines: {node: 20 || >=22}
 
-=======
->>>>>>> Stashed changes
   lucide-react@0.511.0:
     resolution: {integrity: sha512-VK5a2ydJ7xm8GvBeKLS9mu1pVK6ucef9780JVUjw6bAjJL/QXnd4Y0p7SPeOUMC27YhzNCZvm5d/QX0Tp3rc0w==}
     peerDependencies:
@@ -3080,7 +2866,6 @@ packages:
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
 
-<<<<<<< Updated upstream
   math-intrinsics@1.1.0:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
     engines: {node: '>= 0.4'}
@@ -3143,14 +2928,6 @@ packages:
   mnemonist@0.38.3:
     resolution: {integrity: sha512-2K9QYubXx/NAjv4VLq1d1Ly8pWNC5L3BrixtdkyTegXWJIqY+zLNDhhX/A+ZwWt70tB1S8H4BE8FLYEFyNoOBw==}
 
-=======
-  minimalistic-assert@1.0.1:
-    resolution: {integrity: sha512-UtJcAD4yEaGtjPezWuO9wC4nwUnVH/8/Im3yEHQP4b67cXlD/Qr9hdITCU1xDbSEXg2XKNaP8jsReV7vQd00/A==}
-
-  minimist@1.2.8:
-    resolution: {integrity: sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA==}
-
->>>>>>> Stashed changes
   motion-dom@12.43.0:
     resolution: {integrity: sha512-azKON4d9S65PEoFUiQTMTgPheEmzf2QngdRc50AKfJp9Q9mmcBVw22c8eMq9k8kxOFHdL7+WZY7N/5F/lwiDag==}
 
@@ -3232,7 +3009,6 @@ packages:
   ohash@2.0.12:
     resolution: {integrity: sha512-65S/5gk9YSsaRjcyf7Nfa6h/d3E8/1gslpXfI4W7Dxn/oap8IKRuNT5VXkLQ1YFKIEg4apRY4Pj6aiwFzrDdmw==}
 
-<<<<<<< Updated upstream
   on-finished@2.4.2:
     resolution: {integrity: sha512-ATWUv387i+nLD49EiDoOft5scf32Vsdz3ktrQJG9bi7jRFmaXTssvyvj1EmeKVVgvesbqUtvQQvaS2TpTukAZQ==}
     engines: {node: '>= 0.8'}
@@ -3240,8 +3016,6 @@ packages:
   once@1.4.0:
     resolution: {integrity: sha512-lNaJgI+2Q5URQBkccEKHTQOPaXdUxnZZElQTZY0MFUAuaEqe1E+Nyvgdz/aIyNi6Z9MzO5dv1H8n58/GELp3+w==}
 
-=======
->>>>>>> Stashed changes
   p-limit@2.3.0:
     resolution: {integrity: sha512-//88mFWSJx8lxCzwdAABTJL2MyWB12+eIY7MDL2SqLmAkeKU9qxRvWuSyTjm3FUmpBEMuFfckAIqEaVGUDxb6w==}
     engines: {node: '>=6'}
@@ -3257,18 +3031,14 @@ packages:
   parseley@0.12.1:
     resolution: {integrity: sha512-e6qHKe3a9HWr0oMRVDTRhKce+bRO8VGQR3NyVwcjwrbhMmFCX9KszEV35+rn4AdilFAq9VPxP/Fe1wC9Qjd2lw==}
 
-<<<<<<< Updated upstream
   parseurl@1.3.3:
     resolution: {integrity: sha512-CiyeOxFT/JZyN5m0z9PfXw4SCBJ6Sygz1Dpl0wqjlhDEGGBP1GnsUVEL0p63hoG1fcj3fHynXi9NYO4nWOL+qQ==}
     engines: {node: '>= 0.8'}
 
-=======
->>>>>>> Stashed changes
   path-exists@4.0.0:
     resolution: {integrity: sha512-ak9Qy5Q7jYb2Wwcey5Fpvg2KoAc/ZIhLSLOSBmRmygPsGwkVVt0fZa0qrtMz+m6tJTAHfZQ8FnmB4MG4LWy7/w==}
     engines: {node: '>=8'}
 
-<<<<<<< Updated upstream
   path-scurry@2.0.2:
     resolution: {integrity: sha512-3O/iVVsJAPsOnpwWIeD+d6z/7PmqApyQePUtCndjatj/9I5LylHvt5qluFaBT3I5h3r1ejfR056c+FCv+NnNXg==}
     engines: {node: 18 || 20 || >=22}
@@ -3279,8 +3049,6 @@ packages:
   path-to-regexp@8.4.2:
     resolution: {integrity: sha512-qRcuIdP69NPm4qbACK+aDogI5CBDMi1jKe0ry5rSQJz8JVLsC7jV8XpiJjGRLLol3N+R5ihGYcrPLTno6pAdBA==}
 
-=======
->>>>>>> Stashed changes
   pathe@2.0.3:
     resolution: {integrity: sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w==}
 
@@ -3346,7 +3114,6 @@ packages:
     engines: {node: '>=10.13.0'}
     hasBin: true
 
-<<<<<<< Updated upstream
   qs@6.17.1:
     resolution: {integrity: sha512-jd3COkaKVgGUW+ZHyEHCG9bH7RoaaiWuMgzsIBjUMVjLAaWGWpoUAVwljVvBHxRu/2qEHnadLGZrkutYUBPQJA==}
     engines: {node: '>=0.6'}
@@ -3362,8 +3129,6 @@ packages:
     resolution: {integrity: sha512-K5zQjDllxWkf7Z5xJdV0/B0WTNqx6vxG70zJE4N0kBs4LovmEYWJzQGxC9bS9RAKu3bgM40lrd5zoLJ12MQ5BA==}
     engines: {node: '>= 0.10'}
 
-=======
->>>>>>> Stashed changes
   rc9@2.1.2:
     resolution: {integrity: sha512-btXCnMmRIBINM2LDZoEmOogIZU7Qe7zn4BpomSKZ/ykbLObuBdvG+mFq11DL6fjH1DRwHhrlgtYWG96bJiC7Cg==}
 
@@ -3432,7 +3197,6 @@ packages:
     resolution: {integrity: sha512-XQBQ3I8W1Cge0Seh+6gjj03LbmRFWuoszgK9ooCpwYIrhhoO80pfq4cUkU5DkknwfOfFteRwlZ56PYOGYyFWdg==}
     engines: {node: '>= 4'}
 
-<<<<<<< Updated upstream
   reusify@1.1.0:
     resolution: {integrity: sha512-g6QUff04oZpHs0eG5p83rFLhHeV00ug/Yf9nZM6fLeUrPguBTkTQOdpAWWspMh55TZfVQDPaN3NQJfbVRAxdIw==}
     engines: {iojs: '>=1.0.0', node: '>=0.10.0'}
@@ -3444,8 +3208,6 @@ packages:
   run-parallel@1.2.0:
     resolution: {integrity: sha512-5l4VyZR86LZ/lDxZTR6jqL8AFE2S0IFLMP26AbjsLVADxHdhB/c0GUsH+y39UfCi3dzz8OlQuPmnaJOMoDHQBA==}
 
-=======
->>>>>>> Stashed changes
   safe-buffer@5.2.1:
     resolution: {integrity: sha512-rp3So07KcdmmKbGvgaNxQSJr7bGVSVk5S9Eq1F+ppbRo70+YeaDxkw5Dd8NPN+GD6bjnYm2VuPuCXmpuYvmCXQ==}
 
@@ -3463,7 +3225,6 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
 
-<<<<<<< Updated upstream
   send@1.2.1:
     resolution: {integrity: sha512-1gnZf7DFcoIcajTjTwjwuDjzuz4PPcY2StKPlsGAQ1+YH20IRVrBaXSWmdjowTJ6u8Rc01PoYOGHXfP1mYcZNQ==}
     engines: {node: '>= 18'}
@@ -3478,11 +3239,6 @@ packages:
   setprototypeof@1.2.0:
     resolution: {integrity: sha512-E5LDX7Wrp85Kil5bhZv46j8jOeboKq5JMmYM3gVGdGH8xFpPWXUMsNrlODCrkoxMEeNi/XZIwuRvY4XNwYMJpw==}
 
-=======
-  set-blocking@2.0.0:
-    resolution: {integrity: sha512-KiKBS8AnWGEyLzofFfmvKwpdPzqiy16LvQfK3yv/fVH7Bj13/wl3JSR1J+rfgRE9q7xUJK4qvgS8raSOeLUehw==}
-
->>>>>>> Stashed changes
   sharp@0.35.3:
     resolution: {integrity: sha512-ej0zVHuZGHCiABXcNxeYhpRnPNPAcvbG8RMdBAhDAxLKkCRVSpK3Iyu7qbqw3JMzoj0REeM6f3tJLtVwl0023Q==}
     engines: {node: '>=20.9.0'}
@@ -3535,7 +3291,6 @@ packages:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
     engines: {node: '>=0.10.0'}
 
-<<<<<<< Updated upstream
   source-map-support@0.5.21:
     resolution: {integrity: sha512-uBHU3L3czsIyYXKX88fdrGovxdSCoTGDRZ6SYXtSRxLZUzHg5P/66Ht6uoUlHu9EZod+inXhKo3qQgwXUT/y1w==}
 
@@ -3547,13 +3302,10 @@ packages:
     resolution: {integrity: sha512-DvEy55V3DB7uknRo+4iOGT5fP1slR8wQohVdknigZPMpMstaKJQWhwiYBACJE3Ul2pTnATihhBYnRhZQHGBiRw==}
     engines: {node: '>= 0.8'}
 
-=======
->>>>>>> Stashed changes
   string-width@4.2.3:
     resolution: {integrity: sha512-wKyQRQpjJ0sIp62ErSZdGsjMJWsap5oRNihHhu6G7JVO/9jIB6UyevL+tXuOqrng8j/cxKTWyWUwvSTriiZz/g==}
     engines: {node: '>=8'}
 
-<<<<<<< Updated upstream
   string-width@7.2.0:
     resolution: {integrity: sha512-tsaTIkKW9b4N+AEj+SVA+WhJzV7/zMhcSu78mLKWSk7cXMOSHsBKFWUs0fWwq8QyK3MgJBQRX6Gbi4kYbdvGkQ==}
     engines: {node: '>=18'}
@@ -3562,19 +3314,14 @@ packages:
     resolution: {integrity: sha512-ZbmZM0JCihQN91dWnxoipT2KOEyHqEyfRXUyjuRhW8b/xnqPDoq4gWEVApTVa9db2wN8mmoikgFBbjh71+cGeQ==}
     engines: {node: '>=20'}
 
-=======
->>>>>>> Stashed changes
   strip-ansi@6.0.1:
     resolution: {integrity: sha512-Y38VPSHcqkFrCpFnQ9vuSXmquuv5oXOKpGeT6aGrr3o3Gc9AlVa6JBfUSOCnbxGGZF+/0ooI7KrPuUSztUdU5A==}
     engines: {node: '>=8'}
 
-<<<<<<< Updated upstream
   strip-ansi@7.2.0:
     resolution: {integrity: sha512-yDPMNjp4WyfYBkHnjIRLfca1i6KMyGCtsVgoKe/z1+6vukgaENdgGBZt+ZmKPc4gavvEZ5OgHfHdrazhgNyG7w==}
     engines: {node: '>=12'}
 
-=======
->>>>>>> Stashed changes
   styled-jsx@5.1.6:
     resolution: {integrity: sha512-qSVyDTeMotdvQYoHWLNGwRFJHC+i+ZvdBRYosOFgC+Wg1vx4frN2/RG/NA7SYqqvKNLf39P2LSRA2pu6n0XYZA==}
     engines: {node: '>= 12.0.0'}
@@ -3659,7 +3406,6 @@ packages:
     resolution: {integrity: sha512-raqeBD6NQK4SkWhQzeYKd1KmIG6dllBOTt55Rmkt4HtI9mwdWtJljnrXjAFUBLTSN67HWrOIZ3EPF4kjUw80Bg==}
     engines: {node: '>=14.0'}
 
-<<<<<<< Updated upstream
   undici@6.29.1:
     resolution: {integrity: sha512-EvRlUt/QqAEvXdQeRMYUfwOQsfzpDztykrG2owGEE/rBOBoYv9uF39ZzsNDh4lTFHhTr2XOZjKkYgueD12ZmGA==}
     engines: {node: '>=18.17'}
@@ -3678,8 +3424,6 @@ packages:
   urlpattern-polyfill@10.1.0:
     resolution: {integrity: sha512-IGjKp/o0NL3Bso1PymYURCJxMPNAf/ILOpendP9f5B6e1rTJgdgiOvgfoT8VxCAdY+Wisb9uhGaJJf3yZ2V9nw==}
 
-=======
->>>>>>> Stashed changes
   use-callback-ref@1.3.3:
     resolution: {integrity: sha512-jQL3lRnocaFtu3V00JToYz/4QkNWswxijDaCVNZRiRTO3HQDLsdu1ZtmIUvV4yPp+rvWm5j0y0TG/S61cuijTg==}
     engines: {node: '>=10'}
@@ -3700,13 +3444,10 @@ packages:
       '@types/react':
         optional: true
 
-<<<<<<< Updated upstream
   vary@1.1.2:
     resolution: {integrity: sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg==}
     engines: {node: '>= 0.8'}
 
-=======
->>>>>>> Stashed changes
   web-push@3.6.7:
     resolution: {integrity: sha512-OpiIUe8cuGjrj3mMBFWY+e4MMIkW3SVT+7vEIjvD9kejGUypv8GPDf84JdPWskK8zMRIJ6xYGm+Kxr8YkPyA0A==}
     engines: {node: '>= 16'}
@@ -3716,7 +3457,6 @@ packages:
     resolution: {integrity: sha512-d2JWLCivmZYTSIoge9MsgFCZrt571BikcWGYkjC1khllbTeDlGqZ2D8vD8E/lJa8WGWbb7Plm8/XJYV7IJHZZw==}
     engines: {node: '>= 8'}
 
-<<<<<<< Updated upstream
   web-streams-polyfill@4.0.0-beta.3:
     resolution: {integrity: sha512-QW95TCTaHmsYfHDybGMwO5IJIM93I/6vTRk+daHTWFPhwh+C8Cg7j7XyKrwrj8Ib6vYXe0ocYNrmzY4xAAN6ug==}
     engines: {node: '>= 14'}
@@ -3745,16 +3485,10 @@ packages:
       '@cloudflare/workers-types':
         optional: true
 
-=======
-  which-module@2.0.1:
-    resolution: {integrity: sha512-iBdZ57RDvnOR9AGBhML2vFZf7h8vmBjhoaZqODJBFWHVtKkDmKuHai3cx5PgVMrX5YDNp27AofYbAwctSS+vhQ==}
-
->>>>>>> Stashed changes
   wrap-ansi@6.2.0:
     resolution: {integrity: sha512-r6lPcBGxZXlIcymEu7InxDMhdW0KDxpLgoFLcguasxCaJ/SOIZwINatK9KY/tf+ZrlywOKU0UDj3ATXUBfxJXA==}
     engines: {node: '>=8'}
 
-<<<<<<< Updated upstream
   wrap-ansi@9.0.2:
     resolution: {integrity: sha512-42AtmgqjV+X1VpdOfyTGOYRi0/zsoLqtXQckTmqTeybT+BDIbM/Guxo7x3pE2vtpr1ok6xRqM9OpBe+Jyoqyww==}
     engines: {node: '>=18'}
@@ -3778,8 +3512,6 @@ packages:
       utf-8-validate:
         optional: true
 
-=======
->>>>>>> Stashed changes
   ws@8.21.3:
     resolution: {integrity: sha512-201TZ/kPWxoPr/OKWjquZR1SWKXcvxdH+e1xrx89b3YbmzLMFCLfnaG1HFIgWzJOEWZ7MvpK++odZufgYR50Rw==}
     engines: {node: '>=10.0.0'}
@@ -3795,7 +3527,6 @@ packages:
   y18n@4.0.3:
     resolution: {integrity: sha512-JKhqTOwSrqNA1NY5lSztJ1GrBiUodLMmIZuLiDaMRJ+itFd+ABVE8XBjOvIWL+rSqNDC74LCSFmlb/U4UZ4hJQ==}
 
-<<<<<<< Updated upstream
   y18n@5.0.8:
     resolution: {integrity: sha512-0pfFzegeDWJHJIAmTLRP2DwHjdF5s7jo9tuztdQxAhINCdvS+3nGINqPd00AphqJR/0LhANUS6/+7SCb98YOfA==}
     engines: {node: '>=10'}
@@ -3805,24 +3536,18 @@ packages:
     engines: {node: '>= 14.6'}
     hasBin: true
 
-=======
->>>>>>> Stashed changes
   yargs-parser@18.1.3:
     resolution: {integrity: sha512-o50j0JeToy/4K6OZcaQmW6lyXXKhq7csREXcDwk2omFPJEwUNOVtJKvmDr9EI1fAJZUyZcRF7kxGBWmRXudrCQ==}
     engines: {node: '>=6'}
 
-<<<<<<< Updated upstream
   yargs-parser@22.0.0:
     resolution: {integrity: sha512-rwu/ClNdSMpkSrUb+d6BRsSkLUq1fmfsY6TOpYzTwvwkg1/NRG85KBy3kq++A8LKQwX6lsu+aWad+2khvuXrqw==}
     engines: {node: ^20.19.0 || ^22.12.0 || >=23}
 
-=======
->>>>>>> Stashed changes
   yargs@15.4.1:
     resolution: {integrity: sha512-aePbxDmcYW++PaqBsJ+HYUFwCdv4LVvdnhBy78E57PIor8/OVvhMrADFFEDh8DHDFRv/O9i3lPhsENjO7QX0+A==}
     engines: {node: '>=8'}
 
-<<<<<<< Updated upstream
   yargs@18.2.0:
     resolution: {integrity: sha512-9OpKOLeaoNFecEp7P6iYbzze/5CqWoH7N3SMs/6y1XF4nMvFMspEGZzJ6uFi9MmQwXhyzqYoSEKO3tvA3Z/o2w==}
     engines: {node: ^20.19.0 || ^22.12.0 || >=23}
@@ -3841,8 +3566,6 @@ packages:
   youch@4.1.0-beta.10:
     resolution: {integrity: sha512-rLfVLB4FgQneDr0dv1oddCVZmKjcJ6yX6mS4pU82Mq/Dt9a3cLZQ62pDBL4AUO+uVrCvtWz3ZFUL2HFAFJ/BXQ==}
 
-=======
->>>>>>> Stashed changes
   z-ai-web-dev-sdk@0.0.18:
     resolution: {integrity: sha512-xVoZIEME2F+/Z06orHCgUKzOMuFPhoHuzN4ZFZqcD71g11nzbzq2jKSP53igi3lJFE8ZbMB4WKb4gp6lCGrMXQ==}
     engines: {bun: '>=1.3.0', node: '>=20.0.0'}
@@ -4895,111 +4618,67 @@ snapshots:
   '@napi-rs/canvas-android-arm64@0.1.100':
     optional: true
 
-<<<<<<< Updated upstream
   '@napi-rs/canvas-android-arm64@1.2.0':
-=======
-  '@napi-rs/canvas-android-arm64@1.2.1':
->>>>>>> Stashed changes
     optional: true
 
   '@napi-rs/canvas-darwin-arm64@0.1.100':
     optional: true
 
-<<<<<<< Updated upstream
   '@napi-rs/canvas-darwin-arm64@1.2.0':
-=======
-  '@napi-rs/canvas-darwin-arm64@1.2.1':
->>>>>>> Stashed changes
     optional: true
 
   '@napi-rs/canvas-darwin-x64@0.1.100':
     optional: true
 
-<<<<<<< Updated upstream
   '@napi-rs/canvas-darwin-x64@1.2.0':
-=======
-  '@napi-rs/canvas-darwin-x64@1.2.1':
->>>>>>> Stashed changes
     optional: true
 
   '@napi-rs/canvas-linux-arm-gnueabihf@0.1.100':
     optional: true
 
-<<<<<<< Updated upstream
   '@napi-rs/canvas-linux-arm-gnueabihf@1.2.0':
-=======
-  '@napi-rs/canvas-linux-arm-gnueabihf@1.2.1':
->>>>>>> Stashed changes
     optional: true
 
   '@napi-rs/canvas-linux-arm64-gnu@0.1.100':
     optional: true
 
-<<<<<<< Updated upstream
   '@napi-rs/canvas-linux-arm64-gnu@1.2.0':
-=======
-  '@napi-rs/canvas-linux-arm64-gnu@1.2.1':
->>>>>>> Stashed changes
     optional: true
 
   '@napi-rs/canvas-linux-arm64-musl@0.1.100':
     optional: true
 
-<<<<<<< Updated upstream
   '@napi-rs/canvas-linux-arm64-musl@1.2.0':
-=======
-  '@napi-rs/canvas-linux-arm64-musl@1.2.1':
->>>>>>> Stashed changes
     optional: true
 
   '@napi-rs/canvas-linux-riscv64-gnu@0.1.100':
     optional: true
 
-<<<<<<< Updated upstream
   '@napi-rs/canvas-linux-riscv64-gnu@1.2.0':
-=======
-  '@napi-rs/canvas-linux-riscv64-gnu@1.2.1':
->>>>>>> Stashed changes
     optional: true
 
   '@napi-rs/canvas-linux-x64-gnu@0.1.100':
     optional: true
 
-<<<<<<< Updated upstream
   '@napi-rs/canvas-linux-x64-gnu@1.2.0':
-=======
-  '@napi-rs/canvas-linux-x64-gnu@1.2.1':
->>>>>>> Stashed changes
     optional: true
 
   '@napi-rs/canvas-linux-x64-musl@0.1.100':
     optional: true
 
-<<<<<<< Updated upstream
   '@napi-rs/canvas-linux-x64-musl@1.2.0':
-=======
-  '@napi-rs/canvas-linux-x64-musl@1.2.1':
->>>>>>> Stashed changes
     optional: true
 
   '@napi-rs/canvas-win32-arm64-msvc@0.1.100':
     optional: true
 
-<<<<<<< Updated upstream
   '@napi-rs/canvas-win32-arm64-msvc@1.2.0':
-=======
-  '@napi-rs/canvas-win32-arm64-msvc@1.2.1':
->>>>>>> Stashed changes
     optional: true
 
   '@napi-rs/canvas-win32-x64-msvc@0.1.100':
     optional: true
 
-<<<<<<< Updated upstream
   '@napi-rs/canvas-win32-x64-msvc@1.2.0':
-=======
-  '@napi-rs/canvas-win32-x64-msvc@1.2.1':
->>>>>>> Stashed changes
     optional: true
 
   '@napi-rs/canvas@0.1.100':
@@ -5017,7 +4696,6 @@ snapshots:
       '@napi-rs/canvas-win32-x64-msvc': 0.1.100
     optional: true
 
-<<<<<<< Updated upstream
   '@napi-rs/canvas@1.2.0':
     optionalDependencies:
       '@napi-rs/canvas-android-arm64': 1.2.0
@@ -5031,21 +4709,6 @@ snapshots:
       '@napi-rs/canvas-linux-x64-musl': 1.2.0
       '@napi-rs/canvas-win32-arm64-msvc': 1.2.0
       '@napi-rs/canvas-win32-x64-msvc': 1.2.0
-=======
-  '@napi-rs/canvas@1.2.1':
-    optionalDependencies:
-      '@napi-rs/canvas-android-arm64': 1.2.1
-      '@napi-rs/canvas-darwin-arm64': 1.2.1
-      '@napi-rs/canvas-darwin-x64': 1.2.1
-      '@napi-rs/canvas-linux-arm-gnueabihf': 1.2.1
-      '@napi-rs/canvas-linux-arm64-gnu': 1.2.1
-      '@napi-rs/canvas-linux-arm64-musl': 1.2.1
-      '@napi-rs/canvas-linux-riscv64-gnu': 1.2.1
-      '@napi-rs/canvas-linux-x64-gnu': 1.2.1
-      '@napi-rs/canvas-linux-x64-musl': 1.2.1
-      '@napi-rs/canvas-win32-arm64-msvc': 1.2.1
-      '@napi-rs/canvas-win32-x64-msvc': 1.2.1
->>>>>>> Stashed changes
 
   '@neon-rs/load@0.0.4': {}
 
@@ -6039,7 +5702,6 @@ snapshots:
       postcss: 8.5.26
       tailwindcss: 4.3.3
 
-<<<<<<< Updated upstream
   '@tsconfig/node18@18.2.8': {}
 
   '@types/katex@0.16.8': {}
@@ -6053,10 +5715,6 @@ snapshots:
     dependencies:
       undici-types: 5.26.5
 
-=======
-  '@types/katex@0.16.8': {}
-
->>>>>>> Stashed changes
   '@types/node@22.20.1':
     dependencies:
       undici-types: 6.21.0
@@ -6095,7 +5753,6 @@ snapshots:
       throttleit: 2.1.0
       undici: 5.29.0
 
-<<<<<<< Updated upstream
   abort-controller@3.0.0:
     dependencies:
       event-target-shim: 5.0.1
@@ -6124,25 +5781,13 @@ snapshots:
       color-convert: 2.0.1
 
   ansi-styles@6.2.3: {}
-=======
-  agent-base@7.1.4: {}
-
-  ansi-regex@5.0.1: {}
-
-  ansi-styles@4.3.0:
-    dependencies:
-      color-convert: 2.0.1
->>>>>>> Stashed changes
 
   aria-hidden@1.2.6:
     dependencies:
       tslib: 2.8.1
 
-<<<<<<< Updated upstream
   array-timsort@1.0.3: {}
 
-=======
->>>>>>> Stashed changes
   asn1.js@5.4.1:
     dependencies:
       bn.js: 4.12.5
@@ -6168,7 +5813,6 @@ snapshots:
 
   bn.js@4.12.5: {}
 
-<<<<<<< Updated upstream
   body-parser@2.4.0:
     dependencies:
       bytes: 3.1.2
@@ -6199,10 +5843,6 @@ snapshots:
 
   bytes@3.1.2: {}
 
-=======
-  buffer-equal-constant-time@1.0.1: {}
-
->>>>>>> Stashed changes
   c12@3.1.0:
     dependencies:
       chokidar: 4.0.3
@@ -6218,7 +5858,6 @@ snapshots:
       pkg-types: 2.3.1
       rc9: 2.1.2
 
-<<<<<<< Updated upstream
   call-bind-apply-helpers@1.0.2:
     dependencies:
       es-errors: 1.3.0
@@ -6229,8 +5868,6 @@ snapshots:
       call-bind-apply-helpers: 1.0.2
       get-intrinsic: 1.3.0
 
-=======
->>>>>>> Stashed changes
   camelcase@5.3.1: {}
 
   caniuse-lite@1.0.30001809: {}
@@ -6263,7 +5900,6 @@ snapshots:
       strip-ansi: 6.0.1
       wrap-ansi: 6.2.0
 
-<<<<<<< Updated upstream
   cliui@9.0.1:
     dependencies:
       string-width: 7.2.0
@@ -6294,8 +5930,6 @@ snapshots:
     transitivePeerDependencies:
       - encoding
 
-=======
->>>>>>> Stashed changes
   clsx@2.1.1: {}
 
   color-convert@2.0.1:
@@ -6304,7 +5938,6 @@ snapshots:
 
   color-name@1.1.4: {}
 
-<<<<<<< Updated upstream
   combined-stream@1.0.8:
     dependencies:
       delayed-stream: 1.0.0
@@ -6318,10 +5951,6 @@ snapshots:
       array-timsort: 1.0.3
       esprima: 4.0.1
 
-=======
-  commander@15.1.0: {}
-
->>>>>>> Stashed changes
   confbox@0.2.4: {}
 
   consola@3.4.2: {}
@@ -6364,11 +5993,8 @@ snapshots:
 
   detect-node-es@1.1.0: {}
 
-<<<<<<< Updated upstream
   devtools-protocol@0.0.1182435: {}
 
-=======
->>>>>>> Stashed changes
   dijkstrajs@1.0.3: {}
 
   dom-serializer@2.0.0:
@@ -6393,7 +6019,6 @@ snapshots:
 
   dotenv@16.6.1: {}
 
-<<<<<<< Updated upstream
   dunder-proto@1.0.1:
     dependencies:
       call-bind-apply-helpers: 1.0.2
@@ -6402,27 +6027,19 @@ snapshots:
 
   duplexer@0.1.2: {}
 
-=======
->>>>>>> Stashed changes
   ecdsa-sig-formatter@1.0.11:
     dependencies:
       safe-buffer: 5.2.1
 
-<<<<<<< Updated upstream
   ee-first@1.1.1: {}
 
-=======
->>>>>>> Stashed changes
   effect@3.21.0:
     dependencies:
       '@standard-schema/spec': 1.1.0
       fast-check: 3.23.2
 
-<<<<<<< Updated upstream
   emoji-regex@10.6.0: {}
 
-=======
->>>>>>> Stashed changes
   emoji-regex@8.0.0: {}
 
   empathic@2.0.0: {}
@@ -6441,7 +6058,6 @@ snapshots:
 
   entities@4.5.0: {}
 
-<<<<<<< Updated upstream
   error-stack-parser-es@1.0.5: {}
 
   es-define-property@1.0.1: {}
@@ -6531,8 +6147,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-=======
->>>>>>> Stashed changes
   exsolve@1.1.1: {}
 
   fast-check@3.23.2:
@@ -6558,7 +6172,6 @@ snapshots:
       node-domexception: 1.0.0
       web-streams-polyfill: 3.3.3
 
-<<<<<<< Updated upstream
   fill-range@7.1.1:
     dependencies:
       to-regex-range: 5.0.1
@@ -6574,14 +6187,11 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-=======
->>>>>>> Stashed changes
   find-up@4.1.0:
     dependencies:
       locate-path: 5.0.0
       path-exists: 4.0.0
 
-<<<<<<< Updated upstream
   form-data-encoder@1.7.2: {}
 
   form-data@4.0.6:
@@ -6597,8 +6207,6 @@ snapshots:
       node-domexception: 1.0.0
       web-streams-polyfill: 4.0.0-beta.3
 
-=======
->>>>>>> Stashed changes
   formdata-polyfill@4.0.10:
     dependencies:
       fetch-blob: 3.2.0
@@ -6614,7 +6222,6 @@ snapshots:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
 
-<<<<<<< Updated upstream
   fresh@2.0.0: {}
 
   fsevents@2.3.3:
@@ -6639,10 +6246,6 @@ snapshots:
       hasown: 2.0.4
       math-intrinsics: 1.1.0
 
-=======
-  get-caller-file@2.0.5: {}
-
->>>>>>> Stashed changes
   get-nonce@1.0.1: {}
 
   get-proto@1.0.1:
@@ -6673,7 +6276,6 @@ snapshots:
 
   graceful-fs@4.2.11: {}
 
-<<<<<<< Updated upstream
   gzip-size@7.0.0:
     dependencies:
       duplexer: 0.1.2
@@ -6688,8 +6290,6 @@ snapshots:
     dependencies:
       function-bind: 1.1.2
 
-=======
->>>>>>> Stashed changes
   hls.js@1.5.13: {}
 
   html-to-text@9.0.5:
@@ -6707,7 +6307,6 @@ snapshots:
       domutils: 3.2.2
       entities: 4.5.0
 
-<<<<<<< Updated upstream
   http-errors@2.0.1:
     dependencies:
       depd: 2.0.0
@@ -6716,8 +6315,6 @@ snapshots:
       statuses: 2.0.2
       toidentifier: 1.0.1
 
-=======
->>>>>>> Stashed changes
   http_ece@1.2.0: {}
 
   https-proxy-agent@7.0.6:
@@ -6727,7 +6324,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-<<<<<<< Updated upstream
   humanize-ms@1.2.1:
     dependencies:
       ms: 2.1.3
@@ -6752,14 +6348,6 @@ snapshots:
     dependencies:
       is-extglob: 2.1.1
 
-=======
-  inherits@2.0.4: {}
-
-  is-buffer@2.0.5: {}
-
-  is-fullwidth-code-point@3.0.0: {}
-
->>>>>>> Stashed changes
   is-node-process@1.2.0: {}
 
   is-number@7.0.0: {}
@@ -6784,11 +6372,8 @@ snapshots:
   katex@0.18.11:
     dependencies:
       commander: 15.1.0
-<<<<<<< Updated upstream
 
   kleur@4.1.5: {}
-=======
->>>>>>> Stashed changes
 
   leac@0.6.0: {}
 
@@ -6858,11 +6443,8 @@ snapshots:
     dependencies:
       p-locate: 4.1.0
 
-<<<<<<< Updated upstream
   lru-cache@11.5.3: {}
 
-=======
->>>>>>> Stashed changes
   lucide-react@0.511.0(react@19.2.8):
     dependencies:
       react: 19.2.8
@@ -6871,7 +6453,6 @@ snapshots:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
 
-<<<<<<< Updated upstream
   math-intrinsics@1.1.0: {}
 
   media-typer@1.1.1: {}
@@ -6924,12 +6505,6 @@ snapshots:
     dependencies:
       obliterator: 1.6.1
 
-=======
-  minimalistic-assert@1.0.1: {}
-
-  minimist@1.2.8: {}
-
->>>>>>> Stashed changes
   motion-dom@12.43.0:
     dependencies:
       motion-utils: 12.39.0
@@ -7000,7 +6575,6 @@ snapshots:
 
   ohash@2.0.12: {}
 
-<<<<<<< Updated upstream
   on-finished@2.4.2:
     dependencies:
       ee-first: 1.1.1
@@ -7009,8 +6583,6 @@ snapshots:
     dependencies:
       wrappy: 1.0.2
 
-=======
->>>>>>> Stashed changes
   p-limit@2.3.0:
     dependencies:
       p-try: 2.2.0
@@ -7026,7 +6598,6 @@ snapshots:
       leac: 0.6.0
       peberminta: 0.9.0
 
-<<<<<<< Updated upstream
   parseurl@1.3.3: {}
 
   path-exists@4.0.0: {}
@@ -7040,10 +6611,6 @@ snapshots:
 
   path-to-regexp@8.4.2: {}
 
-=======
-  path-exists@4.0.0: {}
-
->>>>>>> Stashed changes
   pathe@2.0.3: {}
 
   pdfjs-dist@4.10.38:
@@ -7104,7 +6671,6 @@ snapshots:
       pngjs: 5.0.0
       yargs: 15.4.1
 
-<<<<<<< Updated upstream
   qs@6.17.1:
     dependencies:
       es-define-property: 1.0.1
@@ -7121,8 +6687,6 @@ snapshots:
       iconv-lite: 0.7.3
       unpipe: 1.0.0
 
-=======
->>>>>>> Stashed changes
   rc9@2.1.2:
     dependencies:
       defu: 6.1.7
@@ -7183,7 +6747,6 @@ snapshots:
 
   retry@0.13.1: {}
 
-<<<<<<< Updated upstream
   reusify@1.1.0: {}
 
   router@2.3.0:
@@ -7200,8 +6763,6 @@ snapshots:
     dependencies:
       queue-microtask: 1.2.3
 
-=======
->>>>>>> Stashed changes
   safe-buffer@5.2.1: {}
 
   safer-buffer@2.1.2: {}
@@ -7242,8 +6803,6 @@ snapshots:
   set-blocking@2.0.0: {}
 
   setprototypeof@1.2.0: {}
-
-  set-blocking@2.0.0: {}
 
   sharp@0.35.3(@types/node@22.20.1):
     dependencies:
@@ -7351,7 +6910,6 @@ snapshots:
 
   source-map-js@1.2.1: {}
 
-<<<<<<< Updated upstream
   source-map-support@0.5.21:
     dependencies:
       buffer-from: 1.1.2
@@ -7361,15 +6919,12 @@ snapshots:
 
   statuses@2.0.2: {}
 
-=======
->>>>>>> Stashed changes
   string-width@4.2.3:
     dependencies:
       emoji-regex: 8.0.0
       is-fullwidth-code-point: 3.0.0
       strip-ansi: 6.0.1
 
-<<<<<<< Updated upstream
   string-width@7.2.0:
     dependencies:
       emoji-regex: 10.6.0
@@ -7381,19 +6936,14 @@ snapshots:
       get-east-asian-width: 1.7.0
       strip-ansi: 7.2.0
 
-=======
->>>>>>> Stashed changes
   strip-ansi@6.0.1:
     dependencies:
       ansi-regex: 5.0.1
 
-<<<<<<< Updated upstream
   strip-ansi@7.2.0:
     dependencies:
       ansi-regex: 6.6.0
 
-=======
->>>>>>> Stashed changes
   styled-jsx@5.1.6(react@19.2.8):
     dependencies:
       client-only: 0.0.1
@@ -7452,7 +7002,6 @@ snapshots:
     dependencies:
       '@fastify/busboy': 2.1.1
 
-<<<<<<< Updated upstream
   undici@6.29.1: {}
 
   undici@7.30.2: {}
@@ -7465,8 +7014,6 @@ snapshots:
 
   urlpattern-polyfill@10.1.0: {}
 
-=======
->>>>>>> Stashed changes
   use-callback-ref@1.3.3(@types/react@19.2.18)(react@19.2.8):
     dependencies:
       react: 19.2.8
@@ -7482,11 +7029,8 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.2.18
 
-<<<<<<< Updated upstream
   vary@1.1.2: {}
 
-=======
->>>>>>> Stashed changes
   web-push@3.6.7:
     dependencies:
       asn1.js: 5.4.1
@@ -7499,7 +7043,6 @@ snapshots:
 
   web-streams-polyfill@3.3.3: {}
 
-<<<<<<< Updated upstream
   web-streams-polyfill@4.0.0-beta.3: {}
 
   webidl-conversions@3.0.1: {}
@@ -7544,17 +7087,12 @@ snapshots:
       - utf-8-validate
       - vitest
 
-=======
-  which-module@2.0.1: {}
-
->>>>>>> Stashed changes
   wrap-ansi@6.2.0:
     dependencies:
       ansi-styles: 4.3.0
       string-width: 4.2.3
       strip-ansi: 6.0.1
 
-<<<<<<< Updated upstream
   wrap-ansi@9.0.2:
     dependencies:
       ansi-styles: 6.2.3
@@ -7570,29 +7108,21 @@ snapshots:
 
   ws@8.21.0: {}
 
-=======
->>>>>>> Stashed changes
   ws@8.21.3: {}
 
   y18n@4.0.3: {}
 
-<<<<<<< Updated upstream
   y18n@5.0.8: {}
 
   yaml@2.9.1: {}
 
-=======
->>>>>>> Stashed changes
   yargs-parser@18.1.3:
     dependencies:
       camelcase: 5.3.1
       decamelize: 1.2.0
 
-<<<<<<< Updated upstream
   yargs-parser@22.0.0: {}
 
-=======
->>>>>>> Stashed changes
   yargs@15.4.1:
     dependencies:
       cliui: 6.0.0
@@ -7607,7 +7137,6 @@ snapshots:
       y18n: 4.0.3
       yargs-parser: 18.1.3
 
-<<<<<<< Updated upstream
   yargs@18.2.0:
     dependencies:
       cliui: 9.0.1
@@ -7636,8 +7165,6 @@ snapshots:
       cookie: 1.1.1
       youch-core: 0.3.3
 
-=======
->>>>>>> Stashed changes
   z-ai-web-dev-sdk@0.0.18: {}
 
   zustand@5.0.15(@types/react@19.2.18)(react@19.2.8):
