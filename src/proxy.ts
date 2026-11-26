@@ -26,6 +26,18 @@ var CSP_UPGRADE = 'upgrade-insecure-requests'
 
 export function proxy(request: NextRequest) {
   var proto = String(request.headers.get('x-forwarded-proto') || '')
+  /* (وN8) بوابة داخلية صريحة للـ API والملفات الثابتة — نية الـ matcher
+     الأصلية بالحرف: الـ API عمره ما يتلمس (بروتوكوله بيمشي مع بروتوكول
+     الصفحة نفسها) — ومفيد كمان لو بيئة استضافة اتجاهلت الـ matcher */
+  var p = String(request.nextUrl.pathname || '')
+  if (
+    p === '/api' || p.indexOf('/api/') === 0 ||
+    p.indexOf('/_next/') === 0 ||
+    p === '/favicon.ico' || p === '/sw.js' || p === '/manifest.json' ||
+    p.indexOf('/images/') === 0 || p.indexOf('/files/') === 0 || p.indexOf('/icons/') === 0
+  ) {
+    return NextResponse.next()
+  }
   /* x-forwarded-proto ممكن يجي «http,http» ورا سلسلة بروكسيات — نتحقق
      إنه http من غير https في أي حتة */
   if (proto && proto.indexOf('https') === -1 && proto.indexOf('http') !== -1) {

@@ -79,15 +79,22 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
         </div>
 
         <div>
-          {student?.isPaidAccess === true || student?.role === "admin" ? (
+          {/* (وN8 — طلب المستر): الفيديو المسعّر بيدفع ليه كل الطلاب — المجاني والمشترك —
+             فالبادج بيقول حالة الفيديو نفسه للكل (مش حالة الاشتراك) — اشتراك شامل
+             على درس مسعّر كان بيحير الطالب والمستر */}
+          {student?.role === "admin" ? (
             <span className="bg-emerald-100 text-emerald-800 px-3.5 py-1.5 rounded-xl font-bold text-xs inline-flex items-center gap-1">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" /> حسابك مفعل (اشتراك شامل)
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" /> معاينة أدمن
             </span>
           ) : !video.price || Number(video.price) === 0 ? (
             <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-xl font-bold text-xs">درس مجاني</span>
+          ) : isUnlocked ? (
+            <span className="bg-emerald-100 text-emerald-800 px-3.5 py-1.5 rounded-xl font-bold text-xs inline-flex items-center gap-1">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" /> مفعّل ليك — تقدر تشوفه
+            </span>
           ) : (
             <span className="bg-amber-100 text-amber-900 px-3 py-1 rounded-xl font-bold text-xs">
-              سعر الدرس: {video.price} ج.م
+              سعر الدرس: {video.price} ج.م — الدفع مطلوب لكل الطلاب
             </span>
           )}
         </div>
@@ -103,6 +110,11 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
             <p className="text-slate-400 text-sm">
               لم يتم تفعيل هذا الفيديو لحسابك بعد. سعر التفعيل:{" "}
               <span className="text-amber-400 font-bold text-lg">{video.price} ج.م</span>
+            </p>
+            {/* (وN8) توضيح طلب المستر: الدفع الفردي لكل الطلاب بلا استثناء */}
+            <p className="text-slate-500 text-xs max-w-md">
+              الدروس المسعّرة بتتفتح بالدفع الفردي لكل الطلاب — المجاني والمشترك —
+              والاشتراك الشامل مش بيشملها
             </p>
             <Link
               href={`/payment?videoId=${video.id}&price=${video.price}&title=${encodeURIComponent(video.title)}`}
