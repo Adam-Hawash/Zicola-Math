@@ -940,7 +940,7 @@ function VideosTab({ videos, watchedIds, approvedVideoIds, studentId, grade, vid
                           <Lock className="h-7 w-7 text-white" />
                         </div>
                         <Badge className="text-lg px-4 py-1.5 bg-amber-500 text-white">
-                          {first.price} ج.م
+                          بفلوس — {first.price} ج.م
                         </Badge>
                         <Button
                           className="mt-1"
@@ -1081,7 +1081,7 @@ function VideosTab({ videos, watchedIds, approvedVideoIds, studentId, grade, vid
                       <Lock className="h-7 w-7 text-white" />
                     </div>
                     <Badge className="text-lg px-4 py-1.5 bg-amber-500 text-white">
-                      {video.price} ج.م
+                      بفلوس — {video.price} ج.م
                     </Badge>
                     <Button
                       className="mt-1"
@@ -1351,7 +1351,7 @@ function LessonPartsModal({ title, parts, mergedProgress, lockedMap, approvedVid
                 </div>
                 {/* الحالة */}
                 {needsPay ? (
-                  <Badge className="bg-amber-500 text-white text-[10px] shrink-0">{p.price} ج.م</Badge>
+                  <Badge className="bg-amber-500 text-white text-[10px] shrink-0">بفلوس · {p.price} ج.م</Badge>
                 ) : locked ? (
                   <Lock className="h-4 w-4 text-red-500 shrink-0" />
                 ) : watched ? (

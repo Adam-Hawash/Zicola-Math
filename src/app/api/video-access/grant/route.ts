@@ -11,9 +11,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'videoId and studentId required' }, { status: 400 })
     }
 
+    /* (و10) إصلاح صامت كان بيبوظ زرار «فتح الفيديو» للأدمن من غير أي ظاهر
+       واضح: العمود المسمّى grantedAt مش موجود أصلًا في الجدول (الأعمدة
+       الحقيقية حسب السكيما وensure-schema: createdAt/updatedAt) فالـ
+       INSERT كان بيفشل دايمًا ويرجّع Failed والمنح اليدوي ما بيحصلش خالص */
     await db.$executeRawUnsafe(
-      `INSERT OR IGNORE INTO VideoAccess (id, studentId, videoId, grantedAt) VALUES (?, ?, ?, datetime('now'))`,
-      'va_' + videoId + '_' + studentId, studentId, videoId
+      `INSERT OR IGNORE INTO VideoAccess (id, videoId, studentId, grantedBy, createdAt, updatedAt) VALUES (?, ?, ?, 'admin', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+      'va_' + videoId + '_' + studentId, videoId, studentId
     )
 
     return NextResponse.json({ success: true })

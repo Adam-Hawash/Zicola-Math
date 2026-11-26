@@ -20,8 +20,10 @@ export async function GET(request: NextRequest) {
 
       // A student's paid status only means they are eligible to purchase.
       // Access is granted only after this specific video's payment is approved.
+      /* (و10) اسم المفتاح المركب الصحيح في السكيما videoId_studentId —
+         studentId_videoId كان بيرمي استثناء والراوت بيرجّع Failed بصمت */
       const access = await db.videoAccess.findUnique({
-        where: { studentId_videoId: { studentId, videoId } },
+        where: { videoId_studentId: { videoId, studentId } },
       })
 
       return NextResponse.json({

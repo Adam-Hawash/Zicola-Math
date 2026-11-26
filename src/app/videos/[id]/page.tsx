@@ -94,7 +94,7 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
             </span>
           ) : (
             <span className="bg-amber-100 text-amber-900 px-3 py-1 rounded-xl font-bold text-xs">
-              سعر الدرس: {video.price} ج.م — الدفع مطلوب لكل الطلاب
+              درس بفلوس — سعره {video.price} ج.م — الدفع مطلوب لكل الطلاب
             </span>
           )}
         </div>

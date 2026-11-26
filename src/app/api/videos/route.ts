@@ -42,7 +42,26 @@ export async function GET(request: NextRequest) {
     const studentId = searchParams.get('studentId')
 
     const admin = await isAdmin(adminId)
+    /* (و10 — طلب المستر الحرفي: «الفديوهات كلها تتضاف لكل الطلاب — لو بسعر
+       يتضاف بسعر، لو مش بسعر يتضاف زي ما هو»)
+       العلة الجذرية اللي كانت بتخفي الفيديو المدفوع عن الطلاب رغم إن مسار
+       الطالب سليم في الكود: getStudentAnyStatus لو فشلت بأي سبب (جلسة قديمة
+       بعد ما الطالب اتسجل تاني / طالب اتمسح واتضاف من جديد / خطأ لحظي في
+       القاعدة) كانت بترجع null بصمت → النداء بيتحول لوضع الزائر → فيلتر
+       price=0 بيشيل كل الدروس المسعّرة من القايمة → الطالب ما يلاقيش
+       الفيديو خالص والمستر يفتكر إن التسعير بيخفيه.
+       الإصلاح الحاسم: أي نداء جاي بـ studentId يفضل بشخصية طالب في العرض
+       مهما حصل — صفر إخفاء صامت. الفيديو المسعّر بيظهر بسعره (كارت مقفول
+       + ادفع الآن)، والزائر الحقيقي (من غير studentId خالص) بيفضل شايف
+       المجاني بس زي التصميم. حماية اللينكات ثابتة: stripVideo بيشيل
+       url/filePath من كل ردود الطلاب، والتشغيل الفعلي محروس بـ
+       computePlayback (402 «محتاج تسديد الفيديو ده الأول» قبل الدفع). */
+    const studentIdSent = Boolean(String(studentId || '').trim())
     const student = admin ? null : await getStudentAnyStatus(studentId)
+    if (studentIdSent && !admin && !student) {
+      console.warn('[videos] studentId=' + String(studentId).slice(0, 10) + '… مش موجود في القاعدة — العرض ماشي بشخصية طالب بلا أي إخفاء (و10: كل الفيديوهات لكل الطلاب)')
+    }
+    const studentContext = Boolean(admin || student || studentIdSent)
 
     const where: Record<string, unknown> = {}
     if (grade) where.grade = gradeWhere(grade)  // «أولى ثانوي» بتجيب «أولى بكالوريا» كمان — نفس الصف
@@ -54,7 +73,9 @@ export async function GET(request: NextRequest) {
     // (ز18-ب) الزائر بدون حساب → المجاني بس. الطالب المسجل بيشوف كمان
     // الفيديوهات اللي ليها سعر ككروت مقفولة بالسعر (needsPay في البورتال)
     // لحد ما تسديده يتأكد — زي Maths-Genius وشريف بالظبط
-    if (!admin && !student) {
+    /* (و10) الفلتر ده للزائر الحقيقي فقط — أي نداء بـ studentId ما بيمرش
+       منه أبدًا عشان مفيش فيديو يتخفي عن طالب بصمت تاني */
+    if (!admin && !studentContext) {
       where.price = 0
       /* (2026-ص5) الحصص البرايفت مستبعدة من **الزائر الحقيقي فقط** (من غير
          studentId) — أما الطالب اللي بيبعت studentId من بوابته بيشوف
@@ -158,6 +179,10 @@ export async function GET(request: NextRequest) {
       page,
       pageSize,
       totalPages: Math.ceil((admin ? total : visibleVideos.length) / pageSize),
+      /* (و10) تشخيص صريح بشخصية العارض — عشان أي بلاغ جاي يتبص عليه فورًا:
+         admin = لوحة الأدمن / student = طالب بالجلسة أو حتى بجلسة مرفوتة
+         (العرض كامل بلا إخفاء) / guest = زائر حقيقي من غير studentId */
+      viewerMode: admin ? 'admin' : (student || studentIdSent ? 'student' : 'guest'),
     })
   } catch (error: any) {
     console.error('Videos fetch error:', error)

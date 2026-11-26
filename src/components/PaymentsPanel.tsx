@@ -537,7 +537,7 @@ export function PaymentsPanel({ onRefresh, adminId }: { onRefresh: () => void; a
                                     <div className="min-w-0 flex-1">
                                       <p className="text-xs font-medium truncate">{v.title}</p>
                                       <div className="flex items-center gap-2">
-                                        <p className="text-[10px] text-muted-foreground">{isFree ? 'مجاني' : v.price + ' ج.م'}</p>
+                                        <p className="text-[10px] text-muted-foreground">{isFree ? 'مجاني' : 'بفلوس — ' + v.price + ' ج.م'}</p>
                                         {isUnlocked && <span className="text-[9px] text-emerald-600">{v.unlockReason === 'payment' ? '✓ مدفوع' : v.unlockReason === 'granted' ? '✓ مفتوح' : '✓ مجاني (مقبول)'}</span>}
                                       </div>
                                     </div>
