@@ -61,7 +61,13 @@ var studentStatusConfig: Record<string, { label: string; color: string; icon: an
   paid: { label: 'مشاهدة بفلوس', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', icon: Wallet },
 }
 
-export function PaymentsPanel({ onRefresh }: { onRefresh: () => void }) {
+/* (وN9 — طلب المستر الحرفي): «ضفت الفيديو لأولى إعدادي وخليته مدفوع، بخش على حساب طالب في أولى إعدادي ما لقيتهوش، هو عشان خليته بفلوس؟ ما تخليه يا عم — الفيديوهات كلها تتضاف لكل الطلاب لو بسعر يتضاف بسعر لو مش بسعر يتضاف زي ما هو»
+   العلة الجذرية: تاب الطلاب هنا كان بيسأل /api/videos من غير adminId ولا studentId
+   → السيرفر بيعتبر النداء زائر → فيلتر price=0 بيشيل كل الدروس المسعّرة
+   → الأدمن يوسّع على طالب ما يلاقيش الدرس المدفوع أصلًا في القايمة.
+   الإصلاح: النداء بيمشي بشخصية الأدمن (adminId) فيشوف كل فيديوهات الصف
+   — المجاني زي ما هو والمسعّر بالسعر — بدون أي إخفاء. */
+export function PaymentsPanel({ onRefresh, adminId }: { onRefresh: () => void; adminId?: string }) {
   const [subTab, setSubTab] = useState<'payments' | 'students'>('payments')
   const [payments, setPayments] = useState<PaymentItem[]>([])
   const [counts, setCounts] = useState<PaymentCounts>({ total: 0, pending: 0, approved: 0, rejected: 0 })
@@ -125,8 +131,8 @@ export function PaymentsPanel({ onRefresh }: { onRefresh: () => void }) {
   var loadStudentVideos = async function(studentId: string, studentGrade: string) {
     setStudentVideosLoading(true)
     try {
-      // Load all videos for this student's grade
-      var videosRes = await fetch('/api/videos?grade=' + encodeURIComponent(studentGrade) + '&pageSize=100')
+      // (وN9) كل فيديوهات الصف للأدمن — المجاني والمسعّر بدون أي فلتر إخفاء
+      var videosRes = await fetch('/api/videos?grade=' + encodeURIComponent(studentGrade) + '&pageSize=100' + (adminId ? '&adminId=' + encodeURIComponent(adminId) : ''))
       var videosData = await videosRes.json()
       var gradeVideos = videosData.videos || []
 
